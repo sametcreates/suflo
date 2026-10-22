@@ -12,6 +12,12 @@
  *  - olumsuzlar: jetonsuz 401 (error yok), gecersiz / suresi dolmus / yanlis audience 401 invalid_token, okuma jetonuyla yazma
  *    403 insufficient_scope, PKCE yok / plain, izinsiz redirect_uri, CSRF yok, yanlis sifre panel kilidinde sayilir, kapatma
  *    anahtari, sifre izi degisince grant'ler gecersiz, buyuk / toplu / bozuk JSON, bilinmeyen yontem / arac, GET 405, kotu Origin 403
+ * Ikinci bolum GERCEK arka uc (mcp-kitaplik/arka-studio.php) + gecici gercek Studio veritabani + panel API (v1/index.php):
+ *  - tam OAuth (onay sifresi panelin kilidinden: ayni girisler sayaci), uctan uca "Yarin 14.00 Özge cekim, 2 saat. Cuma Yusuf'a
+ *    3 reels teslim." cagrilari ve sonucun PANELDEN (giris + veri) okunmasi
+ *  - yetkisiz erisim (jeton yok / gecersiz / iptal / sifre degisti / okuma jetonuyla yazma), yanlis veri, belirsiz / olmayan musteri,
+ *    mukerrer (ayni anahtar, paralel, farkli girdi), cakisma (cekim + edit blogu), beklenen_surum, toplu + anlik kopya + panelden
+ *    geri yukleme, islem gunlugu, hicbir ciktida ucret yok
  * php ya da pdo_sqlite yoksa ATLA.
  */
 "use strict";
@@ -238,8 +244,10 @@ async function calis() {
   ok("DCR: reddedilen (bozuk) kayitlar genel gunluk kotayi tuketmez; IP basina sinir onlari da sayar", sayac("kayit|toplam") === 0 && ipSayac && ipSayac.sayi === kotuKayit.length,
     [sayac("kayit|toplam"), ipSayac]);
   var jetonSutun = O.db(DB_TEST, "PRAGMA table_info(mcp_jeton)").map(function (c) { return c.name; });
-  ok("depo semasi 1 -> 2 yerinde yukseltildi (mcp_jeton: donusum, halef, ebeveyn); eski satirlar korundu", O.db(DB_TEST, "SELECT deger FROM mcp_ayar WHERE anahtar = 'sema'")[0].deger === "2" &&
-    ["donusum", "halef", "ebeveyn"].every(function (c) { return jetonSutun.indexOf(c) !== -1; }) &&
+  var gunlukSutun = O.db(DB_TEST, "PRAGMA table_info(mcp_gunluk)").map(function (c) { return c.name; });
+  ok("depo semasi 1 -> 2 -> 3 yerinde yukseltildi (mcp_jeton: donusum, halef, ebeveyn; mcp_gunluk.izin; mcp_istek); eski satirlar korundu", O.db(DB_TEST, "SELECT deger FROM mcp_ayar WHERE anahtar = 'sema'")[0].deger === "3" &&
+    ["donusum", "halef", "ebeveyn"].every(function (c) { return jetonSutun.indexOf(c) !== -1; }) && gunlukSutun.indexOf("izin") !== -1 &&
+    O.db(DB_TEST, "SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'table' AND name = 'mcp_istek'")[0].c === 1 &&
     O.db(DB_TEST, "SELECT durum, donusum FROM mcp_jeton WHERE ozet = 'eski-surum-jetonu'")[0].durum === "kullanildi", jetonSutun);
   sayaclariSifirla(DB_TEST);
   var kayitlar = [];
@@ -440,8 +448,8 @@ async function calis() {
   r = await I.rpc("studio", J, "tools/list", {}, { "MCP-Protocol-Version": "2025-11-25" });
   var araclar = (r.json && r.json.result && r.json.result.tools) || [];
   var beklenenAdlar = ["studio_bugun", "studio_musteri_ara", "studio_takvim", "studio_icerik_listele", "studio_musteri_olustur", "studio_cekim_olustur",
-    "studio_icerik_olustur", "studio_icerik_durum_guncelle", "studio_cekim_durum_guncelle", "studio_toplu_onizle", "studio_toplu_uygula"];
-  ok("tools/list: 11 arac, sabit sira", JSON.stringify(araclar.map(function (t) { return t.name; })) === JSON.stringify(beklenenAdlar), araclar.map(function (t) { return t.name; }));
+    "studio_icerik_olustur", "studio_edit_zamani_ayir", "studio_icerik_durum_guncelle", "studio_cekim_durum_guncelle", "studio_toplu_onizle", "studio_toplu_uygula"];
+  ok("tools/list: 12 arac, sabit sira", JSON.stringify(araclar.map(function (t) { return t.name; })) === JSON.stringify(beklenenAdlar), araclar.map(function (t) { return t.name; }));
   ok("her arac: title + Turkce aciklama + inputSchema (object, additionalProperties:false) + outputSchema + 4 ipucu acik boolean",
     araclar.every(function (t) {
       var an = t.annotations || {};
@@ -453,10 +461,10 @@ async function calis() {
   araclar.forEach(function (t) { ipucu[t.name] = t.annotations; });
   ok("ipuclari: okuma araclari readOnly; olustur destructive=false idempotent; durum guncelle + toplu uygula destructive",
     ["studio_bugun", "studio_musteri_ara", "studio_takvim", "studio_icerik_listele", "studio_toplu_onizle"].every(function (n) { return ipucu[n].readOnlyHint === true && ipucu[n].destructiveHint === false; }) &&
-    ["studio_musteri_olustur", "studio_cekim_olustur", "studio_icerik_olustur"].every(function (n) { return ipucu[n].readOnlyHint === false && ipucu[n].destructiveHint === false && ipucu[n].idempotentHint === true; }) &&
+    ["studio_musteri_olustur", "studio_cekim_olustur", "studio_icerik_olustur", "studio_edit_zamani_ayir"].every(function (n) { return ipucu[n].readOnlyHint === false && ipucu[n].destructiveHint === false && ipucu[n].idempotentHint === true; }) &&
     ["studio_icerik_durum_guncelle", "studio_cekim_durum_guncelle", "studio_toplu_uygula"].every(function (n) { return ipucu[n].readOnlyHint === false && ipucu[n].destructiveHint === true; }));
   ok("studio_bugun inputSchema.properties JSON'da {} (nesne)", r.metin.indexOf('"name":"studio_bugun"') !== -1 && /"inputSchema":\{"type":"object","properties":\{\},"additionalProperties":false\}/.test(r.metin));
-  ok("yazma araclarinda istek_anahtari zorunlu; tarih / saat bicimleri semada", araclar.filter(function (t) { return /olustur$/.test(t.name); }).every(function (t) { return t.inputSchema.required.indexOf("istek_anahtari") !== -1; }) &&
+  ok("yazma araclarinda istek_anahtari zorunlu; tarih / saat bicimleri semada", araclar.filter(function (t) { return /olustur$|_ayir$/.test(t.name); }).every(function (t) { return t.inputSchema.required.indexOf("istek_anahtari") !== -1; }) &&
     ipucu && araclar[5].inputSchema.properties.tarih.format === "date" && araclar[5].inputSchema.properties.baslangic_saati.pattern === "^([01][0-9]|2[0-3]):[0-5][0-9]$");
 
   r = await I.arac("studio", J, "studio_bugun");
@@ -566,8 +574,8 @@ async function calis() {
       x.metin.indexOf('"sonuc":[]') === -1 && /Müşteri bulunamadı/.test(s.content[0].text);
   }), hataSonuclari.map(function (x) { return x.metin; }));
   r = await I.arac("studio", J, "studio_icerik_durum_guncelle", { icerik_id: "cccccccc0001", yeni_durum: "onayda", beklenen_surum: 4 });
-  ok("icerik_durum_guncelle: eski surum -> surum_uyusmadi + guncel kayit, yazilmadi", r.json.result.structuredContent.durum === "surum_uyusmadi" &&
-    r.json.result.structuredContent.icerik.surum === 5, r.metin);
+  ok("icerik_durum_guncelle: eski surum -> isError (409) + structuredContent surum_uyusmadi + guncel kayit, yazilmadi", r.json.result.isError === true &&
+    /409/.test(r.json.result.content[0].text) && r.json.result.structuredContent.durum === "surum_uyusmadi" && r.json.result.structuredContent.icerik.surum === 5, r.metin);
   r = await I.arac("studio", J, "studio_icerik_durum_guncelle", { icerik_id: "cccccccc0001", yeni_durum: "onayda", beklenen_surum: 5 });
   ok("icerik_durum_guncelle: dogru surum -> guncellendi, surum artti", r.json.result.structuredContent.durum === "guncellendi" && r.json.result.structuredContent.icerik.surum > 5, r.metin);
   r = await I.arac("studio", J, "studio_sil", {});
@@ -601,7 +609,7 @@ async function calis() {
     j.capabilities.tools && typeof j.instructions === "string" && j.ttlMs > 0 && j.cacheScope === "private" && j._meta["io.modelcontextprotocol/serverInfo"].name === "suflo-studio" &&
     !r.headers["mcp-session-id"], r.metin);
   r = await I.yeni("studio", J, "tools/list");
-  ok("yeni donem tools/list: resultType + ttlMs + cacheScope + 11 arac", r.status === 200 && r.json.result.resultType === "complete" && r.json.result.tools.length === 11 &&
+  ok("yeni donem tools/list: resultType + ttlMs + cacheScope + 12 arac", r.status === 200 && r.json.result.resultType === "complete" && r.json.result.tools.length === 12 &&
     r.json.result.cacheScope === "private", r.metin);
   r = await I.yeni("studio", J, "tools/call", { name: "studio_bugun", arguments: {} });
   ok("yeni donem tools/call (Mcp-Name eslesiyor) -> resultType complete", r.status === 200 && r.json.result.resultType === "complete" && r.json.result.isError === false, r.metin);
@@ -846,8 +854,528 @@ async function calis() {
   ok("tum kosu boyunca PHP uyarisi / hatasi yok (yalniz beklenen cikti semasi kaydi)", uyarilar.length === 0 && /suflo-mcp cikti semasi \(studio_musteri_ara\)/.test(phpGunluk), uyarilar.slice(0, 5));
 }
 
-calis().catch(function (e) { ok("beklenmeyen hata: " + (e && e.stack || e), false); }).then(durdur).then(function () {
+/* ======================================================================================================================
+ * GERCEK ARKA UC: mcp-kitaplik/arka-studio.php + gecici gercek Studio veritabani (SQLite) + panel API (v1/index.php).
+ * Sahte arka uc YOK. Kurulum dagitim tablosuyla ayni (DAGITIM): <u>/v1/studio-ortak.php + <u>/v1/index.php (panel).
+ * Veri panelin kendi API'siyle (giris + toplu) eklenir ve sonuclar yine panelden (giris + veri) okunur.
+ * ==================================================================================================================== */
+var TMP2 = null;
+async function gercekArka() {
+  var KOK2, PRIV2, STUDIO_DB, DB2, I2, r, j, sc;
+  var SIFRE2 = O.SIFRE, YENI_SIFRE = "yeni-ornek-sifre-22";
+  var UCRET = 987654;
+  var ciktilar = [];          // butun MCP yanit govdeleri (ucret denetimi icin)
+  TMP2 = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-studio-mcp-gercek-"));
+  PUB = O.kur(TMP2, ["studio"]);
+  fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", "index.php"), path.join(PUB, "studio", "v1", "index.php"));
+  PRIV2 = path.join(TMP2, "private", "studio-v1");
+  STUDIO_DB = path.join(PRIV2, "studio.sqlite");
+  DB2 = path.join(PRIV2, "mcp.sqlite");
+  PORT = await O.bosPort();
+  KOK2 = "http://127.0.0.1:" + PORT;
+  // mcp_arka YOK: varsayilan mcp-kitaplik/arka-studio.php (gercek arka uc). Panel ve MCP ayni config.php'yi okur.
+  fs.writeFileSync(path.join(PRIV2, "config.php"), "<?php\nreturn " + O.phpDizi({
+    password_hash: cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE2], { encoding: "utf8" }).stdout,
+    dsn: "sqlite:" + STUDIO_DB, allowed_origins: [KOK2], cookie_secure: false, kok_url: KOK2, login_max_fail: 3, login_window: 900
+  }) + ";\n");
+  var gunlukBas = phpGunluk.length;
+  await baslat();
+  I2 = new O.Istemci(PORT, KOK2);
+
+  // ---- yardimcilar ----
+  function panel(govde, cerez) {
+    var b = { "Content-Type": "application/json", "X-Studio": "1", Origin: KOK2 };
+    if (cerez) b.Cookie = cerez;
+    return O.istek({ port: PORT, yontem: "POST", yol: "/studio/v1/index.php", baslik: b, govde: govde });
+  }
+  async function panelGiris(sifre) {
+    var y = await panel({ islem: "giris", sifre: sifre || SIFRE2 });
+    var c = [].concat(y.headers["set-cookie"] || []).filter(function (x) { return /^suflo_studio=/.test(x); })[0];
+    return { r: y, cerez: c ? c.split(";")[0] : "" };
+  }
+  async function panelVeri() {
+    var g = await panelGiris(SIFRE_SIMDI);
+    var y = await panel({ islem: "veri" }, g.cerez);
+    return (y.json && y.json.veri) || null;
+  }
+  var SIFRE_SIMDI = SIFRE2;
+  async function arac(jeton, ad, args) {
+    var y = await I2.arac("studio", jeton, ad, args);
+    ciktilar.push(y.metin);
+    return y;
+  }
+  function sonuc(y) { return (y.json && y.json.result) || {}; }
+  function yapi(y) { return sonuc(y).structuredContent || {}; }
+  function metin(y) { var s = sonuc(y); return s.content && s.content[0] ? s.content[0].text : y.metin; }
+  function say(tur) { return O.db(STUDIO_DB, "SELECT COUNT(*) AS c FROM kayitlar WHERE tur = ?", [tur])[0].c; }
+  function sayilar() { return ["musteri", "icerik", "etkinlik", "blok"].map(say).join(","); }
+  function kayit(id) { var x = O.db(STUDIO_DB, "SELECT veri, surum, tur FROM kayitlar WHERE id = ?", [id])[0]; return x ? Object.assign(JSON.parse(x.veri), { surum: x.surum, tur: x.tur }) : null; }
+  function istanbulGunu(ek) { return new Date(Date.now() + 3 * 3600 * 1000 + ek * 86400 * 1000).toISOString().slice(0, 10); }
+  function yazmaSayaciSifirla() { O.db(DB2, "DELETE FROM mcp_sayac WHERE anahtar LIKE 'yazma|%' OR anahtar LIKE 'mcp|%'"); }
+  function izinOf(jeton) { return O.db(DB2, "SELECT izin FROM mcp_jeton WHERE ozet = ?", [O.sha256(jeton)])[0].izin; }
+  async function baglan(ad, ek) {
+    ek = ek || {};
+    var k = await I2.kayit("studio", { client_name: ad, redirect_uris: [CLAUDE] });
+    var cid = k.json && k.json.client_id;
+    var a = await I2.yetkiAl("studio", { client_id: cid, redirect_uri: CLAUDE, yaz: ek.yaz, sifre: ek.sifre || SIFRE_SIMDI });
+    var t = a.kod ? (await I2.kodTakas("studio", cid, a, CLAUDE)).json || {} : {};
+    return { client_id: cid, a: a, t: t };
+  }
+
+  /* ---- statik: gercek arka uc ---- */
+  var arkaKod = fs.readFileSync(path.join(K, "mcp-kitaplik", "arka-studio.php"), "utf8");
+  var arkaYalin = arkaKod.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  ok("gercek arka uc: kitapligi ../v1/studio-ortak.php'den STUDIO_ORTAK ile yukler, hatalari istisnaya baglar, panel ayarini kullanir",
+    /__DIR__ \. '\/\.\.\/v1\/studio-ortak\.php'/.test(arkaYalin) && /define\('STUDIO_ORTAK', 1\)/.test(arkaYalin) && /studio_dur_ayarla\(null\)/.test(arkaYalin) && /studio_ayar_kullan\(\$C\)/.test(arkaYalin));
+  ok("gercek arka uc: ucret alani hic okunmaz / yazilmaz; silme, arsivleme ve mesaj yolu yok", !/ucret/i.test(arkaYalin) && !/DELETE\s+FROM/i.test(arkaYalin) &&
+    !/'arsiv'\s*=>\s*true/.test(arkaYalin) && !/mail\(|curl_|file_get_contents\(\s*'http/i.test(arkaYalin));
+  ok("gercek arka uc: yazmalar panelin yolundan (islem + kayit_yaz + gunluk_anlik), toplu oncesi anlik_al('mcp_toplu_oncesi')",
+    /islem\(function/.test(arkaYalin) && /kayit_yaz\(/.test(arkaYalin) && /gunluk_anlik\(\)/.test(arkaYalin) && /anlik_al\('mcp_toplu_oncesi'\)/.test(arkaYalin));
+  var studioJs = fs.readFileSync(path.join(O.ROOT, "server", "studio-v1", "arayuz", "studio.js"), "utf8");
+  ok("panel Ayarlar: otomatik kopya nedeni mcp_toplu_oncesi Turkce etiketli", /mcp_toplu_oncesi: "Sohbet toplu işlemi öncesi"/.test(studioJs));
+
+  /* ---- tohum veri: panelin kendi API'siyle (anonim) ---- */
+  var D = "mdeniz0001", OZ = "mozge00001", YU = "myusuf0001";
+  var g0 = await panelGiris();
+  ok("[gercek] panel girisi (kurulum: gercek Studio veritabani)", g0.r.status === 200 && g0.cerez, g0.r.metin);
+  var tohum = [
+    { tur: "musteri", id: OZ, veri: { ad: "Özge Test", kurum: "", ucret: UCRET, siklik: { tur: "haftalik", haftalikAdet: 2, gunler: [1, 3] }, not: "Gizli not ucret pazarligi" } },
+    { tur: "musteri", id: YU, veri: { ad: "Yusuf Test", kurum: "", ucret: UCRET } },
+    { tur: "musteri", id: "mali000001", veri: { ad: "Ali Test", kurum: "Birinci Şube" } },
+    { tur: "musteri", id: "mali000002", veri: { ad: "Ali Test", kurum: "İkinci Şube" } },
+    { tur: "musteri", id: "meski00001", veri: { ad: "Eski Test", kurum: "", arsiv: true } },
+    { tur: "musteri", id: D, veri: { ad: "Deniz Test", kurum: "Örnek Ajans", siklik: { tur: "gunluk" } } },
+    { tur: "etkinlik", id: "edeniz0001", veri: { musteriId: D, baslik: "Mevcut çekim", tur: "cekim", basTarih: "2099-03-10", basSaat: "10:00", bitTarih: "2099-03-10", bitSaat: "12:00" } },
+    { tur: "icerik", id: "ideniz0001", veri: { musteriId: D, baslik: "Deniz reels 1", tur: "reels", durum: "cekildi" } },
+    { tur: "icerik", id: "ideniz0002", veri: { musteriId: D, baslik: "Deniz reels 2", tur: "reels", durum: "cekildi", teslimTarihi: "2099-03-11" } },
+    { tur: "icerik", id: "ideniz0003", veri: { musteriId: D, baslik: "Deniz video", tur: "video", durum: "kurguda", planTarihi: "2099-03-12" } },
+    { tur: "icerik", id: "iyusuf0001", veri: { musteriId: YU, baslik: "Yusuf post", tur: "post", durum: "fikir" } },
+    { tur: "ozelgun", id: "oozel00001", veri: { baslik: "Test özel gün", tarih: "2099-03-11", tur: "ozel" } },
+    { tur: "ozelgun", id: "odogum0001", veri: { baslik: "Test doğum günü", tarih: "2000-03-12", tur: "dogum", herYil: true } }
+  ];
+  r = await panel({ islem: "toplu", kayitlar: tohum }, g0.cerez);
+  ok("[gercek] tohum veri panelin toplu kaydiyla eklendi (ucretli musteri dahil)", r.status === 200 && r.json && r.json.ok !== false && say("musteri") === 6 && kayit(OZ).ucret === UCRET, r.metin);
+
+  /* ---- yetkisiz erisim ---- */
+  r = await I2.rpc("studio", null, "tools/list");
+  ok("[gercek] jetonsuz -> 401 (error yok)", r.status === 401 && O.wwwCoz(r.headers["www-authenticate"]).error === undefined, r.status);
+  r = await I2.arac("studio", "b".repeat(43), "studio_musteri_ara", { sorgu: "test" });
+  ok("[gercek] gecersiz jeton -> 401 invalid_token, arac calismaz", r.status === 401 && O.wwwCoz(r.headers["www-authenticate"]).error === "invalid_token", r.status);
+  // Onay sayfasindaki sifre PANELIN kilidinden gecer: ayni girisler tablosu, ayni sinir (login_max_fail 3)
+  var kayitC = await I2.kayit("studio", { client_name: "Claude", redirect_uris: [CLAUDE] });
+  var CID = kayitC.json && kayitC.json.client_id;
+  var pkK = O.pkce();
+  r = await I2.yetkiSayfasi("studio", { response_type: "code", client_id: CID, redirect_uri: CLAUDE, code_challenge: pkK.challenge, code_challenge_method: "S256",
+    state: "kilit-1", scope: "studio.oku studio.yaz", resource: KOK2 + "/studio/mcp" });
+  var sK = I2.sayfaCoz(r);
+  var girisSay = function () { return O.db(STUDIO_DB, "SELECT COUNT(*) AS c FROM girisler")[0].c; };
+  var gOnce = girisSay();
+  var yanlis = [];
+  for (var wi = 0; wi < 3; wi++) yanlis.push((await I2.onayGonder("studio", sK, { karar: "izin", sifre: "yanlis-sifre-" + wi, yaz: "1" })).status);
+  ok("[gercek] onay sayfasinda yanlis sifre -> 401; her deneme Studio'nun girisler tablosunda (panel kilidi) sayildi", yanlis.join() === "401,401,401" && girisSay() === gOnce + 3, [yanlis, girisSay() - gOnce]);
+  r = await I2.onayGonder("studio", sK, { karar: "izin", sifre: SIFRE2, yaz: "1" });
+  var pk429 = await panelGiris();
+  ok("[gercek] kilit paylasilir: onay sayfasi dogru sifreyle de 429, panel girisi de 429 (ayni sayac)", r.status === 429 && pk429.r.status === 429, [r.status, pk429.r.status, pk429.r.metin]);
+  O.db(STUDIO_DB, "DELETE FROM girisler");   // kilit penceresi gecmis gibi
+  // Tam OAuth: DCR -> authorize (panel kilidinden gecen sifre) -> PKCE ile jeton
+  var A = await I2.yetkiAl("studio", { client_id: CID, redirect_uri: CLAUDE });
+  r = await I2.kodTakas("studio", CID, A, CLAUDE);
+  var T = r.json || {};
+  var J = T.access_token;
+  ok("[gercek] tam OAuth (DCR -> onay -> kod -> PKCE jeton), kapsam oku + yaz; grant panel sifre izine bagli", r.status === 200 && J && T.scope === "studio.oku studio.yaz" &&
+    O.db(DB2, "SELECT sifre_izi FROM mcp_izin WHERE id = ?", [izinOf(J)])[0].sifre_izi === O.db(STUDIO_DB, "SELECT deger FROM ayar WHERE anahtar = 'sifre_izi'")[0].deger, r.metin);
+  var GRANT = izinOf(J);
+  var OKU = await baglan("Okuyucu", { yaz: false });
+  var JO = OKU.t.access_token;
+  ok("[gercek] yalniz okuma baglantisi (studio.oku)", JO && OKU.t.scope === "studio.oku", OKU.t);
+
+  /* ================= Uctan uca: "Yarın 14.00 Özge çekim, 2 saat. Cuma Yusuf'a 3 reels teslim." ================= */
+  r = await I2.rpc("studio", J, "initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "claude-ai", version: "1" } });
+  ok("[uctan uca] initialize: talimat goreli tarih / belirsizlik kurallarini tasir", r.status === 200 && /studio_bugun/.test(r.json.result.instructions) && /YAZMA/.test(r.json.result.instructions), r.metin);
+  r = await I2.rpc("studio", J, "tools/list");
+  var liste = (r.json && r.json.result && r.json.result.tools) || [];
+  var acik = {};
+  liste.forEach(function (t) { acik[t.name] = t.description; });
+  ok("[uctan uca] arac aciklamalari: goreli tarihleri studio_bugun ile coz, belirsizse SOR; ISO bicimleri", ["studio_cekim_olustur", "studio_icerik_olustur", "studio_edit_zamani_ayir", "studio_takvim"].every(function (n) {
+    return /studio_bugun/.test(acik[n]) && /sor/.test(acik[n]) && /tahmin etme/.test(acik[n]);
+  }) && /YYYY-AA-GG/.test(JSON.stringify(liste)) && /SS:DD/.test(JSON.stringify(liste)) && liste.length === 12 &&
+    !liste.some(function (t) { return /sil|arsiv|mesaj|ucret|odeme|fatura/.test(t.name); }), Object.keys(acik));
+  r = await arac(J, "studio_bugun");
+  var bg = yapi(r);
+  var YARIN = bg.gunler && bg.gunler[1].tarih;
+  var CUMA = (bg.gunler || []).filter(function (x) { return x.gun_adi === "Cuma" && x.goreli !== "bugün"; })[0];
+  CUMA = CUMA && CUMA.tarih;
+  ok("[uctan uca] studio_bugun: yarin = Istanbul (UTC+3) yarini; ilk Cuma tablodan", YARIN === istanbulGunu(1) && /^\d{4}-\d{2}-\d{2}$/.test(CUMA || "") && CUMA > bg.tarih, [bg.tarih, YARIN, CUMA]);
+  r = await arac(J, "studio_musteri_ara", { sorgu: "Özge" });
+  sc = yapi(r);
+  var ozge = sc.musteriler && sc.musteriler[0];
+  ok("[uctan uca] musteri_ara 'Özge' -> tek eslesme (Özge Test), yayin duzeni metni, ucret YOK", sc.toplam === 1 && ozge.id === OZ && ozge.ad === "Özge Test" &&
+    ozge.yayin_duzeni === "Haftada 2: Pzt, Çar" && !("ucret" in ozge) && r.metin.indexOf(String(UCRET)) === -1 && r.metin.indexOf("pazarligi") === -1, r.metin);
+  r = await arac(J, "studio_musteri_ara", { sorgu: "yusuf" });
+  sc = yapi(r);
+  var yusuf = sc.musteriler && sc.musteriler[0];
+  ok("[uctan uca] musteri_ara 'yusuf' -> tek eslesme (Yusuf Test)", sc.toplam === 1 && yusuf.id === YU, r.metin);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: ozge.id, baslik: "Özge çekim", tur: "cekim", tarih: YARIN, baslangic_saati: "14:00", sure_dakika: 120, istek_anahtari: "sohbet-ozge-cekim-0001" });
+  sc = yapi(r);
+  var OZGE_CEKIM = sc.etkinlik && sc.etkinlik.id;
+  ok("[uctan uca] cekim_olustur yarin 14:00 + 120 dk -> olusturuldu, 14:00-16:00 Istanbul, gun adi, kimlik = sha256('mcp|'+grant+'|'+anahtar) ilk 24",
+    sonuc(r).isError === false && sc.durum === "olusturuldu" && sc.etkinlik.tarih === YARIN && sc.etkinlik.baslangic_saati === "14:00" && sc.etkinlik.bitis_saati === "16:00" &&
+    sc.etkinlik.bitis_tarihi === YARIN && sc.etkinlik.gun_adi === bg.gunler[1].gun_adi && OZGE_CEKIM === O.sha256("mcp|" + GRANT + "|sohbet-ozge-cekim-0001").slice(0, 24), r.metin);
+  var once = sayilar();
+  r = await arac(J, "studio_icerik_olustur", { musteri_id: yusuf.id, baslik: "Reels", tur: "reels", adet: 3, teslim_tarihi: CUMA, istek_anahtari: "sohbet-yusuf-reels-0001" });
+  sc = yapi(r);
+  var KOD = sc.onay_kodu;
+  ok("[uctan uca] icerik_olustur adet=3 -> YAZMAZ: onizleme (3 satir, teslim Cuma) + onay_kodu", sonuc(r).isError === false && sc.durum === "onay_gerekli" && KOD &&
+    sc.onizleme.satirlar.length === 3 && sc.onizleme.satirlar.every(function (s) { return s.durum === "gecerli" && s.ozet.indexOf(CUMA + " Cuma") !== -1; }) && sayilar() === once &&
+    /KAYDEDİLMEDİ/.test(metin(r)), r.metin);
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: KOD });
+  sc = yapi(r);
+  ok("[uctan uca] toplu_uygula -> uygulandi, 3 kayit, anlik kopya kimligi", sonuc(r).isError === false && sc.durum === "uygulandi" && sc.etkilenen.length === 3 && sc.anlik_id, r.metin);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: ozge.id, baslik: "Özge çekim", tur: "cekim", tarih: YARIN, baslangic_saati: "14:00", sure_dakika: 120, istek_anahtari: "sohbet-ozge-cekim-0001" });
+  ok("[uctan uca] sohbet ayni cagriyi yeniden gonderir (ayni istek_anahtari) -> zaten_vardi, ayni kayit", yapi(r).durum === "zaten_vardi" && yapi(r).etkinlik.id === OZGE_CEKIM, r.metin);
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: KOD });
+  ok("[uctan uca] onay kodu yeniden -> daha_once_uygulandi (mukerrer yok)", yapi(r).durum === "daha_once_uygulandi", r.metin);
+  var V = await panelVeri();
+  var pc = V.etkinlikler.filter(function (e) { return e.baslik === "Özge çekim"; });
+  ok("[uctan uca] PANEL (giris + veri): 'Özge çekim' tam bir kez, Özge Test'e bagli, Istanbul " + YARIN + " 14:00-16:00, planlandi",
+    pc.length === 1 && pc[0].id === OZGE_CEKIM && pc[0].musteriId === OZ && pc[0].basTarih === YARIN && pc[0].basSaat === "14:00" && pc[0].bitTarih === YARIN &&
+    pc[0].bitSaat === "16:00" && pc[0].tumGun === false && pc[0].durum === "planlandi", pc);
+  var pr = V.icerikler.filter(function (i) { return i.musteriId === YU && /^Reels \(\d\/3\)$/.test(i.baslik); });
+  ok("[uctan uca] PANEL: Yusuf Test'e 3 reels tam bir kez (1/3, 2/3, 3/3), teslim " + CUMA + " (Cuma), fikir, gecmis 'Sohbetten eklendi (Claude)'",
+    pr.length === 3 && pr.map(function (i) { return i.baslik; }).sort().join("|") === "Reels (1/3)|Reels (2/3)|Reels (3/3)" &&
+    pr.every(function (i) { return i.teslimTarihi === CUMA && i.tur === "reels" && i.durum === "fikir" && i.gecmis.length === 1 && i.gecmis[0].m === "Sohbetten eklendi (Claude)" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(i.gecmis[0].z); }), pr);
+  r = await arac(J, "studio_takvim", { baslangic_tarihi: bg.tarih, bitis_tarihi: CUMA });
+  sc = yapi(r);
+  ok("[uctan uca] studio_takvim (bugun..Cuma): Özge çekimi ve 3 teslim gorunur", sc.etkinlikler.some(function (e) { return e.id === OZGE_CEKIM; }) &&
+    sc.teslimler.filter(function (t) { return t.musteri_id === YU && t.tarih === CUMA; }).length === 3, r.metin);
+
+  /* ================= Kapsam: okuma jetonuyla yazma ================= */
+  once = sayilar();
+  r = await I2.arac("studio", JO, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Okuyucu çekimi", tur: "cekim", tarih: "2099-05-01", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "okuma-yazma-0001" });
+  var r2 = await I2.arac("studio", JO, "studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: ["ideniz0001"], tarih: "2099-05-01", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "okuma-yazma-0002" });
+  ok("[gercek] okuma jetonuyla yazma araclari -> 403 insufficient_scope, hicbir sey yazilmadi", r.status === 403 && r2.status === 403 &&
+    O.wwwCoz(r.headers["www-authenticate"]).error === "insufficient_scope" && sayilar() === once, [r.status, r2.status]);
+  r = await arac(JO, "studio_takvim", { baslangic_tarihi: "2099-03-01", bitis_tarihi: "2099-03-31" });
+  ok("[gercek] okuma jetonuyla takvim calisir", r.status === 200 && sonuc(r).isError === false, r.metin);
+
+  /* ================= Yanlis veri: hicbiri yazilmaz ================= */
+  yazmaSayaciSifirla();
+  once = sayilar();
+  var tm = function (ek) { return Object.assign({ musteri_id: D, baslik: "Yanlış veri", tur: "cekim", tarih: "2099-05-05", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "yanlis-veri-0001" }, ek); };
+  var sil = function (o, k) { delete o[k]; return o; };
+  var yanlisVeri = [
+    ["studio_cekim_olustur", tm({ tarih: "2099-02-30" }), /YYYY-AA-GG/, "30 Subat"],
+    ["studio_cekim_olustur", tm({ tarih: "05.05.2099" }), /YYYY-AA-GG/, "noktali tarih"],
+    ["studio_cekim_olustur", tm({ tarih: "1999-12-31" }), /2000-01-01 ile 2099-12-31/, "makul aralik disi yil"],
+    ["studio_cekim_olustur", tm({ baslangic_saati: "24:00" }), /SS:DD/, "saat 24:00"],
+    ["studio_cekim_olustur", tm({ baslangic_saati: "9:00" }), /SS:DD/, "saat 9:00 (iki hane degil)"],
+    ["studio_cekim_olustur", tm({ baslangic_saati: "12:60" }), /SS:DD/, "dakika 60"],
+    ["studio_cekim_olustur", sil(tm({ bitis_saati: "09:00" }), "sure_dakika"), /Bitiş, başlangıçtan sonra/, "bitis baslangictan once"],
+    ["studio_cekim_olustur", sil(tm({}), "baslangic_saati"), /baslangic_saati gerekli/, "saat yok (muglak)"],
+    ["studio_cekim_olustur", tm({ musteri_id: "yokmusteri01" }), /müşteri bulunamadı/, "olmayan musteri id"],
+    ["studio_cekim_olustur", sil(tm({ musteri_adi: "Bilinmeyen Kişi" }), "musteri_id"), /adında müşteri yok/, "olmayan musteri adi"],
+    ["studio_cekim_olustur", sil(tm({ musteri_adi: "Özge" }), "musteri_id"), /Benzer adlar: “Özge Test”.*tahmin etme/, "eksik ad (Özge): tahmin yok, aday"],
+    ["studio_cekim_olustur", sil(tm({ musteri_adi: "ali TEST" }), "musteri_id"), /2 müşteri var: “Ali Test · Birinci Şube”.*“Ali Test · İkinci Şube”/, "belirsiz musteri (iki Ali Test)"],
+    ["studio_cekim_olustur", sil(tm({ musteri_adi: "Eski Test" }), "musteri_id"), /arşivde/, "arsivdeki musteri"],
+    ["studio_cekim_olustur", tm({ musteri_id: "meski00001" }), /arşivde/, "arsivdeki musteri id"],
+    ["studio_cekim_olustur", tm({ musteri_adi: "Deniz Test" }), /birlikte verilmez/, "musteri_id + musteri_adi birlikte"],
+    ["studio_cekim_olustur", sil(tm({}), "musteri_id"), /musteri_id ya da musteri_adi gerekli/, "musteri hic yok"],
+    ["studio_cekim_olustur", tm({ baslik: "x".repeat(201) }), /en çok 200 karakter/, "cok uzun baslik"],
+    ["studio_cekim_olustur", tm({ konum: "k".repeat(301) }), /en çok 300 karakter/, "cok uzun konum"],
+    ["studio_cekim_olustur", tm({ ucret: 5 }), /ucret: bilinmeyen alan/, "fazladan alan (ucret)"],
+    ["studio_musteri_olustur", { ad: "a".repeat(121), istek_anahtari: "yanlis-veri-0002" }, /en çok 120 karakter/, "cok uzun musteri adi"],
+    ["studio_musteri_olustur", { ad: "Ücretli", ucret: 100, istek_anahtari: "yanlis-veri-0003" }, /ucret: bilinmeyen alan/, "musteriye ucret girilemez"],
+    ["studio_icerik_olustur", { musteri_id: D, baslik: "X", tur: "reels", teslim_tarihi: "2099-13-01", istek_anahtari: "yanlis-veri-0004" }, /YYYY-AA-GG/, "13. ay"],
+    ["studio_icerik_olustur", { musteri_id: YU, baslik: "X", tur: "reels", cekim_id: "edeniz0001", istek_anahtari: "yanlis-veri-0005" }, /başka bir müşteriye ait/, "baska musterinin cekimi"],
+    ["studio_icerik_olustur", { musteri_id: D, baslik: "X", tur: "tiktok", istek_anahtari: "yanlis-veri-0006" }, /tur: şunlardan biri/, "bilinmeyen tur"],
+    ["studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: ["iyusuf0001"], tarih: "2099-05-06", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "yanlis-veri-0007" }, /başka bir müşterinin içeriği \(Yusuf Test\)/, "blokta baska musterinin icerigi"],
+    ["studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: ["ideniz0001", "iyusuf0001"], tarih: "2099-05-06", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "yanlis-veri-0008" }, /başka bir müşterinin/, "blokta karisik musteri"],
+    ["studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: ["yokicerik01"], tarih: "2099-05-06", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "yanlis-veri-0009" }, /içerik bulunamadı/, "blokta olmayan icerik"],
+    ["studio_edit_zamani_ayir", { musteri_adi: "Ali Test", icerik_idler: ["ideniz0001"], tarih: "2099-05-06", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "yanlis-veri-0010" }, /2 müşteri var/, "blokta belirsiz musteri"],
+    ["studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: [], tarih: "2099-05-06", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "yanlis-veri-0011" }, /en az 1 öğe/, "bos icerik listesi"],
+    ["studio_icerik_durum_guncelle", { icerik_id: "ideniz0001", yeni_durum: "silindi", beklenen_surum: 1 }, /yeni_durum: şunlardan biri/, "bilinmeyen durum"],
+    ["studio_icerik_durum_guncelle", { icerik_id: "ideniz0001", yeni_durum: "kurguda" }, /beklenen_surum: zorunlu alan eksik/, "beklenen_surum yok"],
+    ["studio_cekim_olustur", tm({ istek_anahtari: "kisa" }), /istek_anahtari: en az 8/, "kisa istek_anahtari"]
+  ];
+  var yvHatalar = [];
+  for (var yi = 0; yi < yanlisVeri.length; yi++) {
+    r = await arac(J, yanlisVeri[yi][0], yanlisVeri[yi][1]);
+    if (!(sonuc(r).isError === true && yanlisVeri[yi][2].test(metin(r)))) yvHatalar.push(yanlisVeri[yi][3] + ": " + metin(r));
+  }
+  ok("[gercek] yanlis veri (" + yanlisVeri.length + " durum: tarih, saat, olmayan / belirsiz / arsivdeki musteri, baska musterinin icerigi, uzun metin, fazla alan) -> isError, acik Turkce neden",
+    yvHatalar.length === 0, yvHatalar);
+  ok("[gercek] yanlis verilerin hicbiri Studio'ya yazilmadi", sayilar() === once, [once, sayilar()]);
+  r = await arac(J, "studio_cekim_olustur", { musteri_adi: "ALİ test · ikinci şube", baslik: "Şube çekimi", tur: "cekim", tarih: "2099-06-01", baslangic_saati: "10:00", sure_dakika: 30, istek_anahtari: "tam-ad-cekim-0001" });
+  ok("[gercek] musteri_adi tam 'ad · kurum' (Turkce buyuk / kucuk harf duyarsiz) -> dogru musteri (Ali Test · İkinci Şube)", yapi(r).durum === "olusturuldu" && yapi(r).etkinlik.musteri_id === "mali000002", r.metin);
+  r = await arac(J, "studio_cekim_olustur", { musteri_adi: "deniz test", baslik: "Deniz adla", tur: "toplanti", tarih: "2099-06-02", baslangic_saati: "10:00", bitis_saati: "10:30", istek_anahtari: "tam-ad-cekim-0002" });
+  ok("[gercek] musteri_adi tam ad (tek eslesme) -> kaydedilir", yapi(r).durum === "olusturuldu" && yapi(r).etkinlik.musteri_id === D, r.metin);
+
+  /* ================= Mukerrer ================= */
+  yazmaSayaciSifirla();
+  var mSay = say("musteri");
+  r = await arac(J, "studio_musteri_olustur", { ad: "Yeni Test", kurum: "Deneme", istek_anahtari: "tekrar-musteri-0001" });
+  var YENI = yapi(r).musteri && yapi(r).musteri.id;
+  r2 = await arac(J, "studio_musteri_olustur", { ad: "Yeni Test", kurum: "Deneme", istek_anahtari: "tekrar-musteri-0001" });
+  ok("[gercek] ayni istek_anahtari iki kez -> ikincisi zaten_vardi, ayni kimlik (sha256 grant+anahtar), tek kayit", yapi(r).durum === "olusturuldu" &&
+    YENI === O.sha256("mcp|" + GRANT + "|tekrar-musteri-0001").slice(0, 24) && yapi(r2).durum === "zaten_vardi" && yapi(r2).musteri.id === YENI && say("musteri") === mSay + 1, [r.metin, r2.metin]);
+  r = await arac(J, "studio_musteri_olustur", { ad: "Başka Test", kurum: "Deneme", istek_anahtari: "tekrar-musteri-0001" });
+  ok("[gercek] ayni istek_anahtari FARKLI girdiyle -> isError, hicbir sey yazilmadi", sonuc(r).isError === true && /farklı bir istekte/.test(metin(r)) && say("musteri") === mSay + 1, r.metin);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: D, baslik: "Anahtar baska arac", tur: "cekim", tarih: "2099-06-03", baslangic_saati: "10:00", sure_dakika: 30, istek_anahtari: "tekrar-musteri-0001" });
+  ok("[gercek] ayni istek_anahtari baska aracta -> isError", sonuc(r).isError === true && /farklı bir istekte/.test(metin(r)), r.metin);
+  r = await arac(J, "studio_musteri_olustur", { ad: "yeni TEST", kurum: "deneme", istek_anahtari: "tekrar-musteri-0002" });
+  ok("[gercek] baska anahtar ama ayni ad + kurum -> zaten_vardi + uyari (anlamsal mukerrer)", yapi(r).durum === "zaten_vardi" && yapi(r).musteri.id === YENI && /zaten var/.test(yapi(r).uyari) && say("musteri") === mSay + 1, r.metin);
+  var eSay = say("etkinlik");
+  var paralel = await Promise.all([0, 1, 2, 3, 4, 5].map(function () {
+    return arac(J, "studio_cekim_olustur", { musteri_id: D, baslik: "Paralel çekim", tur: "cekim", tarih: "2099-07-01", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "paralel-cekim-0001" });
+  }));
+  var pd = paralel.map(function (x) { return sonuc(x).isError ? "isError:" + metin(x) : yapi(x).durum; });
+  ok("[gercek] ayni istek_anahtari 6 paralel cagri -> tam bir 'olusturuldu', digerleri zaten_vardi; Studio'da tek kayit",
+    pd.filter(function (x) { return x === "olusturuldu"; }).length === 1 && pd.filter(function (x) { return x === "zaten_vardi"; }).length === 5 && say("etkinlik") === eSay + 1, pd);
+  paralel = await Promise.all([0, 1, 2, 3].map(function (k) {
+    return arac(J, "studio_cekim_olustur", { musteri_id: D, baslik: "Paralel ikinci", tur: "cekim", tarih: "2099-07-02", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "paralel-farkli-000" + k });
+  }));
+  pd = paralel.map(function (x) { return sonuc(x).isError ? "isError" : yapi(x).durum; });
+  ok("[gercek] farkli anahtarlarla ayni cekim 4 paralel -> tek kayit (digerleri zaten_vardi: ayni musteri + baslangic + baslik)",
+    pd.filter(function (x) { return x === "olusturuldu"; }).length === 1 && pd.filter(function (x) { return x === "zaten_vardi"; }).length === 3 && say("etkinlik") === eSay + 2, pd);
+  var iSay = say("icerik");
+  r = await arac(J, "studio_icerik_olustur", { musteri_adi: "Deniz Test", baslik: "Tekil reels", tur: "reels", teslim_tarihi: "2099-03-12", istek_anahtari: "tekil-icerik-0001" });
+  r2 = await arac(J, "studio_icerik_olustur", { musteri_adi: "Deniz Test", baslik: "Tekil reels", tur: "reels", teslim_tarihi: "2099-03-12", istek_anahtari: "tekil-icerik-0001" });
+  var TEKIL = yapi(r).icerik && yapi(r).icerik.id;
+  ok("[gercek] icerik_olustur tekrar -> zaten_vardi; gecmis 'Sohbetten eklendi (Claude)'", yapi(r).durum === "olusturuldu" && yapi(r2).durum === "zaten_vardi" &&
+    say("icerik") === iSay + 1 && kayit(TEKIL).gecmis[0].m === "Sohbetten eklendi (Claude)", [r.metin, r2.metin]);
+
+  /* ================= Cakisma (etkinlik + edit blogu, arayuzle ayni kural) ================= */
+  yazmaSayaciSifirla();
+  eSay = say("etkinlik");
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Çakışan çekim", tur: "cekim", tarih: "2099-03-10", baslangic_saati: "11:00", sure_dakika: 60, istek_anahtari: "cakisma-cekim-0001" });
+  sc = yapi(r);
+  ok("[gercek] cekim vs cekim: cakisma -> YAZILMADI, cakisan (id, tur etkinlik, baslik, saat) doner", sonuc(r).isError === false && sc.durum === "cakisma" && sc.etkinlik === null &&
+    sc.cakisanlar.length === 1 && sc.cakisanlar[0].id === "edeniz0001" && sc.cakisanlar[0].tur === "etkinlik" && sc.cakisanlar[0].baslangic === "2099-03-10T10:00" &&
+    /KAYDEDİLMEDİ/.test(metin(r)) && say("etkinlik") === eSay, r.metin);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Uç uca sonra", tur: "cekim", tarih: "2099-03-10", baslangic_saati: "12:00", bitis_saati: "13:00", istek_anahtari: "uc-uca-cekim-0001" });
+  r2 = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Uç uca önce", tur: "cekim", tarih: "2099-03-10", baslangic_saati: "09:00", bitis_saati: "10:00", istek_anahtari: "uc-uca-cekim-0002" });
+  ok("[gercek] uc uca degen cekimler (12:00 bitis = 12:00 baslangic) cakisma degil", yapi(r).durum === "olusturuldu" && yapi(r2).durum === "olusturuldu", [r.metin, r2.metin]);
+  var bSay = say("blok");
+  r = await arac(J, "studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: ["ideniz0001", "ideniz0002"], tarih: "2099-03-11", baslangic_saati: "14:00", sure_dakika: 120, istek_anahtari: "edit-blok-0001" });
+  sc = yapi(r);
+  var BLOK = sc.blok && sc.blok.id;
+  ok("[gercek] studio_edit_zamani_ayir: Deniz'in 2 icerigi icin 14:00-16:00 blok (calisma blogu), iceriklerin durumu degismez",
+    sonuc(r).isError === false && sc.durum === "olusturuldu" && sc.blok.icerik_idler.join() === "ideniz0001,ideniz0002" && sc.blok.bitis_saati === "16:00" &&
+    say("blok") === bSay + 1 && kayit(BLOK).tur === "blok" && kayit(BLOK).musteriId === D && kayit("ideniz0001").durum === "cekildi", r.metin);
+  r = await arac(J, "studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: ["ideniz0001", "ideniz0002"], tarih: "2099-03-11", baslangic_saati: "14:00", sure_dakika: 120, istek_anahtari: "edit-blok-0001" });
+  ok("[gercek] edit_zamani_ayir tekrar (ayni anahtar) -> zaten_vardi", yapi(r).durum === "zaten_vardi" && yapi(r).blok.id === BLOK && say("blok") === bSay + 1, r.metin);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Bloğa denk", tur: "cekim", tarih: "2099-03-11", baslangic_saati: "15:00", sure_dakika: 30, istek_anahtari: "cakisma-blok-0001" });
+  sc = yapi(r);
+  ok("[gercek] cekim vs edit blogu: cakisma (tur blok) -> yazilmadi", sc.durum === "cakisma" && sc.cakisanlar.length === 1 && sc.cakisanlar[0].id === BLOK && sc.cakisanlar[0].tur === "blok" &&
+    say("etkinlik") === eSay + 2, r.metin);
+  r = await arac(J, "studio_edit_zamani_ayir", { musteri_id: D, icerik_idler: ["ideniz0003"], tarih: "2099-03-10", baslangic_saati: "10:30", bitis_saati: "11:30", istek_anahtari: "blok-cakisma-0001" });
+  ok("[gercek] edit blogu vs cekim: cakisma -> yazilmadi", yapi(r).durum === "cakisma" && yapi(r).cakisanlar[0].id === "edeniz0001" && say("blok") === bSay + 1, r.metin);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Bloğa denk", tur: "cekim", tarih: "2099-03-11", baslangic_saati: "15:00", sure_dakika: 30, cakismayi_onayla: true, istek_anahtari: "cakisma-blok-0001" });
+  sc = yapi(r);
+  var ONAYLI = sc.etkinlik && sc.etkinlik.id;
+  ok("[gercek] cakismayi_onayla: true (ayni anahtar) -> olusturuldu, cakisanlar listede", sc.durum === "olusturuldu" && sc.cakisanlar[0].id === BLOK && sc.etkinlik.cakisan_idler[0] === BLOK &&
+    say("etkinlik") === eSay + 3, r.metin);
+  r = await arac(J, "studio_takvim", { baslangic_tarihi: "2099-03-10", bitis_tarihi: "2099-03-12" });
+  sc = yapi(r);
+  var tkE = {}, tkB = {};
+  (sc.etkinlikler || []).forEach(function (e) { tkE[e.id] = e; });
+  (sc.bloklar || []).forEach(function (b) { tkB[b.id] = b; });
+  ok("[gercek] studio_takvim: etkinlikler + edit bloklari + cakisma haritasi (iki yonlu) + teslim + planli paylasim + ozel gun (her yil tekrar eden dogum gunu)",
+    tkE.edeniz0001 && tkE[ONAYLI] && tkE[ONAYLI].cakisan_idler.indexOf(BLOK) !== -1 && tkB[BLOK] && tkB[BLOK].cakisan_idler.indexOf(ONAYLI) !== -1 &&
+    tkB[BLOK].icerikler.length === 2 && tkB[BLOK].baslik === "Edit: Deniz Test · Örnek Ajans" &&
+    sc.teslimler.some(function (t) { return t.icerik_id === "ideniz0002" && t.tarih === "2099-03-11"; }) &&
+    sc.paylasimlar.some(function (p) { return p.icerik_id === "ideniz0003" && p.tarih === "2099-03-12"; }) &&
+    sc.ozel_gunler.some(function (o) { return o.ad === "Test özel gün" && o.tarih === "2099-03-11" && o.tur === "ozel"; }) &&
+    sc.ozel_gunler.some(function (o) { return o.ad === "Test doğum günü" && o.tarih === "2099-03-12" && o.tur === "dogum"; }) && !tkE["toplu-0"], r.metin);
+  r = await arac(J, "studio_takvim", { baslangic_tarihi: "2099-10-25", bitis_tarihi: "2099-10-31" });
+  sc = yapi(r);
+  ok("[gercek] studio_takvim: resmi tatiller (28 Ekim yarim gun, 29 Ekim) + dini bayram bilinmeyen yil notu (tahmin yok)",
+    sc.ozel_gunler.some(function (o) { return o.tarih === "2099-10-28" && o.tur === "tatil" && o.yarim_gun === true; }) &&
+    sc.ozel_gunler.some(function (o) { return o.tarih === "2099-10-29" && o.ad === "Cumhuriyet Bayramı"; }) && sc.notlar.some(function (n) { return /^2099: .*Diyanet/.test(n); }), r.metin);
+  r = await arac(J, "studio_takvim", { baslangic_tarihi: "2099-01-01", bitis_tarihi: "2099-03-15" });
+  ok("[gercek] studio_takvim: 62 gunden uzun aralik -> isError", sonuc(r).isError === true && /62 gün/.test(metin(r)), r.metin);
+  // iptal ve tamamlanmis kayitlar takvimi doldurmaz; tum gun etkinlik butun gunu kapatir (arayuzle ayni)
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "İptal edilecek", tur: "cekim", tarih: "2099-08-01", baslangic_saati: "10:00", sure_dakika: 60, istek_anahtari: "iptal-cekim-0001" });
+  var IPT = yapi(r).etkinlik;
+  r = await arac(J, "studio_cekim_durum_guncelle", { cekim_id: IPT.id, yeni_durum: "iptal", beklenen_surum: IPT.surum });
+  r2 = await arac(J, "studio_cekim_olustur", { musteri_id: D, baslik: "İptalin yerine", tur: "cekim", tarih: "2099-08-01", baslangic_saati: "10:30", sure_dakika: 30, istek_anahtari: "iptal-yerine-0001" });
+  ok("[gercek] iptal edilen cekim cakisma sayilmaz", yapi(r).durum === "guncellendi" && yapi(r2).durum === "olusturuldu", [r.metin, r2.metin]);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: null, baslik: "Fuar", tur: "diger", tarih: "2099-09-01", tum_gun: true, istek_anahtari: "tum-gun-fuar-0001" });
+  r2 = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Fuar günü çekim", tur: "cekim", tarih: "2099-09-01", baslangic_saati: "15:00", sure_dakika: 60, istek_anahtari: "tum-gun-cak-0001" });
+  ok("[gercek] musterisiz tum gun etkinlik kaydedilir; ayni gun saatli cekim onunla cakisir", yapi(r).durum === "olusturuldu" && yapi(r).etkinlik.musteri_id === null &&
+    yapi(r).etkinlik.tum_gun === true && yapi(r2).durum === "cakisma" && yapi(r2).cakisanlar[0].id === yapi(r).etkinlik.id, [r.metin, r2.metin]);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Gece çekimi", tur: "cekim", tarih: "2099-09-05", baslangic_saati: "23:00", sure_dakika: 120, istek_anahtari: "gece-cekim-0001" });
+  ok("[gercek] sure_dakika gece yarisini asar: 23:00 + 120 dk -> ertesi gun 01:00", yapi(r).durum === "olusturuldu" && yapi(r).etkinlik.bitis_tarihi === "2099-09-06" &&
+    yapi(r).etkinlik.bitis_saati === "01:00" && kayit(yapi(r).etkinlik.id).bitTarih === "2099-09-06", r.metin);
+
+  /* ================= Eszamanlilik: beklenen_surum ================= */
+  yazmaSayaciSifirla();
+  var G0 = await panelGiris();
+  V = await panelVeri();
+  var ic = V.icerikler.filter(function (i) { return i.id === "ideniz0003"; })[0];
+  var s0 = ic.surum;
+  r = await arac(J, "studio_icerik_listele", { musteri_id: D, durum: "kurguda" });
+  ok("[gercek] icerik_listele: surum panelle ayni, ucret yok", yapi(r).icerikler.some(function (i) { return i.id === "ideniz0003" && i.surum === s0; }), r.metin);
+  var pv = Object.assign({}, ic, { durum: "onayda" });
+  ["id", "surum", "olusturma", "guncelleme"].forEach(function (k) { delete pv[k]; });
+  var pk = await panel({ islem: "kaydet", tur: "icerik", id: "ideniz0003", veri: pv, surum: s0 }, G0.cerez);
+  var s1 = pk.json && pk.json.kayit && pk.json.kayit.surum;
+  r = await arac(J, "studio_icerik_durum_guncelle", { icerik_id: "ideniz0003", yeni_durum: "hazir", beklenen_surum: s0 });
+  sc = yapi(r);
+  ok("[gercek] panel kaydi degistirdi; sohbet eski surumle -> isError 409, guncel kayit (surum, durum) doner, YAZILMADI", s1 > s0 && sonuc(r).isError === true && /409/.test(metin(r)) &&
+    sc.durum === "surum_uyusmadi" && sc.icerik.surum === s1 && sc.icerik.durum === "onayda" && kayit("ideniz0003").durum === "onayda" && kayit("ideniz0003").surum === s1, r.metin);
+  r = await arac(J, "studio_icerik_durum_guncelle", { icerik_id: "ideniz0003", yeni_durum: "hazir", beklenen_surum: s1, not: "Müşteri onayladı" });
+  var gk = kayit("ideniz0003");
+  ok("[gercek] guncel surumle -> guncellendi; gecmis: 'Sohbetten değiştirildi (Claude): not' + arayuz bicimli durum satiri", yapi(r).durum === "guncellendi" && gk.durum === "hazir" &&
+    gk.gecmis[gk.gecmis.length - 1].m === "Müşteri onayında → Yayına hazır" && gk.gecmis[gk.gecmis.length - 2].m === "Sohbetten değiştirildi (Claude): Müşteri onayladı", r.metin);
+  var s2 = gk.surum;
+  paralel = await Promise.all([arac(J, "studio_icerik_durum_guncelle", { icerik_id: "ideniz0003", yeni_durum: "yayinlandi", beklenen_surum: s2 }),
+    arac(J, "studio_icerik_durum_guncelle", { icerik_id: "ideniz0003", yeni_durum: "revizyonda", beklenen_surum: s2 })]);
+  pd = paralel.map(function (x) { return sonuc(x).isError ? "409" : yapi(x).durum; });
+  ok("[gercek] ayni surumle iki paralel guncelleme -> biri guncellendi, digeri 409 (ustune yazilmaz)", pd.sort().join() === "409,guncellendi", pd);
+  ok("[gercek] yayinlandi'ya gecen icerige yayin tarihi (bugun, Istanbul) yazilir; geri donuste temizlenir (arayuzle ayni)",
+    kayit("ideniz0003").durum === "yayinlandi" ? kayit("ideniz0003").yayinTarihi === istanbulGunu(0) : kayit("ideniz0003").yayinTarihi === null, kayit("ideniz0003"));
+  var ek = kayit("edeniz0001");
+  r = await arac(J, "studio_cekim_durum_guncelle", { cekim_id: "edeniz0001", yeni_durum: "tamamlandi", beklenen_surum: ek.surum - 1 });
+  r2 = await arac(J, "studio_cekim_durum_guncelle", { cekim_id: "edeniz0001", yeni_durum: "tamamlandi", beklenen_surum: ek.surum });
+  ok("[gercek] cekim_durum_guncelle: eski surum 409; dogru surum -> tamamlandi + tamamlanma ani (Istanbul)", sonuc(r).isError === true && /409/.test(metin(r)) &&
+    yapi(r2).durum === "guncellendi" && kayit("edeniz0001").durum === "tamamlandi" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(kayit("edeniz0001").tamamZaman || ""), [r.metin, r2.metin]);
+  r = await arac(J, "studio_cekim_olustur", { musteri_id: OZ, baslik: "Tamamlananın yerine", tur: "cekim", tarih: "2099-03-10", baslangic_saati: "10:30", sure_dakika: 30, istek_anahtari: "tamam-yerine-0001" });
+  ok("[gercek] tamamlanmis cekim takvimi doldurmaz (arayuz takvimdeSayilir)", yapi(r).durum === "olusturuldu", r.metin);
+
+  /* ================= Toplu: onizle -> kod -> uygula (anlik kopya) -> panelden geri yukleme ================= */
+  yazmaSayaciSifirla();
+  var s02 = kayit("ideniz0002").surum;
+  var islemler = [
+    { islem: "icerik_olustur", musteri_id: D, baslik: "Toplu A", tur: "post", teslim_tarihi: "2099-04-03" },
+    { islem: "cekim_olustur", musteri_id: D, baslik: "Toplu çekim", tur: "cekim", tarih: "2099-04-01", baslangic_saati: "10:00", bitis_saati: "11:00" },
+    { islem: "icerik_durum", icerik_id: "ideniz0002", yeni_durum: "kurguda", beklenen_surum: s02 }
+  ];
+  once = sayilar();
+  var anlikSay = function () { return O.db(STUDIO_DB, "SELECT COUNT(*) AS c FROM anliklar WHERE neden = 'mcp_toplu_oncesi'")[0].c; };
+  var aOnce = anlikSay();
+  r = await arac(J, "studio_toplu_onizle", { islemler: islemler });
+  sc = yapi(r);
+  var K1 = sc.onay_kodu;
+  ok("[gercek] toplu_onizle: 3 islem gecerli, ozetler Turkce (gun adi), onay_kodu; HICBIR SEY yazilmadi, kopya alinmadi",
+    sc.gecerli === true && K1 && sc.satirlar.length === 3 && sc.satirlar.every(function (s) { return s.durum === "gecerli"; }) && /2099-04-01 Çarşamba 10:00–11:00/.test(sc.satirlar[1].ozet) &&
+    sayilar() === once && anlikSay() === aOnce, r.metin);
+  r = await arac(J, "studio_toplu_onizle", { islemler: [{ islem: "cekim_olustur", musteri_id: OZ, baslik: "Bloğa denk toplu", tur: "cekim", tarih: "2099-03-11", baslangic_saati: "14:30", sure_dakika: 30 }] });
+  ok("[gercek] toplu_onizle: cakisan cekim -> satir hata (Çakışma), onay kodu yok", yapi(r).gecerli === false && yapi(r).onay_kodu === null && /Çakışma/.test(yapi(r).satirlar[0].mesaj), r.metin);
+  r = await arac(J, "studio_toplu_onizle", { islemler: [
+    { islem: "cekim_olustur", musteri_id: OZ, baslik: "Liste içi 1", tur: "cekim", tarih: "2099-04-10", baslangic_saati: "10:00", bitis_saati: "11:00" },
+    { islem: "cekim_olustur", musteri_id: D, baslik: "Liste içi 2", tur: "cekim", tarih: "2099-04-10", baslangic_saati: "10:30", bitis_saati: "11:30" }] });
+  ok("[gercek] toplu_onizle: liste icindeki iki cekim birbiriyle cakisir -> ikinci satir hata", yapi(r).gecerli === false && yapi(r).satirlar[0].durum === "gecerli" &&
+    yapi(r).satirlar[1].durum === "hata" && /Liste içi 1/.test(yapi(r).satirlar[1].mesaj), r.metin);
+  r = await arac(J, "studio_toplu_onizle", { islemler: [{ islem: "icerik_durum", icerik_id: "ideniz0002", yeni_durum: "hazir", beklenen_surum: s02 - 1 },
+    { islem: "icerik_olustur", musteri_id: "meski00001", baslik: "Arşive", tur: "post" }] });
+  ok("[gercek] toplu_onizle: eski surum ve arsivdeki musteri -> hata satirlari", yapi(r).gecerli === false && /Sürüm uyuşmuyor/.test(yapi(r).satirlar[0].mesaj) &&
+    /arşivde/.test(yapi(r).satirlar[1].mesaj), r.metin);
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: "yanlis-onay-kodu-00000000000000" });
+  ok("[gercek] toplu_uygula: yanlis kod -> isError", sonuc(r).isError === true && /geçersiz/.test(metin(r)) && sayilar() === once, r.metin);
+  var IKINCI = await baglan("ChatGPT");
+  r = await arac(IKINCI.t.access_token, "studio_toplu_uygula", { onay_kodu: K1 });
+  ok("[gercek] toplu_uygula: baska baglantinin (grant) kodu -> isError, uygulanmadi (kod grant'e bagli)", sonuc(r).isError === true && /bu bağlantıya ait değil/.test(metin(r)) && sayilar() === once, r.metin);
+  // Baska bir sohbet (baska grant, baska kimlik turetimi) ayni cekimi toplu islemle yeniden gonderir: anlamsal mukerrer, yeni kayit yok
+  r = await arac(IKINCI.t.access_token, "studio_toplu_onizle", { islemler: [{ islem: "cekim_olustur", musteri_id: OZ, baslik: "özge ÇEKİM", tur: "cekim", tarih: YARIN, baslangic_saati: "14:00", bitis_saati: "16:00" }] });
+  var KX = yapi(r).onay_kodu;
+  ok("[gercek] baska grant ayni cekimi toplu onizler -> satir uyari 'zaten var' (cakisma degil)", yapi(r).gecerli === true && KX && yapi(r).satirlar[0].durum === "uyari" &&
+    /zaten var/.test(yapi(r).satirlar[0].mesaj), r.metin);
+  r = await arac(IKINCI.t.access_token, "studio_toplu_uygula", { onay_kodu: KX });
+  ok("[gercek] ... uygulanir ama yeni kayit acilmaz (zaten_vardi), 'Özge çekim' yine tek", yapi(r).durum === "uygulandi" && yapi(r).sonuc.zaten_vardi === 1 && yapi(r).sonuc.olusturulan === 0 &&
+    O.db(STUDIO_DB, "SELECT COUNT(*) AS c FROM kayitlar WHERE tur = 'etkinlik' AND veri LIKE ?", ['%"baslik":"Özge çekim"%'])[0].c === 1 && sayilar() === once, r.metin);
+  aOnce = anlikSay();
+  r = await arac(J, "studio_toplu_onizle", { islemler: [{ islem: "icerik_olustur", musteri_id: D, baslik: "Süresi dolacak", tur: "post" }] });
+  O.db(DB2, "UPDATE mcp_toplu SET son = 1 WHERE kod_ozet = ?", [O.sha256(yapi(r).onay_kodu)]);
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: yapi(r).onay_kodu });
+  ok("[gercek] toplu_uygula: suresi dolmus kod -> isError, uygulanmadi", sonuc(r).isError === true && /süresi doldu/.test(metin(r)) && sayilar() === once, r.metin);
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: K1 });
+  sc = yapi(r);
+  var ANLIK = sc.anlik_id;
+  var anl = O.db(STUDIO_DB, "SELECT neden, ozet FROM anliklar WHERE id = ?", [ANLIK || ""])[0];
+  ok("[gercek] toplu_uygula: uygulandi, 3 etkilenen; ONCE Studio anlik kopyasi ('mcp_toplu_oncesi', uygulama oncesi sayilar)", sonuc(r).isError === false && sc.durum === "uygulandi" &&
+    sc.etkilenen.length === 3 && anl && anl.neden === "mcp_toplu_oncesi" && anlikSay() === aOnce + 1 && sc.sonuc.olusturulan === 2 && sc.sonuc.guncellenen === 1 &&
+    say("icerik") === Number(once.split(",")[1]) + 1 && kayit("ideniz0002").durum === "kurguda", r.metin);
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: K1 });
+  ok("[gercek] ayni kod yeniden -> daha_once_uygulandi, ayni etkilenen, yeni kayit / kopya yok", yapi(r).durum === "daha_once_uygulandi" && yapi(r).etkilenen.join() === sc.etkilenen.join() &&
+    anlikSay() === aOnce + 1 && say("icerik") === Number(once.split(",")[1]) + 1, r.metin);
+  var ayniListe = [{ islem: "icerik_olustur", musteri_id: D, baslik: "Toplu B", tur: "story" }];
+  var KA = yapi(await arac(J, "studio_toplu_onizle", { islemler: ayniListe })).onay_kodu;
+  var KB = yapi(await arac(J, "studio_toplu_onizle", { islemler: ayniListe })).onay_kodu;
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: KA });
+  r2 = await arac(J, "studio_toplu_uygula", { onay_kodu: KB });
+  V = await panelVeri();
+  ok("[gercek] ayni islem listesi iki ayri onay koduyla onaylansa da tek kayit (ikinci: zaten_vardi)", KA !== KB && yapi(r).sonuc.olusturulan === 1 && yapi(r2).sonuc.zaten_vardi === 1 &&
+    V.icerikler.filter(function (i) { return i.baslik === "Toplu B"; }).length === 1, [r.metin, r2.metin]);
+  var s01 = kayit("ideniz0001").surum;
+  var KE = yapi(await arac(J, "studio_toplu_onizle", { islemler: [{ islem: "icerik_durum", icerik_id: "ideniz0001", yeni_durum: "kurguda", beklenen_surum: s01 },
+    { islem: "icerik_olustur", musteri_id: D, baslik: "Eskiyen liste", tur: "post" }] })).onay_kodu;
+  var ic1 = kayit("ideniz0001");
+  var pv1 = Object.assign({}, ic1, { baslik: "Deniz reels 1 (panelde)" });
+  ["id", "surum", "tur"].forEach(function (k) { delete pv1[k]; });
+  await panel({ islem: "kaydet", tur: "icerik", id: "ideniz0001", veri: pv1, surum: s01 }, (await panelGiris()).cerez);
+  var aOnce2 = anlikSay(), once2 = sayilar();
+  r = await arac(J, "studio_toplu_uygula", { onay_kodu: KE });
+  ok("[gercek] onizlemeden sonra panel kaydi degistirdi -> uygulama basarisiz (isError), HICBIRI yazilmadi, kopya da geri alindi",
+    sonuc(r).isError === true && yapi(r).durum === "basarisiz" && /Uygulanmadı/.test(metin(r)) && sayilar() === once2 && anlikSay() === aOnce2 &&
+    kayit("ideniz0001").durum === "cekildi", r.metin);
+  // Panelden geri yukleme: Ayarlar -> Otomatik kopyalar -> "Sohbet toplu işlemi öncesi"
+  var GP = await panelGiris();
+  r = await panel({ islem: "anliklar" }, GP.cerez);
+  var listede = r.json && r.json.anliklar && r.json.anliklar.filter(function (a) { return a.id === ANLIK; })[0];
+  r2 = await panel({ islem: "anlik_geri", id: ANLIK, onay: "GERI YUKLE" }, GP.cerez);
+  V = await panelVeri();
+  ok("[gercek] PANELDEN geri yukleme: kopya listede (neden mcp_toplu_oncesi); geri yukleyince toplu islem oncesi hal (Toplu A / çekim yok, durum eski)",
+    listede && listede.neden === "mcp_toplu_oncesi" && r2.status === 200 && r2.json && r2.json.ok !== false &&
+    !V.icerikler.some(function (i) { return i.baslik === "Toplu A"; }) && !V.etkinlikler.some(function (e) { return e.baslik === "Toplu çekim"; }) &&
+    V.icerikler.filter(function (i) { return i.id === "ideniz0002"; })[0].durum === "cekildi" && V.etkinlikler.some(function (e) { return e.id === OZGE_CEKIM; }), [listede, r2.metin]);
+
+  /* ================= Islem gunlugu ================= */
+  var gl = O.db(DB2, "SELECT * FROM mcp_gunluk WHERE olay = 'studio_cekim_olustur' AND sonuc = 'tamam' AND etkilenen = ?", [JSON.stringify([OZGE_CEKIM])]);
+  var glHata = O.db(DB2, "SELECT COUNT(*) AS c FROM mcp_gunluk WHERE olay = 'studio_cekim_olustur' AND sonuc = 'hata' AND izin = ?", [GRANT])[0].c;
+  var glToplu = O.db(DB2, "SELECT * FROM mcp_gunluk WHERE olay = 'studio_toplu_uygula' AND sonuc = 'tamam' AND izin = ? ORDER BY sira", [GRANT]);
+  var glIzinsiz = O.db(DB2, "SELECT COUNT(*) AS c FROM mcp_gunluk WHERE olay LIKE 'studio_%' AND izin IS NULL")[0].c;
+  ok("[gercek] islem gunlugu (mcp_gunluk): her arac cagrisi grant, arac, etkilenen kimlikler, sonuc (tamam / hata) ile; sir yok",
+    gl.length === 1 && gl[0].izin === GRANT && gl[0].istemci === "Claude" && glHata >= 10 && glToplu.length >= 1 && JSON.parse(glToplu[0].etkilenen).length === 3 && glIzinsiz === 0 &&
+    O.db(DB2, "SELECT COUNT(*) AS c FROM mcp_gunluk WHERE ozet LIKE ? OR etkilenen LIKE ?", ["%" + J + "%", "%" + J + "%"])[0].c === 0, [gl, glHata, glToplu.length, glIzinsiz]);
+  var ist = O.db(DB2, "SELECT COUNT(*) AS c FROM mcp_istek WHERE izin = ? AND durum = 'tamam'", [GRANT])[0].c;
+  ok("[gercek] istek_anahtari kayitlari (mcp_istek) yalniz yazan cagrilar icin kalici; anahtarin kendisi saklanmaz", ist >= 10 &&
+    O.db(DB2, "SELECT COUNT(*) AS c FROM mcp_istek WHERE anahtar_ozet LIKE '%tekrar-musteri%'")[0].c === 0, ist);
+
+  /* ================= Ucret hicbir yerde yok ================= */
+  r = await arac(J, "studio_musteri_ara", { sorgu: "test" });
+  ok("[gercek] musteri_ara: butun musteriler (arsiv dahil, arsiv: true), ucret / not alani yok", yapi(r).toplam >= 7 && yapi(r).musteriler.every(function (m) {
+    return Object.keys(m).sort().join() === "ad,arsiv,id,kurum,yayin_duzeni";
+  }) && yapi(r).musteriler.some(function (m) { return m.id === "meski00001" && m.arsiv === true; }), r.metin);
+  var ucretli = ciktilar.filter(function (t) { return t.indexOf(String(UCRET)) !== -1 || /"ucret"\s*:/.test(t) || /Aylık ücret|pazarligi/.test(t); });
+  ok("[gercek] " + ciktilar.length + " MCP yanitinin HICBIRINDE ucret (deger, alan adi) ya da musteri notu yok", ciktilar.length > 80 && ucretli.length === 0, ucretli.slice(0, 2));
+
+  /* ================= Iptal ve sifre degisimi ================= */
+  r = await I2.iptal("studio", OKU.client_id, OKU.t.refresh_token);
+  r2 = await I2.arac("studio", JO, "studio_takvim", { baslangic_tarihi: "2099-03-01", bitis_tarihi: "2099-03-02" });
+  ok("[gercek] baglanti iptal edildi (RFC 7009 revoke) -> jeton 401", r.status === 200 && r2.status === 401, [r.status, r2.status]);
+  GP = await panelGiris();
+  r = await panel({ islem: "sifre_degistir", eski: SIFRE2, yeni: YENI_SIFRE }, GP.cerez);
+  SIFRE_SIMDI = YENI_SIFRE;
+  r2 = await I2.arac("studio", J, "studio_takvim", { baslangic_tarihi: "2099-03-01", bitis_tarihi: "2099-03-02" });
+  var w2 = O.wwwCoz(r2.headers["www-authenticate"]);
+  ok("[gercek] panelde sifre degisti -> butun sohbet baglantilari gecersiz (401 invalid_token 'sifresi degisti')", r.status === 200 && r2.status === 401 &&
+    w2.error === "invalid_token" && /sifresi degisti/.test(w2.error_description || "") &&
+    O.db(DB2, "SELECT COUNT(*) AS c FROM mcp_izin WHERE durum = 'aktif'")[0].c === 0, [r.metin, r2.status, r2.headers["www-authenticate"]]);
+  var eski = await baglan("Eski şifreyle", { sifre: SIFRE2 });
+  var yeni = await baglan("Yeni şifreyle");
+  r = yeni.t.access_token ? await arac(yeni.t.access_token, "studio_musteri_ara", { sorgu: "özge" }) : { json: null, metin: "" };
+  ok("[gercek] eski sifreyle yeniden baglanilamaz; yeni sifreyle baglanti calisir", !eski.t.access_token && eski.a.hata === "onay" && eski.a.r.status === 401 &&
+    yapi(r).toplam === 1, [eski.a.hata, yeni.t]);
+
+  var uy = phpGunluk.slice(gunlukBas).split(/\r?\n/).filter(function (s) { return /PHP (Warning|Notice|Deprecated|Fatal|Parse)|Uncaught|suflo-mcp/.test(s); });
+  ok("[gercek] gercek arka uc kosusunda PHP uyarisi / hatasi / beklenmeyen sunucu kaydi yok", uy.length === 0, uy.slice(0, 5));
+}
+
+calis().catch(function (e) { ok("beklenmeyen hata: " + (e && e.stack || e), false); }).then(durdur)
+  .then(gercekArka).catch(function (e) { ok("beklenmeyen hata (gercek arka uc): " + (e && e.stack || e), false); }).then(durdur).then(function () {
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
+  try { if (TMP2) fs.rmSync(TMP2, { recursive: true, force: true }); } catch (e) {}
   console.log("\n" + gecen + "/" + (gecen + kalan) + " gecti");
   process.exit(kalan ? 1 : 0);
 });

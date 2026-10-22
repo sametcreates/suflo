@@ -3518,7 +3518,7 @@
       kutu.textContent = "";
       if (!j.ok) { kutu.appendChild(h("p", { class: "hata" }, hataMetni(j))); return; }
       if (!j.anliklar.length) { kutu.appendChild(h("p", { class: "soluk kucuk" }, "Henüz otomatik kopya yok.")); return; }
-      var neden = { gunluk: "Günlük kopya", ice_aktarma_oncesi: "İçe aktarma öncesi", geri_yukleme_oncesi: "Geri yükleme öncesi", anlik_geri_oncesi: "Kopyaya dönüş öncesi" };
+      var neden = { gunluk: "Günlük kopya", ice_aktarma_oncesi: "İçe aktarma öncesi", geri_yukleme_oncesi: "Geri yükleme öncesi", anlik_geri_oncesi: "Kopyaya dönüş öncesi", mcp_toplu_oncesi: "Sohbet toplu işlemi öncesi" };
       j.anliklar.forEach(function (a) {
         var z = C.istanbulSimdi(new Date(a.zaman * 1000));
         var kopyaSayi = sayilarOzet(a.ozet);

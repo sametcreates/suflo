@@ -272,7 +272,7 @@ function mcp_arac_cagrisi(array $params, $id, array $yetki): array {
         }
     }
     $etkilenen = $sonuc->hata ? [] : $sonuc->etkilenen;
-    mcp_gunluk($istemciAdi, $ad, $sonuc->hata ? 'hata' : 'tamam', $etkilenen, $sonuc->ozet !== '' ? $sonuc->ozet : ($sonuc->metin ?? ''));
+    mcp_gunluk($istemciAdi, $ad, $sonuc->hata ? 'hata' : 'tamam', $etkilenen, $sonuc->ozet !== '' ? $sonuc->ozet : ($sonuc->metin ?? ''), (string)$izin['id']);
     $icerik = [];
     if ($sonuc->metin !== null && $sonuc->metin !== '') $icerik[] = ['type' => 'text', 'text' => $sonuc->metin];
     if ($sonuc->veri !== []) $icerik[] = ['type' => 'text', 'text' => mcp_json_metin($sonuc->veri)];
@@ -307,6 +307,24 @@ function mcp_arac_calistir(array $arac, array $arg, McpBaglam $b): McpSonuc {
     if ($arac['_kapsam'] === MCP_KAPSAM_YAZ && ($arac['annotations']['readOnlyHint'] ?? false) !== true && !mcp_hiz('yazma|' . $b->izin_id, 600, 60)) {
         return McpSonuc::hata('Çok fazla yazma isteği (10 dakikada en çok 60). Biraz bekleyip yeniden dene.');
     }
+    // istek_anahtari: ayni anahtar farkli girdiyle gelirse arka uca gidilmez (yanlis kayit doner ya da mukerrer olurdu)
+    $ayrim = [];
+    if (isset($girdi['istek_anahtari']) && is_string($girdi['istek_anahtari'])) {
+        try {
+            $ayrim = mcp_istek_ayir($b->izin_id, $arac['name'], $girdi);
+        } catch (Throwable $e) {
+            if (mcp_mesgul_mu($e)) return McpSonuc::hata('Sunucu şu an meşgul. Birkaç saniye sonra aynı istek_anahtari ile yeniden dene.');
+            throw $e;
+        }
+        if (isset($ayrim['hata'])) return McpSonuc::hata($ayrim['hata']);
+    }
+    $sonuc = mcp_arac_isle($arac, $girdi, $b);
+    if ($ayrim) mcp_istek_bitir($ayrim, !$sonuc->hata && $sonuc->etkilenen !== []);
+    return $sonuc;
+}
+
+/** Isleyici: yerlesik araclar ya da arka uc. Is hatalari ve gecici hatalar isError sonucu olur. */
+function mcp_arac_isle(array $arac, array $girdi, McpBaglam $b): McpSonuc {
     try {
         switch ($arac['name']) {
             case 'studio_bugun': return mcp_arac_bugun();

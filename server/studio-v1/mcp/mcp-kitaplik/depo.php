@@ -14,12 +14,14 @@ declare(strict_types=1);
  *                donusum (dondurulme zamani), halef (yerine verilen yenileme jetonunun ozeti) ve ebeveyn (hangi jetonun
  *                donusumunden ciktigi): ayni anda gelen iki yenilemenin ikincisi icin kisa tolerans penceresi (oauth.php)
  *   mcp_toplu    toplu onay kodlari (islem listesinin ozetine ve grant'e bagli, 15 dk, tek kullanimlik, sonuc saklanir)
- *   mcp_gunluk   islem gunlugu (sir / jeton yok)
+ *   mcp_gunluk   islem gunlugu (sir / jeton yok): zaman, istemci adi, grant (izin), arac / olay, sonuc, etkilenen kimlikler, ozet
+ *   mcp_istek    yazma araclarinin istek_anahtari kayitlari: grant + anahtarin ozeti -> arac + girdinin ozeti. Ayni anahtar
+ *                farkli bir girdiyle gelirse hicbir sey yapilmaz (mukerrer / yanlis eslesme korumasi)
  *   mcp_sayac    hiz siniri sayaclari (sabit pencere; pencere = baslangic zamani)
  */
 if (!defined('SUFLO_MCP')) { http_response_code(404); exit; }
 
-const MCP_SEMA = '2';
+const MCP_SEMA = '3';
 const MCP_KAYIT_SAYACI = 'kayit|toplam';         // DCR genel gunluk sayaci (mcp_sayac anahtari)
 const MCP_KAYITSIZ_ISTEMCI_OMRU = 6 * 3600;     // hic baglanmamis (grant almamis) istemci bu sureden sonra silinir
 
@@ -58,8 +60,9 @@ function mcp_sema_degeri(PDO $p): ?string {
 
 /**
  * Tablolari bir kez, kurulum kilidi altinda kurar. SQLite'ta DDL islem icindedir: yarim kurulum kalmaz.
- * Eski surumdeki depo yerinde, ayni kilit altinda yukseltilir (veri korunur): 1 -> 2 mcp_jeton'a donusum / halef /
- * ebeveyn sutunlari. Bilinmeyen (daha yeni) bir sema surumu bulunursa uzerine yazilmaz (acik kurulum hatasi).
+ * Eski surumdeki depo yerinde, ayni kilit altinda adim adim yukseltilir (veri korunur):
+ *   1 -> 2 mcp_jeton'a donusum / halef / ebeveyn sutunlari; 2 -> 3 mcp_gunluk.izin sutunu ve mcp_istek tablosu.
+ * Bilinmeyen (daha yeni) bir sema surumu bulunursa uzerine yazilmaz (acik kurulum hatasi).
  */
 function mcp_sema_kur(PDO $p): void {
     if (mcp_sema_degeri($p) === MCP_SEMA) return;
@@ -90,24 +93,37 @@ function mcp_sema_kur(PDO $p): void {
                 islem_ozeti TEXT NOT NULL, olusturma INTEGER NOT NULL, son INTEGER NOT NULL, durum TEXT NOT NULL,
                 sonuc TEXT NULL, alinma INTEGER NULL)');
             $p->exec('CREATE TABLE IF NOT EXISTS mcp_gunluk (sira INTEGER PRIMARY KEY AUTOINCREMENT, zaman INTEGER NOT NULL,
-                istemci TEXT NOT NULL, olay TEXT NOT NULL, sonuc TEXT NOT NULL, etkilenen TEXT NOT NULL, ozet TEXT NOT NULL)');
+                istemci TEXT NOT NULL, olay TEXT NOT NULL, sonuc TEXT NOT NULL, etkilenen TEXT NOT NULL, ozet TEXT NOT NULL, izin TEXT NULL)');
             $p->exec('CREATE TABLE IF NOT EXISTS mcp_sayac (anahtar TEXT PRIMARY KEY, pencere INTEGER NOT NULL, sayi INTEGER NOT NULL)');
+            mcp_istek_tablosu($p);
             $p->exec("INSERT INTO mcp_ayar (anahtar, deger) VALUES ('sema', '" . MCP_SEMA . "')");
-        } elseif ($s === '1') {
-            // 1 -> 2: yenileme jetonu tolerans penceresi icin sutunlar. Eski 'kullanildi' satirlarinda donusum NULL kalir:
-            // onlar icin tolerans yok (eskisi gibi tekrar = grant iptali).
-            $p->exec('ALTER TABLE mcp_jeton ADD COLUMN donusum INTEGER NULL');
-            $p->exec('ALTER TABLE mcp_jeton ADD COLUMN halef TEXT NULL');
-            $p->exec('ALTER TABLE mcp_jeton ADD COLUMN ebeveyn TEXT NULL');
+        } else {
+            if ($s === '1') {
+                // 1 -> 2: yenileme jetonu tolerans penceresi icin sutunlar. Eski 'kullanildi' satirlarinda donusum NULL kalir:
+                // onlar icin tolerans yok (eskisi gibi tekrar = grant iptali).
+                $p->exec('ALTER TABLE mcp_jeton ADD COLUMN donusum INTEGER NULL');
+                $p->exec('ALTER TABLE mcp_jeton ADD COLUMN halef TEXT NULL');
+                $p->exec('ALTER TABLE mcp_jeton ADD COLUMN ebeveyn TEXT NULL');
+                $s = '2';
+            }
+            if ($s === '2') {
+                // 2 -> 3: gunlukte grant (eski satirlarda NULL) ve istek_anahtari kayitlari
+                $p->exec('ALTER TABLE mcp_gunluk ADD COLUMN izin TEXT NULL');
+                mcp_istek_tablosu($p);
+                $s = '3';
+            }
+            if ($s !== MCP_SEMA) throw new McpKurulumHatasi('MCP veritabani baska bir sema surumunde.');
             $p->exec("UPDATE mcp_ayar SET deger = '" . MCP_SEMA . "' WHERE anahtar = 'sema'");
-        } elseif ($s !== MCP_SEMA) {
-            throw new McpKurulumHatasi('MCP veritabani baska bir sema surumunde.');
         }
         $p->exec('COMMIT');
     } catch (Throwable $e) {
         try { $p->exec('ROLLBACK'); } catch (Throwable $e2) {}
         throw $e;
     }
+}
+function mcp_istek_tablosu(PDO $p): void {
+    $p->exec('CREATE TABLE IF NOT EXISTS mcp_istek (anahtar_ozet TEXT PRIMARY KEY, izin TEXT NOT NULL, arac TEXT NOT NULL,
+        girdi_ozet TEXT NOT NULL, durum TEXT NOT NULL, zaman INTEGER NOT NULL)');
 }
 
 function mcp_tek(string $sql, array $par = []): ?array {
@@ -169,13 +185,16 @@ function mcp_hiz(string $anahtar, int $pencere, int $sinir): bool {
 
 /* ---------------- Gunluk ---------------- */
 
-/** Islem gunlugu satiri. $etkilenen: kayit kimlikleri; $ozet: kisa aciklama (sir, jeton, sifre ASLA). */
-function mcp_gunluk(string $istemci, string $olay, string $sonuc, array $etkilenen = [], string $ozet = ''): void {
+/**
+ * Islem gunlugu satiri. $etkilenen: kayit kimlikleri; $ozet: kisa aciklama (sir, jeton, sifre ASLA); $izin: arac
+ * cagrilarinda grant kimligi (hangi baglanti yapti; Ayarlar'daki baglanti listesiyle eslesir).
+ */
+function mcp_gunluk(string $istemci, string $olay, string $sonuc, array $etkilenen = [], string $ozet = '', ?string $izin = null): void {
     $kimlikler = array_values(array_slice(array_filter(array_map('strval', $etkilenen), fn ($x) => $x !== ''), 0, 100));
     try {
-        mcp_calistir('INSERT INTO mcp_gunluk (zaman, istemci, olay, sonuc, etkilenen, ozet) VALUES (?, ?, ?, ?, ?, ?)', [
+        mcp_calistir('INSERT INTO mcp_gunluk (zaman, istemci, olay, sonuc, etkilenen, ozet, izin) VALUES (?, ?, ?, ?, ?, ?, ?)', [
             mcp_zaman(), mcp_kisalt($istemci, 100), mcp_kisalt($olay, 60), mcp_kisalt($sonuc, 60),
-            mcp_json_metin($kimlikler), mcp_kisalt($ozet, 300),
+            mcp_json_metin($kimlikler), mcp_kisalt($ozet, 300), $izin,
         ]);
     } catch (Throwable $e) {
         error_log('suflo-mcp gunluk yazilamadi: ' . $e->getMessage());
@@ -253,6 +272,51 @@ function mcp_erisim_dogrula(string $jeton, ?string $guncelIz): array {
     ];
 }
 
+/* ---------------- istek_anahtari (yazma araclari) ---------------- */
+
+const MCP_ISTEK_ASKIDA = 120;   // 'isleniyor' kaydi bu kadar saniyeden eskiyse (surec yarida kesildi) yok sayilir
+
+/** Girdinin parmak izi: arac adi + kanonik JSON (istek_anahtari ve cakismayi_onayla haric; onay sonradan verilebilir). */
+function mcp_girdi_ozeti(string $arac, array $girdi): string {
+    unset($girdi['istek_anahtari'], $girdi['cakismayi_onayla']);
+    return mcp_ozet($arac . '|' . mcp_kanonik_json($girdi));
+}
+/**
+ * Yazma aracindan ONCE: grant + istek_anahtari kaydini ayirir (tek islemde). Ayni anahtar baska bir arac ya da farkli
+ * girdiyle kullanilmissa null DEGIL hata metni doner ve arka uca gidilmez. Doner: ['yeni' => bool, 'ozet' => anahtar ozeti]
+ * ya da ['hata' => metin].
+ */
+function mcp_istek_ayir(string $izin, string $arac, array $girdi): array {
+    $anahtar = mcp_ozet('mcp|' . $izin . '|' . (string)$girdi['istek_anahtari']);
+    $gz = mcp_girdi_ozeti($arac, $girdi);
+    $n = mcp_zaman();
+    return mcp_islem(function () use ($anahtar, $izin, $arac, $gz, $n) {
+        $r = mcp_tek('SELECT arac, girdi_ozet, durum, zaman FROM mcp_istek WHERE anahtar_ozet = ?', [$anahtar]);
+        if ($r && ($r['durum'] === 'tamam' || (int)$r['zaman'] > $n - MCP_ISTEK_ASKIDA)) {
+            if ($r['arac'] !== $arac || !hash_equals((string)$r['girdi_ozet'], $gz)) {
+                return ['hata' => 'Bu istek_anahtari daha önce farklı bir istekte kullanıldı; hiçbir şey yapılmadı. Aynı isteği tekrarlıyorsan alanları değiştirme; yeni bir istek için yeni bir istek_anahtari ver.'];
+            }
+            return ['yeni' => false, 'ozet' => $anahtar];
+        }
+        mcp_calistir('INSERT OR REPLACE INTO mcp_istek (anahtar_ozet, izin, arac, girdi_ozet, durum, zaman) VALUES (?, ?, ?, ?, ?, ?)',
+            [$anahtar, $izin, $arac, $gz, 'isleniyor', $n]);
+        return ['yeni' => true, 'ozet' => $anahtar];
+    });
+}
+/**
+ * Yazma aracindan SONRA: bir kayit yazildiysa anahtar kalici olarak bu girdiye baglanir ('tamam'); hicbir sey yazilmadiysa
+ * (hata, cakisma, onizleme) ve kaydi bu cagri actiysa kayit silinir: model duzeltilmis girdiyle ayni anahtari kullanabilir.
+ */
+function mcp_istek_bitir(array $ayrim, bool $yazildi): void {
+    if (!isset($ayrim['ozet'])) return;
+    try {
+        if ($yazildi) mcp_calistir("UPDATE mcp_istek SET durum = 'tamam', zaman = ? WHERE anahtar_ozet = ?", [mcp_zaman(), $ayrim['ozet']]);
+        elseif ($ayrim['yeni']) mcp_calistir("DELETE FROM mcp_istek WHERE anahtar_ozet = ? AND durum = 'isleniyor'", [$ayrim['ozet']]);
+    } catch (Throwable $e) {
+        error_log('suflo-mcp istek kaydi: ' . $e->getMessage());
+    }
+}
+
 /* ---------------- Toplu onay kodlari ---------------- */
 
 /** Islem listesinin kanonik JSON'u (anahtarlar sirali): ozet buna gore alinir. */
@@ -308,7 +372,7 @@ function mcp_gunluk_son(int $adet = 100): array {
     return array_map(function ($r) {
         $r['etkilenen'] = json_decode((string)$r['etkilenen'], true) ?: [];
         return $r;
-    }, mcp_hepsi("SELECT zaman, istemci, olay, sonuc, etkilenen, ozet FROM mcp_gunluk ORDER BY sira DESC LIMIT $adet"));
+    }, mcp_hepsi("SELECT zaman, istemci, izin, olay, sonuc, etkilenen, ozet FROM mcp_gunluk ORDER BY sira DESC LIMIT $adet"));
 }
 
 /* ---------------- Budama ---------------- */
@@ -324,6 +388,8 @@ function mcp_buda(bool $zorla = false): void {
             mcp_calistir('DELETE FROM mcp_jeton WHERE son < ?', [$n - 86400]);
             mcp_calistir('DELETE FROM mcp_toplu WHERE son < ?', [$n - 86400]);
             mcp_calistir('DELETE FROM mcp_sayac WHERE pencere < ?', [$n - 86400]);   // pencereler en cok 1 gun
+            // istek_anahtari kayitlari grant omru boyunca tutulur (o grant'le ayni anahtar hep ayni kayda gider)
+            mcp_calistir('DELETE FROM mcp_istek WHERE zaman < ? OR (durum <> ? AND zaman < ?)', [$n - MCP_IZIN_OMRU, 'tamam', $n - 86400]);
             mcp_calistir("DELETE FROM mcp_izin WHERE (durum <> 'aktif' AND iptal_zamani < ?) OR bitis < ?", [$n - 30 * 86400, $n - 30 * 86400]);
             mcp_calistir("UPDATE mcp_izin SET durum = 'iptal', iptal_nedeni = 'suresi_doldu', iptal_zamani = ? WHERE durum = 'aktif' AND bitis < ?", [$n, $n]);
             // Hic kullanilmamis (grant almamis) istemciler 6 saat sonra silinir (sahte kayitlar birikmesin; gercek istemci

@@ -59,12 +59,13 @@ function sifreOzeti() {
   if (!ozetOnbellek) ozetOnbellek = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE], { encoding: "utf8" }).stdout;
   return ozetOnbellek;
 }
-/** private/<u>-v1/config.php yazar (test ayarlari + ek). */
+/** private/<u>-v1/config.php yazar (test ayarlari + ek; ek.mcp_arka === null ise gercek arka uc). */
 function ayarYaz(kok, u, kokUrl, ek) {
   var C = Object.assign({
     password_hash: sifreOzeti(), cookie_secure: false, kok_url: kokUrl, mcp_arka: SAHTE_ARKA,
     login_max_fail: 3, login_window: 900
   }, ek || {});
+  if (C.mcp_arka === null) delete C.mcp_arka;   // null: varsayilan GERCEK arka uc (mcp-kitaplik/arka-studio.php)
   fs.writeFileSync(path.join(kok, "private", u + "-v1", "config.php"), "<?php\nreturn " + phpDizi(C) + ";\n");
 }
 /** SQLite sorgusu (php -r ile; test icin). Doner: satirlar. */

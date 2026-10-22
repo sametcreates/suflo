@@ -7,12 +7,12 @@ declare(strict_types=1);
  */
 if (!defined('SUFLO_MCP')) { http_response_code(404); exit; }
 
-const MCP_TALIMATLAR = "Suflo Studio, tek kullanıcılı içerik üretim ve ajans takip uygulamasıdır (müşteriler, çekim takvimi, içerikler). Saat dilimi her zaman Europe/Istanbul.\n"
-    . "1) 'Yarın', 'cuma', 'haftaya' gibi göreli tarihleri önce studio_bugun ile kesin tarihe çevir; yanıtında tarihin yanına gün adını yaz.\n"
-    . "2) Müşteri kimliğini studio_musteri_ara ile bul. Hiç ya da birden çok eşleşme varsa, tarih / saat eksik ya da 'öğleden sonra' gibi muğlaksa YAZMA; kullanıcıya sor. Tahmin etme.\n"
+const MCP_TALIMATLAR = "Suflo Studio, tek kullanıcılı içerik üretim ve ajans takip uygulamasıdır (müşteriler, çekim takvimi, edit blokları, içerikler). Saat dilimi her zaman Europe/Istanbul (UTC+3, yaz saati yok).\n"
+    . "1) 'Yarın', 'cuma', 'haftaya' gibi göreli tarihleri önce studio_bugun ile kesin tarihe çevir; tarihleri YYYY-AA-GG, saatleri SS:DD (24 saat) gönder; yanıtında tarihin yanına gün adını yaz.\n"
+    . "2) Müşteri kimliğini studio_musteri_ara ile bul (ya da musteri_adi alanına tam adı yaz: sunucu yalnız tam eşleşmeyi kabul eder). Hiç ya da birden çok eşleşme varsa, tarih / saat eksik ya da 'öğleden sonra', 'akşam' gibi muğlaksa YAZMA; kullanıcıya sor. Tahmin etme.\n"
     . "3) Her yazma isteğine yeni bir istek_anahtari ver; aynı isteği yeniden gönderirken aynı anahtarı kullan (mükerrer kayıt açılmaz).\n"
     . "4) Birden çok kayıt için önce studio_toplu_onizle; önizlemeyi kullanıcıya göster ve yalnız açık onay gelirse studio_toplu_uygula'yı çağır.\n"
-    . "5) Güncellemelerde beklenen_surum olarak en son okunan sürümü ver. Çakışma ya da sürüm uyuşmazlığında kullanıcıya sor.\n"
+    . "5) Güncellemelerde beklenen_surum olarak en son okunan sürümü ver. Çakışma (takvimde aynı saatte çekim ya da edit bloğu) ya da sürüm uyuşmazlığında kullanıcıya sor; cakismayi_onayla'yı yalnız kullanıcı açıkça kabul ederse ver.\n"
     . "6) Silme, mesaj gönderme ve ücret / finans işlemi yoktur.";
 
 const MCP_ICERIK_DURUMLARI = ['fikir', 'cekim_planlandi', 'cekildi', 'kurguda', 'onayda', 'revizyonda', 'hazir', 'yayinlandi'];
@@ -20,6 +20,7 @@ const MCP_ICERIK_TURLERI = ['reels', 'video', 'post', 'story', 'diger'];
 const MCP_ETKINLIK_TURLERI = ['cekim', 'toplanti', 'diger'];
 const MCP_ETKINLIK_DURUMLARI = ['planlandi', 'tamamlandi', 'iptal'];
 const MCP_TAKVIM_EN_COK_GUN = 62;
+const MCP_BELIRSIZLIK = " Göreli tarihleri ('yarın', 'cuma', 'haftaya') önce studio_bugun ile kesin tarihe çevir; tarih, saat ya da müşteri belli değilse ('öğleden sonra', 'akşama doğru', yalnız ad) tahmin etme, kullanıcıya sor.";
 
 /* ---------------- Tanimlar ---------------- */
 
@@ -29,13 +30,15 @@ function mcp_araclar(): array {
     if ($liste !== null) return $liste;
 
     $id = fn (string $acik) => ['type' => 'string', 'pattern' => '^[a-z0-9]{8,40}$', 'description' => $acik];
-    $tarih = fn (string $acik) => ['type' => 'string', 'format' => 'date', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', 'description' => $acik . ' (YYYY-AA-GG, İstanbul)'];
+    $tarih = fn (string $acik) => ['type' => 'string', 'format' => 'date', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', 'description' => $acik . ' (YYYY-AA-GG, İstanbul takvimi; göreli günleri studio_bugun ile çöz)'];
     $saat = fn (string $acik) => ['type' => 'string', 'pattern' => '^([01][0-9]|2[0-3]):[0-5][0-9]$', 'description' => $acik . ' (SS:DD, 24 saat, İstanbul)'];
     $metin = fn (int $en, string $acik, int $az = 0) => ['type' => 'string', 'minLength' => $az, 'maxLength' => $en, 'description' => $acik];
     $anahtar = ['type' => 'string', 'minLength' => 8, 'maxLength' => 80, 'pattern' => '^[A-Za-z0-9._:-]{8,80}$',
         'description' => 'Bu isteğe özgü rastgele anahtar (ör. bir UUID). Aynı isteği yeniden gönderirken aynı anahtarı kullan; böylece mükerrer kayıt açılmaz.'];
     $surum = ['type' => 'integer', 'minimum' => 1, 'description' => 'Kaydın en son okunan sürümü (studio_takvim ya da studio_icerik_listele yanıtındaki surum).'];
     $nullMetin = ['type' => ['string', 'null']];
+    $musteriAdi = ['type' => 'string', 'minLength' => 1, 'maxLength' => 250,
+        'description' => "musteri_id yerine müşterinin TAM adı (ya da studio_musteri_ara'daki \"ad · kurum\" biçimi). Büyük / küçük harf ve Türkçe harf farkı gözetilmez ama ad eksiksiz olmalı: hiç ya da birden çok müşteri eşleşirse hiçbir şey yazılmaz ve adaylar döner; kullanıcıya sor."];
     $okuma = ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false];
     $ekleme = ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false];
     $degistirme = ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true, 'openWorldHint' => false];
@@ -51,15 +54,28 @@ function mcp_araclar(): array {
         'musteri_id' => $nullMetin, 'musteri_adi' => $nullMetin, 'tur' => ['type' => 'string', 'enum' => MCP_ETKINLIK_TURLERI],
         'tum_gun' => ['type' => 'boolean'], 'baslangic' => ['type' => 'string'], 'bitis' => ['type' => 'string'],
         'durum' => ['type' => 'string', 'enum' => MCP_ETKINLIK_DURUMLARI], 'konum' => ['type' => 'string'],
+        'tarih' => ['type' => 'string'], 'baslangic_saati' => $nullMetin, 'bitis_tarihi' => ['type' => 'string'], 'bitis_saati' => $nullMetin,
+        'gun_adi' => ['type' => 'string'],
         'cakisan_idler' => ['type' => 'array', 'items' => ['type' => 'string']],
     ], ['id', 'surum', 'baslik', 'musteri_id', 'tur', 'tum_gun', 'baslangic', 'bitis', 'durum'], false);
+    $blok = $nesne([
+        'id' => ['type' => 'string'], 'surum' => ['type' => 'integer'], 'baslik' => ['type' => 'string'],
+        'musteri_id' => ['type' => 'string'], 'musteri_adi' => $nullMetin,
+        'icerik_idler' => ['type' => 'array', 'items' => ['type' => 'string']],
+        'icerikler' => ['type' => 'array', 'items' => $nesne(['id' => ['type' => 'string'], 'baslik' => ['type' => 'string']], ['id', 'baslik'], false)],
+        'tarih' => ['type' => 'string'], 'baslangic_saati' => ['type' => 'string'], 'bitis_tarihi' => ['type' => 'string'], 'bitis_saati' => ['type' => 'string'],
+        'gun_adi' => ['type' => 'string'], 'baslangic' => ['type' => 'string'], 'bitis' => ['type' => 'string'],
+        'durum' => ['type' => 'string', 'enum' => ['planlandi', 'tamamlandi']],
+        'cakisan_idler' => ['type' => 'array', 'items' => ['type' => 'string']],
+    ], ['id', 'surum', 'baslik', 'musteri_id', 'icerik_idler', 'baslangic', 'bitis', 'durum'], false);
     $icerik = $nesne([
         'id' => ['type' => 'string'], 'surum' => ['type' => 'integer'], 'baslik' => ['type' => 'string'],
         'musteri_id' => ['type' => 'string'], 'musteri_adi' => $nullMetin, 'tur' => ['type' => 'string', 'enum' => MCP_ICERIK_TURLERI],
         'durum' => ['type' => 'string', 'enum' => MCP_ICERIK_DURUMLARI], 'teslim_tarihi' => $nullMetin, 'plan_tarihi' => $nullMetin,
         'cekim_id' => $nullMetin,
     ], ['id', 'surum', 'baslik', 'musteri_id', 'tur', 'durum'], false);
-    $cakisan = $nesne(['id' => ['type' => 'string'], 'baslik' => ['type' => 'string'], 'baslangic' => ['type' => 'string'], 'bitis' => ['type' => 'string']],
+    $cakisan = $nesne(['id' => ['type' => 'string'], 'tur' => ['type' => 'string', 'enum' => ['etkinlik', 'blok']], 'baslik' => ['type' => 'string'],
+        'baslangic' => ['type' => 'string'], 'bitis' => ['type' => 'string']],
         ['id', 'baslik', 'baslangic', 'bitis'], false);
 
     // Toplu islem ogeleri (tekil araclarin alanlari, istek_anahtari ve adet olmadan)
@@ -74,7 +90,7 @@ function mcp_araclar(): array {
         'not' => $metin(2000, 'Kısa not.'),
     ];
     $cekimAlanlari = [
-        'musteri_id' => ['type' => ['string', 'null'], 'pattern' => '^[a-z0-9]{8,40}$', 'description' => 'Müşteri id; müşterisiz etkinlik için null.'],
+        'musteri_id' => ['type' => ['string', 'null'], 'pattern' => '^[a-z0-9]{8,40}$', 'description' => 'Müşteri id (studio_musteri_ara); müşterisiz etkinlik için null. musteri_adi ile birlikte verilmez.'],
         'baslik' => $metin(200, 'Etkinlik başlığı.', 1),
         'tur' => ['type' => 'string', 'enum' => MCP_ETKINLIK_TURLERI, 'description' => 'cekim, toplanti ya da diger.'],
         'tarih' => $tarih('Başlangıç tarihi'),
@@ -126,7 +142,7 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_musteri_ara',
             'title' => 'Müşteri ara',
-            'description' => 'Ada ya da kuruma göre müşteri arar (büyük / küçük harf ve Türkçe karakter duyarsız). Yazma araçlarında kullanılacak müşteri id\'sini buradan al. Hiç ya da birden çok eşleşme varsa tahmin etme; kullanıcıya hangisi olduğunu sor. Ücret bilgisi döndürülmez.',
+            'description' => 'Ada ya da kuruma göre müşteri arar (büyük / küçük harf ve Türkçe karakter duyarsız; ad parçası yeter). Yazma araçlarında kullanılacak müşteri id\'sini buradan al. Hiç ya da birden çok eşleşme varsa tahmin etme; kullanıcıya hangisi olduğunu sor. Arşivdeki müşteriler arsiv: true ile döner (onlara yeni kayıt açılmaz). Ücret bilgisi döndürülmez.',
             'inputSchema' => $nesne(['sorgu' => $metin(100, 'Aranacak ad ya da kurum (en az 1 karakter).', 1)], ['sorgu']),
             'outputSchema' => $nesne(['musteriler' => ['type' => 'array', 'items' => $musteri], 'toplam' => ['type' => 'integer']], ['musteriler', 'toplam']),
             'annotations' => ['title' => 'Müşteri ara'] + $okuma,
@@ -135,7 +151,7 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_takvim',
             'title' => 'Takvim',
-            'description' => 'Verilen tarih aralığındaki çekim ve etkinlikleri (id, surum, başlık, müşteri, başlangıç–bitiş, durum, çakışanlar) ve planlı paylaşımları döndürür. Aralık en çok 62 gün; tarihler YYYY-AA-GG, İstanbul saati.',
+            'description' => 'Verilen tarih aralığındaki takvimi döndürür: çekim / toplantı / etkinlikler ve edit (çalışma) blokları (id, surum, başlık, müşteri, başlangıç–bitiş, durum, çakışanlar), içerik teslim tarihleri, planlı paylaşımlar, resmî tatiller ve özel günler. Çakışma kuralı Studio ile aynı: iptal, tamamlanmış ve arşivdeki kayıtlar sayılmaz; uç uca değmek çakışma değildir. Aralık en çok 62 gün; tarihler YYYY-AA-GG, İstanbul saati.' . MCP_BELIRSIZLIK,
             'inputSchema' => $nesne([
                 'baslangic_tarihi' => $tarih('Aralığın ilk günü'),
                 'bitis_tarihi' => $tarih('Aralığın son günü (dahil)'),
@@ -143,11 +159,21 @@ function mcp_araclar(): array {
             ], ['baslangic_tarihi', 'bitis_tarihi']),
             'outputSchema' => $nesne([
                 'etkinlikler' => ['type' => 'array', 'items' => $etkinlik],
+                'bloklar' => ['type' => 'array', 'items' => $blok],
+                'teslimler' => ['type' => 'array', 'items' => $nesne([
+                    'tarih' => ['type' => 'string'], 'icerik_id' => ['type' => 'string'], 'baslik' => ['type' => 'string'],
+                    'musteri_id' => ['type' => 'string'], 'musteri_adi' => $nullMetin, 'tur' => ['type' => 'string'], 'durum' => ['type' => 'string'],
+                ], ['tarih', 'icerik_id', 'baslik', 'musteri_id'], false)],
                 'paylasimlar' => ['type' => 'array', 'items' => $nesne([
                     'tarih' => ['type' => 'string'], 'musteri_id' => ['type' => 'string'], 'musteri_adi' => $nullMetin,
                     'tur' => ['type' => 'string'], 'icerik_id' => $nullMetin, 'baslik' => $nullMetin,
                 ], ['tarih', 'musteri_id', 'tur'], false)],
-            ], ['etkinlikler', 'paylasimlar']),
+                'ozel_gunler' => ['type' => 'array', 'items' => $nesne([
+                    'tarih' => ['type' => 'string'], 'ad' => ['type' => 'string'], 'tur' => ['type' => 'string', 'enum' => ['tatil', 'ozel', 'dogum']],
+                    'yarim_gun' => ['type' => 'boolean'],
+                ], ['tarih', 'ad', 'tur'], false)],
+                'notlar' => ['type' => 'array', 'items' => ['type' => 'string']],
+            ], ['etkinlikler', 'bloklar', 'teslimler', 'paylasimlar', 'ozel_gunler']),
             'annotations' => ['title' => 'Takvim'] + $okuma,
             '_kapsam' => MCP_KAPSAM_OKU, '_isleyici' => 'arka', '_capraz' => 'mcp_capraz_takvim',
         ],
@@ -169,7 +195,7 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_musteri_olustur',
             'title' => 'Müşteri oluştur',
-            'description' => 'Yeni müşteri kaydı açar. Aynı ad ve kurumla bir müşteri zaten varsa yenisini açmaz; mevcut kaydı ve bir uyarı döndürür. Ücret bu araçla girilmez.',
+            'description' => 'Yeni müşteri kaydı açar. Yalnız kullanıcı açıkça yeni müşteri istediyse kullan (bir adı bulamadın diye müşteri açma; sor). Aynı ad ve kurumla bir müşteri zaten varsa yenisini açmaz; mevcut kaydı ve bir uyarı döndürür. Ücret bu araçla girilmez.',
             'inputSchema' => $nesne([
                 'ad' => $metin(120, 'Müşteri adı.', 1),
                 'kurum' => $metin(120, 'Kurum / marka (isteğe bağlı).'),
@@ -186,8 +212,8 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_cekim_olustur',
             'title' => 'Çekim / etkinlik oluştur',
-            'description' => 'Takvime çekim, toplantı ya da başka bir etkinlik ekler. Saatli etkinlikte baslangic_saati ve ya bitis_saati ya da sure_dakika gerekir; tüm gün etkinlikte saat verilmez. Başka bir etkinlikle çakışıyorsa ve cakismayi_onayla true değilse KAYDETMEZ, çakışanları döndürür: kullanıcıya sor. Aynı müşteri, aynı başlangıç ve benzer başlıkla bir kayıt zaten varsa yenisini açmaz.',
-            'inputSchema' => $nesne($cekimAlanlari + ['istek_anahtari' => $anahtar], ['musteri_id', 'baslik', 'tur', 'tarih', 'istek_anahtari']),
+            'description' => 'Takvime çekim, toplantı ya da başka bir etkinlik ekler. Müşteri: musteri_id ya da musteri_adi (tam ad); müşterisiz etkinlik için musteri_id: null. Saatli etkinlikte baslangic_saati ve ya bitis_saati ya da sure_dakika gerekir; tüm gün etkinlikte saat verilmez. Takvimdeki başka bir etkinlik ya da edit bloğuyla çakışıyorsa ve cakismayi_onayla true değilse KAYDETMEZ, çakışanları döndürür: kullanıcıya sor. Aynı müşteri, aynı başlangıç ve aynı başlıkla bir kayıt zaten varsa yenisini açmaz.' . MCP_BELIRSIZLIK,
+            'inputSchema' => $nesne($cekimAlanlari + ['musteri_adi' => $musteriAdi, 'istek_anahtari' => $anahtar], ['baslik', 'tur', 'tarih', 'istek_anahtari']),
             'outputSchema' => $nesne([
                 'durum' => ['type' => 'string', 'enum' => ['olusturuldu', 'zaten_vardi', 'cakisma']],
                 'etkinlik' => ['anyOf' => [$etkinlik, ['type' => 'null']]],
@@ -200,11 +226,12 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_icerik_olustur',
             'title' => 'İçerik oluştur',
-            'description' => "Bir müşteri için içerik kaydı (reels, video, post, story, diğer) açar. adet 1 ise hemen kaydeder. adet 1'den büyükse KAYDETMEZ: önizleme ve onay_kodu döndürür; kullanıcı açıkça onaylarsa studio_toplu_uygula ile uygula.",
-            'inputSchema' => $nesne($icerikAlanlari + [
+            'description' => "Bir müşteri için içerik kaydı (reels, video, post, story, diğer) açar; teslim_tarihi (kurgu teslimi), plan_tarihi (paylaşım) ve cekim_id (bağlı çekim) verilebilir. Müşteri: musteri_id ya da musteri_adi (tam ad). adet 1 ise hemen kaydeder. adet 1'den büyükse KAYDETMEZ: önizleme ve onay_kodu döndürür; kullanıcı açıkça onaylarsa studio_toplu_uygula ile uygula." . MCP_BELIRSIZLIK,
+            'inputSchema' => $nesne(['musteri_id' => $icerikAlanlari['musteri_id'], 'musteri_adi' => $musteriAdi] + $icerikAlanlari + [
                 'adet' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50, 'default' => 1, 'description' => 'Kaç içerik (1 = hemen kaydet; fazlası önizleme + onay).'],
                 'istek_anahtari' => $anahtar,
-            ], ['musteri_id', 'baslik', 'tur', 'istek_anahtari']),
+            ], ['baslik', 'tur', 'istek_anahtari']),
+            '_capraz' => 'mcp_capraz_icerik',
             'outputSchema' => $nesne([
                 'durum' => ['type' => 'string', 'enum' => ['olusturuldu', 'zaten_vardi', 'onay_gerekli']],
                 'icerik' => ['anyOf' => [$icerik, ['type' => 'null']]],
@@ -216,9 +243,36 @@ function mcp_araclar(): array {
             '_kapsam' => MCP_KAPSAM_YAZ, '_isleyici' => 'arka',
         ],
         [
+            'name' => 'studio_edit_zamani_ayir',
+            'title' => 'Edit zamanı ayır',
+            'description' => "Bir müşterinin içerikleri için takvimde edit (kurgu) zamanı, yani çalışma bloğu ayırır. icerik_idler aynı müşterinin içerikleri olmalı (studio_icerik_listele). İçeriklerin durumu değişmez. Takvimdeki bir çekim, etkinlik ya da başka bir blokla çakışıyorsa ve cakismayi_onayla true değilse KAYDETMEZ, çakışanları döndürür: kullanıcıya sor." . MCP_BELIRSIZLIK,
+            'inputSchema' => $nesne([
+                'musteri_id' => $id('Blokun müşterisi (studio_musteri_ara). musteri_adi ile birlikte verilmez.'),
+                'musteri_adi' => $musteriAdi,
+                'icerik_idler' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 50, 'items' => $id('İçerik id.'), 'description' => 'Bu blokta çalışılacak içerikler (1–50, hepsi aynı müşterinin).'],
+                'tarih' => $tarih('Başlangıç tarihi'),
+                'baslangic_saati' => $saat('Başlangıç saati'),
+                'bitis_saati' => $saat('Bitiş saati; sure_dakika ile birlikte verilmez'),
+                'sure_dakika' => ['type' => 'integer', 'minimum' => 15, 'maximum' => 720, 'description' => 'Süre (dakika); bitis_saati yerine.'],
+                'bitis_tarihi' => $tarih('Gece yarısını aşan bloğun bitiş tarihi'),
+                'baslik' => $metin(200, 'Blok başlığı (isteğe bağlı; boşsa Studio içeriklerden üretir).'),
+                'not' => $metin(2000, 'Kısa not.'),
+                'cakismayi_onayla' => ['type' => 'boolean', 'default' => false, 'description' => 'Yalnız kullanıcı çakışmayı açıkça kabul ettiyse true.'],
+                'istek_anahtari' => $anahtar,
+            ], ['icerik_idler', 'tarih', 'baslangic_saati', 'istek_anahtari']),
+            'outputSchema' => $nesne([
+                'durum' => ['type' => 'string', 'enum' => ['olusturuldu', 'zaten_vardi', 'cakisma']],
+                'blok' => ['anyOf' => [$blok, ['type' => 'null']]],
+                'cakisanlar' => ['type' => 'array', 'items' => $cakisan],
+                'mesaj' => ['type' => 'string'],
+            ], ['durum', 'blok', 'cakisanlar', 'mesaj']),
+            'annotations' => ['title' => 'Edit zamanı ayır'] + $ekleme,
+            '_kapsam' => MCP_KAPSAM_YAZ, '_isleyici' => 'arka', '_capraz' => 'mcp_capraz_blok',
+        ],
+        [
             'name' => 'studio_icerik_durum_guncelle',
             'title' => 'İçerik durumunu güncelle',
-            'description' => 'Bir içeriğin durumunu değiştirir (ör. kurguda → onayda). beklenen_surum, kaydın en son okunan sürümü olmalı. Kayıt bu arada değiştiyse güncellemez; güncel kaydı döndürür.',
+            'description' => 'Bir içeriğin durumunu değiştirir (ör. kurguda → onayda). beklenen_surum, kaydın en son okunan sürümü olmalı (studio_icerik_listele). Kayıt bu arada değiştiyse (ör. panelden) HİÇBİR ŞEY YAZMAZ: hata (409 sürüm uyuşmazlığı) ve güncel kaydı döndürür; kullanıcıya güncel hali göster ve sor.',
             'inputSchema' => $nesne([
                 'icerik_id' => $id('İçerik id.'),
                 'yeni_durum' => ['type' => 'string', 'enum' => MCP_ICERIK_DURUMLARI, 'description' => 'Yeni durum.'],
@@ -235,7 +289,7 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_cekim_durum_guncelle',
             'title' => 'Çekim durumunu güncelle',
-            'description' => 'Bir çekimin / etkinliğin durumunu planlandi, tamamlandi ya da iptal yapar. beklenen_surum, kaydın en son okunan sürümü olmalı. Kayıt bu arada değiştiyse güncellemez; güncel kaydı döndürür.',
+            'description' => 'Bir çekimin / etkinliğin durumunu planlandi, tamamlandi ya da iptal yapar. beklenen_surum, kaydın en son okunan sürümü olmalı (studio_takvim). Kayıt bu arada değiştiyse HİÇBİR ŞEY YAZMAZ: hata (409 sürüm uyuşmazlığı) ve güncel kaydı döndürür; kullanıcıya sor.',
             'inputSchema' => $nesne([
                 'cekim_id' => $id('Çekim / etkinlik id.'),
                 'yeni_durum' => ['type' => 'string', 'enum' => MCP_ETKINLIK_DURUMLARI, 'description' => 'Yeni durum.'],
@@ -251,7 +305,7 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_toplu_onizle',
             'title' => 'Toplu işlem önizlemesi',
-            'description' => "1–50 işlemi doğrular ve önizler; HİÇBİR ŞEY YAZMAZ. Her işlem bir nesnedir: islem alanı icerik_olustur, cekim_olustur, icerik_durum ya da cekim_durum; diğer alanlar ilgili tekil aracınkiyle aynıdır (istek_anahtari yok). Hepsi geçerliyse 15 dakika geçerli, tek kullanımlık bir onay_kodu döner. Önizlemeyi kullanıcıya göster; yalnız kullanıcı açıkça onaylarsa studio_toplu_uygula'yı çağır.",
+            'description' => "1–50 işlemi doğrular ve önizler; HİÇBİR ŞEY YAZMAZ. Her işlem bir nesnedir: islem alanı icerik_olustur, cekim_olustur, icerik_durum ya da cekim_durum; diğer alanlar ilgili tekil aracınkiyle aynıdır (istek_anahtari ve musteri_adi yok: musteri_id ver). Çakışan çekim, eksik / yanlış müşteri ya da eski sürüm hata satırı olur. Hepsi geçerliyse 15 dakika geçerli, tek kullanımlık bir onay_kodu döner. Önizlemeyi kullanıcıya göster; yalnız kullanıcı açıkça onaylarsa studio_toplu_uygula'yı çağır.",
             'inputSchema' => $nesne(['islemler' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 50, 'items' => $topluOge, 'description' => 'Uygulanacak işlemler (1–50).']], ['islemler']),
             'outputSchema' => $onizlemeCikti,
             'annotations' => ['title' => 'Toplu işlem önizlemesi'] + $okuma,
@@ -260,7 +314,7 @@ function mcp_araclar(): array {
         [
             'name' => 'studio_toplu_uygula',
             'title' => 'Toplu işlemi uygula',
-            'description' => "studio_toplu_onizle'nin verdiği onay_kodu ile işlemleri tek seferde uygular: hepsi ya da hiçbiri. Uygulamadan önce Studio'nun otomatik kopyası alınır (Ayarlar'dan geri yüklenebilir). Yalnız kullanıcı önizlemeyi açıkça onayladıktan sonra çağır. Aynı kod yeniden gönderilirse işlem tekrarlanmaz; ilk sonuç döner.",
+            'description' => "studio_toplu_onizle'nin (ya da adet > 1 ile studio_icerik_olustur'un) verdiği onay_kodu ile işlemleri tek seferde uygular: hepsi ya da hiçbiri. Uygulamadan önce Studio'nun otomatik kopyası alınır ('Sohbet toplu işlemi öncesi'; Ayarlar → Otomatik kopyalar'dan geri yüklenebilir). Yalnız kullanıcı önizlemeyi açıkça onayladıktan sonra çağır. Aynı kod yeniden gönderilirse işlem tekrarlanmaz; ilk sonuç döner.",
             'inputSchema' => $nesne(['onay_kodu' => ['type' => 'string', 'pattern' => '^[A-Za-z0-9_-]{20,64}$', 'description' => 'studio_toplu_onizle yanıtındaki onay_kodu.']], ['onay_kodu']),
             'outputSchema' => $nesne([
                 'durum' => ['type' => 'string', 'enum' => ['uygulandi', 'daha_once_uygulandi', 'basarisiz']],
@@ -356,6 +410,8 @@ function mcp_sema_uygula($v, array $s, string $yol, array &$hatalar) {
         if (isset($s['maxLength']) && $uzunluk > $s['maxLength']) $hatalar[] = "$ad: en çok {$s['maxLength']} karakter olmalı";
         if (isset($s['format']) && $s['format'] === 'date') {
             if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) || !checkdate((int)$m[2], (int)$m[3], (int)$m[1])) { $hatalar[] = "$ad: geçerli bir YYYY-AA-GG tarihi olmalı"; return $v; }
+            // Studio takvimi 2000-2099 arasini tanir (core makulTarih): 0001-01-01 gibi bicimce gecerli ama anlamsiz tarih yazilmaz
+            if ($v < '2000-01-01' || $v > '2099-12-31') { $hatalar[] = "$ad: 2000-01-01 ile 2099-12-31 arasında olmalı"; return $v; }
         } elseif (isset($s['format']) && $s['format'] === 'date-time') {
             if (!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/', $v)) { $hatalar[] = "$ad: tarih-saat (RFC 3339) olmalı"; return $v; }
         }
@@ -420,8 +476,22 @@ function mcp_capraz_icerik_listele(array $g): ?string {
     if (isset($g['tarih_baslangic'], $g['tarih_bitis']) && $g['tarih_bitis'] < $g['tarih_baslangic']) return 'tarih_bitis, tarih_baslangic\'tan önce olamaz.';
     return null;
 }
+/** Musteri: musteri_id (cekimde null olabilir) ya da musteri_adi'ndan tam olarak biri. */
+function mcp_capraz_musteri(array $g, bool $bosOlur): ?string {
+    $id = array_key_exists('musteri_id', $g);
+    $ad = array_key_exists('musteri_adi', $g);
+    if ($id && $ad) return 'musteri_id ve musteri_adi birlikte verilmez; birini ver.';
+    if (!$id && !$ad) return 'musteri_id ya da musteri_adi gerekli' . ($bosOlur ? ' (müşterisiz etkinlik için musteri_id: null).' : '.');
+    if ($id && $g['musteri_id'] === null && !$bosOlur) return 'musteri_id gerekli.';
+    return null;
+}
+function mcp_capraz_icerik(array $g): ?string { return mcp_capraz_musteri($g, false); }
+/** Edit blogu: musteri + saat / sure tutarliligi (tum gun yok). */
+function mcp_capraz_blok(array $g): ?string { return mcp_capraz_musteri($g, false) ?? mcp_capraz_zaman($g); }
+/** Cekim / etkinlik: musteri + saat. Toplu islemde musteri_id her zaman vardir (sema). */
+function mcp_capraz_cekim(array $g): ?string { return mcp_capraz_musteri($g, true) ?? mcp_capraz_zaman($g); }
 /** Saat / sure / tum gun tutarliligi. Muğlak ya da eksik saat: yazma, sor. */
-function mcp_capraz_cekim(array $g): ?string {
+function mcp_capraz_zaman(array $g): ?string {
     $tumGun = ($g['tum_gun'] ?? false) === true;
     $bas = $g['baslangic_saati'] ?? null;
     $bit = $g['bitis_saati'] ?? null;

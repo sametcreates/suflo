@@ -58,6 +58,7 @@ function hazirla() {
   // Panel (/studio/v1/): repodaki v1 .htaccess'i ve yerine gecen kucuk bir index.php (https yonlendirmesi buraya da islemeli)
   fs.mkdirSync(path.join(PUB, "studio", "v1"), { recursive: true });
   fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", ".htaccess"), path.join(PUB, "studio", "v1", ".htaccess"));
+  fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", ".htaccess"), path.join(PUB, "studio-test", "v1", ".htaccess"));
   fs.writeFileSync(path.join(PUB, "studio", "v1", "index.php"), "<?php echo 'panel-yoklama';\n");
   // Ortak veri kitapligi index.php'nin yaninda durur; v1/.htaccess onu dogrudan HTTP erisimine kapatmali
   fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", "studio-ortak.php"), path.join(PUB, "studio", "v1", "studio-ortak.php"));
@@ -67,11 +68,12 @@ function hazirla() {
   fs.writeFileSync(path.join(PUB, "yoklama", "mcp-giris.php"), "<?php header('Content-Type: application/json'); echo json_encode([" +
     "'HTTP_AUTHORIZATION' => $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'REDIRECT_HTTP_AUTHORIZATION' => $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null," +
     "'getallheaders' => function_exists('getallheaders') ? (getallheaders()['Authorization'] ?? null) : null, 'script' => $_SERVER['SCRIPT_NAME'], 'uri' => $_SERVER['REQUEST_URI']]);\n");
-  ["studio", "studio-test"].forEach(function (u) {
-    var arka = path.join(TMP, "private", u + "-v1", "arka-sahte.php");
-    fs.copyFileSync(O.SAHTE_ARKA, arka);   // apache kullanicisi repo klasorunu okuyamayabilir
-    O.ayarYaz(TMP, u, KOK, { mcp_arka: arka });
-  });
+  // studio: sahte arka uc (tasima / OAuth denetimleri); studio-test: GERCEK arka uc (mcp-kitaplik/arka-studio.php -> ../v1/studio-ortak.php)
+  // + gercek Studio veritabani: dagitimdaki klasor duzeninde mod_php altinda yuklenebildigi denenir
+  var arka = path.join(TMP, "private", "studio-v1", "arka-sahte.php");
+  fs.copyFileSync(O.SAHTE_ARKA, arka);   // apache kullanicisi repo klasorunu okuyamayabilir
+  O.ayarYaz(TMP, "studio", KOK, { mcp_arka: arka });
+  O.ayarYaz(TMP, "studio-test", KOK, { mcp_arka: null, dsn: "sqlite:" + path.join(TMP, "private", "studio-test-v1", "studio.sqlite") });
   // Izinler: Apache (www-data) dosyalari okur, private/<uygulama>-v1 klasorlerine yazar (SQLite)
   (function izin(d) {
     fs.chmodSync(d, 0o755);
@@ -247,6 +249,19 @@ async function calis() {
   r = await I.iptal("studio", A.client_id, T.refresh_token);
   r2 = await I.rpc("studio", T.access_token, "tools/list");
   ok("Apache: revoke -> jeton gecersiz", r.status === 200 && r2.status === 401, [r.status, r2.status]);
+  /* ---- gercek arka uc (studio-test): kitaplik ../v1/studio-ortak.php'den, Studio veritabani private/studio-test-v1 ---- */
+  r = await I.kayit("studio-test", { client_name: "Claude", redirect_uris: [CLAUDE] });
+  var AT = r.json || {};
+  a = await I.yetkiAl("studio-test", { client_id: AT.client_id, redirect_uri: CLAUDE });
+  r = await I.kodTakas("studio-test", AT.client_id, a, CLAUDE);
+  var TT = r.json || {};
+  ok("Apache + gercek arka uc: onay sifresi panelin kilidinden (Studio veritabani) gecer, jeton verilir", a.kod && r.status === 200 && TT.access_token, a.hata ? a.r.metin : r.metin);
+  r = await I.arac("studio-test", TT.access_token, "studio_musteri_olustur", { ad: "Apache Test", istek_anahtari: "apache-gercek-0001" });
+  r2 = await I.arac("studio-test", TT.access_token, "studio_musteri_ara", { sorgu: "apache" });
+  ok("Apache + gercek arka uc: yazma ve okuma araclari Studio veritabaninda calisir", r.status === 200 && r.json.result.isError === false &&
+    r.json.result.structuredContent.durum === "olusturuldu" && r2.json.result.structuredContent.toplam === 1, [r.metin, r2.metin]);
+  r = await I.istek({ yol: "/studio-test/v1/studio-ortak.php" });
+  ok("Apache + gercek arka uc: kitaplik (v1/studio-ortak.php) disaridan yine kapali", r.status === 403, r.status);
   /* ---- gercek tarayici (istege bagli): onay sayfasi Apache'nin cift CSP'siyle calisiyor mu ---- */
   var pw = playwrightBul();
   if (!pw) {

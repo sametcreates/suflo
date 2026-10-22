@@ -10,7 +10,9 @@ Bu klasör şu parçaları içerir:
 - Ayrı bir SQLite deposu.
 - Araç kaydı.
 
-Studio kayıtlarına dokunan araç işleyicileri **arka uç arayüzünün** arkasındadır (aşağıda). Gerçek arka uç henüz bağlanmadı: `mcp-kitaplik/arka-studio.php` bilerek "kurulmadı" der. Bu sürüm canlıya yüklense bile hiçbir şifre kabul edilmez ve hiçbir bağlantı açılmaz.
+Studio kayıtlarına dokunan araç işleyicileri **arka uç arayüzünün** arkasındadır (aşağıda). Gerçek arka uç `mcp-kitaplik/arka-studio.php`'dir ve Studio veritabanına panelle **aynı kitaplıktan** (`../studio-ortak.php`) bağlanır: aynı doğrulama, aynı yazma yolu, aynı otomatik kopya, aynı şifre kilidi.
+
+> **Dikkat:** Bu sürüm yüklendiğinde onay sayfası Studio şifresini kabul eder ve sohbet bağlantısı Studio verisine yazabilir. Önce test kurulumunda (`studio-test`, ayrı `private/studio-test-v1/config.php` ve **ayrı** `dsn`) dene. Kapatmak için `config.php`'ye `'mcp_acik' => false` yaz.
 
 Tasarımın kaynağı `mcp-tasarim.md` (v1) belgesidir. Studio şeması ve `pro` dosyaları değişmedi. Panelin veri mantığı, davranışı değişmeden ortak kitaplığa (`../studio-ortak.php`) ayrıldı; gerçek arka uç onu kullanacak (aşağıda).
 
@@ -36,7 +38,7 @@ Test kurulumunda aynı dosyalar `public_html/studio-test/` altına konur. Ayar v
 - `studio` → `private/studio-v1/config.php` (canlıdaki bugünkü yol, değişmedi)
 - `studio-test` → `private/studio-test-v1/config.php`
 
-Depo ilk istekte kendiliğinden kurulur: `private/<klasör>-v1/mcp.sqlite` (ayrı dosya, kendi şema sürümü, kurulum kilidi altında). Eski şema sürümündeki depo aynı kilit altında (`BEGIN IMMEDIATE`) yerinde yükseltilir; veri korunur (1 → 2: refresh token tolerans sütunları). `config.php`'ye yeni ayar eklemek **gerekmez**; varsayılanlar koddadır.
+Depo ilk istekte kendiliğinden kurulur: `private/<klasör>-v1/mcp.sqlite` (ayrı dosya, kendi şema sürümü, kurulum kilidi altında). Eski şema sürümündeki depo aynı kilit altında (`BEGIN IMMEDIATE`) yerinde yükseltilir; veri korunur (1 → 2: refresh token tolerans sütunları; 2 → 3: işlem günlüğünde grant sütunu ve `istek_anahtari` kayıtları). `config.php`'ye yeni ayar eklemek **gerekmez**; varsayılanlar koddadır.
 
 Keşif adresleri (hepsi `kesif-giris.php`'den gelir; `issuer` her belgede bayt bayt aynı):
 
@@ -63,7 +65,8 @@ Kök `.well-known/.htaccess` hakkında üç not:
 | `mcp_redirect_izinli` | `claude.ai` ve `claude.com` `/api/mcp/auth_callback`, `chatgpt.com/connector_platform_oauth_redirect`, `chatgpt.com/connector/oauth/*` | Dönüş adresi izin listesi. `*` tek bir `[A-Za-z0-9_-]` yol parçası demektir |
 | `mcp_origin_izinli` | `https://claude.ai`, `https://claude.com`, `https://chatgpt.com` | Origin başlığı gelirse bu listede olmalı; gelmezse kabul edilir |
 | `mcp_db` | `private/<klasör>-v1/mcp.sqlite` | MCP deposu |
-| `mcp_arka` | `mcp-kitaplik/arka-studio.php` | Arka uç dosyası (testler sahte arka uç verir) |
+| `mcp_arka` | `mcp-kitaplik/arka-studio.php` | Arka uç dosyası (gerçek arka uç; testlerin bir bölümü sahte arka uç verir) |
+| `dsn`, `db_user`, `db_pass` | (panelle ortak) | Gerçek arka ucun bağlandığı Studio veritabanı. Panel ile aynı `config.php`'den okunur |
 | `cookie_secure` | `true` | Panelle ortak. Onay çerezi `__Host-` önekli olur |
 
 ### Geri dönüş
@@ -124,7 +127,7 @@ Panel ve Studio verisi bunlardan etkilenmez.
 
 ## Arka uç arayüzü (gerçek Studio işleyicilerini yazacak kişi için)
 
-Dosya: `mcp-kitaplik/arka.php`. Arka uç, iki arayüzü birden uygulayan **bir nesne döndüren** bir PHP dosyasıdır (`return new class ... implements McpSahipDogrulayici, McpStudioArka { ... };`). Dosyanın kapsamında iki değişken vardır: `$C` (config dizisi) ve `$ozel` (`private/<klasör>-v1`). Bu dosya `mcp-kitaplik/arka-studio.php`'nin yerine yazılır; istenirse config'te `mcp_arka` ile başka bir dosya gösterilir. Örnek uygulama: `tests/fixtures/studio-mcp/arka-sahte.php` (yalnız test için).
+Dosya: `mcp-kitaplik/arka.php`. Arka uç, iki arayüzü birden uygulayan **bir nesne döndüren** bir PHP dosyasıdır (`return new class ... implements McpSahipDogrulayici, McpStudioArka { ... };`). Dosyanın kapsamında iki değişken vardır: `$C` (config dizisi) ve `$ozel` (`private/<klasör>-v1`). Gerçek uygulama `mcp-kitaplik/arka-studio.php`'dir; istenirse config'te `mcp_arka` ile başka bir dosya gösterilir. Sahte uygulama: `tests/fixtures/studio-mcp/arka-sahte.php` (yalnız taşıma katmanı testleri için).
 
 ```php
 interface McpSahipDogrulayici {
@@ -167,12 +170,13 @@ Girdi buraya gelmeden önce MCP katmanında denetlenir:
 | Durum | Ne yapılır |
 |---|---|
 | Müşteri yok ya da arşivde | `McpAracHatasi('…')` ya da `McpSonuc::hata('…')`. Model kullanıcıya sorar |
-| Çakışma | `cakismayi_onayla !== true` ise YAZMAZ; `durum = 'cakisma'` ve `cakisanlar` döner |
-| Mükerrer (tekil yazmalar) | Kayıt kimliği `$b->kayit_kimligi($girdi['istek_anahtari'])` olmalı: `sha256('mcp|'.grant.'|'.anahtar)` ilk 24 hex. Aynı anahtar → aynı kayıt (`durum = 'zaten_vardi'`). Anlamsal mükerrer de denetlenir (aynı müşteri, aynı başlangıç, benzer başlık; müşteride aynı ad ve kurum) |
-| Güncelleme | Panelin `WHERE surum = ?` mekanizması kullanılır. Uyuşmazlıkta yazılmaz; `durum = 'surum_uyusmadi'` ve güncel kayıt döner |
+| Müşteri adı (`musteri_adi`) | Yalnız **tam** ad (ya da "ad · kurum"), Türkçe büyük / küçük harf duyarsız (`norm()`). Hiç ya da birden çok eşleşme: iş hatası + aday adlar (id'leriyle); hiçbir şey yazılmaz, tahmin edilmez. Eksik ad ("Özge") benzer adları önerir ama seçmez |
+| Çakışma | Arayüzle aynı kural (`studio-core.js` `zamanCakisanlari` / `takvimdeSayilir`): etkinlik **ve** çalışma bloğu birlikte; arşiv, iptal ve tamamlanmış sayılmaz; `[başlangıç, bitiş)` yarı açık (uç uca değmek çakışma değil); tüm gün etkinlik bütün günü kapatır. `cakismayi_onayla !== true` ise YAZMAZ; `durum = 'cakisma'` ve `cakisanlar` (id, tür, başlık, saat) döner |
+| Mükerrer (tekil yazmalar) | Kayıt kimliği `$b->kayit_kimligi($girdi['istek_anahtari'])`: `sha256('mcp|'.grant.'|'.anahtar)` ilk 24 hex; yazma panelin istemci kimlikli `kayit_yaz` yoludur. Aynı anahtar → aynı kayıt (`durum = 'zaten_vardi'`). Aynı anahtar **farklı girdiyle** (ya da başka araçta) gelirse MCP katmanı (`mcp_istek`) arka uca gitmeden reddeder. Anlamsal mükerrer de denetlenir (etkinlik: aynı müşteri + başlık + başlangıç; içerik: aynı müşteri + başlık + tür + tarihler; blok: aynı müşteri + başlangıç + içerikler; müşteri: aynı ad + kurum) |
+| Güncelleme | Panelin `WHERE surum = ?` mekanizması kullanılır. Uyuşmazlıkta hiçbir şey yazılmaz: **iş hatası** (`isError`, metin "409 Sürüm uyuşmazlığı"), `structuredContent` `durum = 'surum_uyusmadi'` ve güncel kayıt |
 | `studio_icerik_olustur` ve `adet > 1` | YAZMAZ. `$b->toplu_onizle($islemler)` çağrılır; dönen önizleme ve `onay_kodu` ile `durum = 'onay_gerekli'` döndürülür |
-| Geçmiş satırı | MCP ile oluşan içeriklerin geçmişine "Sohbetten eklendi (`$b->istemci_adi`)" yazılır |
-| Ücret | Hiçbir çıktıda dönmez |
+| Geçmiş satırı | MCP ile oluşan içeriklerin geçmişine "Sohbetten eklendi (`$b->istemci_adi`)" yazılır; durum değişikliğinde "Sohbetten değiştirildi (…)" ve arayüzle aynı "Eski → Yeni" satırı |
+| Ücret | Hiçbir çıktıda dönmez; müşteri notu da dönmez. Araç şemaları `ucret` alanını kabul etmez (bilinmeyen alan) |
 | Geçici hata | `McpMesgulHatasi` fırlatılır. Model "meşgul, aynı istek_anahtari ile yeniden dene" görür |
 
 Dönüş biçimi:
@@ -196,7 +200,8 @@ Bu işlev yalnız kullanıcı kodu onayladıktan sonra çağrılır:
 
 1. Önce anlık kopyayı al: `anlik_al('mcp_toplu_oncesi')` (`studio-ortak.php`; `islem()` içinde, yazmalarla aynı işlemde).
 2. Sonra **tek işlemde** hepsini ya da hiçbirini uygula.
-3. Kayıt kimliklerini `$toplu_anahtar`'dan türet, ör. `substr(sha256($toplu_anahtar.'|'.$sira), 0, 24)`. Yarıda kesilen bir uygulama yeniden denenebilir; böylece mükerrer açılmaz.
+3. Kayıt kimliklerini kararlı türet ki yarıda kesilen bir uygulama yeniden denenebilsin ve mükerrer açılmasın. En basiti `$toplu_anahtar`'dan: `substr(sha256($toplu_anahtar.'|'.$sira), 0, 24)`. Gerçek arka uç daha sıkısını yapar: `sha256('mcp|'.grant.'|toplu|'.kanonikJSON(işlem).'|'.tekrarSırası)`; aynı liste başka bir onay koduyla yeniden onaylansa da ikinci kayıt açılmaz. Ayrıca anlamsal mükerrer satırlar önizlemede "uyari" olur ve uygulamada atlanır (`zaten_vardi`).
+4. Önizlemeden sonra veri değiştiyse (eski sürüm, çakışma) uygulama **hiçbir şey yazmaz** (kopya da geri alınır) ve `tamam: false` döner.
 
 Döner: `['tamam' => bool, 'mesaj' => string, 'veri' => array, 'etkilenen' => [kimlik…], 'anlik_id' => ?string]`.
 
@@ -223,7 +228,7 @@ Tanımlar `mcp-kitaplik/araclar.php`'dedir: ad, Türkçe başlık ve açıklama,
 |---|---|---|
 | `studio_bugun` | studio.oku | readOnly (MCP katmanında; İstanbul tarihi, 14 günlük tablo) |
 | `studio_musteri_ara`, `studio_takvim`, `studio_icerik_listele` | studio.oku | readOnly |
-| `studio_musteri_olustur`, `studio_cekim_olustur`, `studio_icerik_olustur` | studio.yaz | destructive=false, idempotent=true |
+| `studio_musteri_olustur`, `studio_cekim_olustur`, `studio_icerik_olustur`, `studio_edit_zamani_ayir` | studio.yaz | destructive=false, idempotent=true |
 | `studio_icerik_durum_guncelle`, `studio_cekim_durum_guncelle` | studio.yaz | destructive=true, idempotent=true |
 | `studio_toplu_onizle` | studio.yaz | readOnly (yalnız önizler ve kod verir) |
 | `studio_toplu_uygula` | studio.yaz | destructive=true, idempotent=true |
@@ -263,8 +268,10 @@ Panelden kullanmak için: `define('SUFLO_MCP', 1); require '<public_html>/studio
 ## Testler
 
 ```text
-node tests/test-studio-mcp.js          # php -S + .htaccess taklidi + sahte arka uç: tam OAuth akışı, iki MCP dönemi, araçlar, olumsuz durumlar
-node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php (MultiViews açık, Options yalnız Indexes): .htaccess kuralları, https yönlendirmesi, Authorization geçişi, acme-challenge, kapalı kitaplık, kapalı v1/studio-ortak.php
+node tests/test-studio-mcp.js          # 1) php -S + .htaccess taklidi + sahte arka uç: tam OAuth akışı, iki MCP dönemi, araçlar, olumsuz durumlar
+                                       # 2) GERÇEK arka uç + geçici Studio veritabanı + panel API: uçtan uca sohbet senaryosu (sonuç panelden okunur),
+                                       #    yetkisiz erişim, yanlış veri, belirsiz müşteri, mükerrer (paralel dahil), çakışma, sürüm, toplu + panelden geri yükleme, ücret yok
+node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php (MultiViews açık, Options yalnız Indexes): .htaccess kuralları, https yönlendirmesi, Authorization geçişi, acme-challenge, kapalı kitaplık, kapalı v1/studio-ortak.php; studio-test gerçek arka uçla
 node tests/test-studio-ortak.js        # ortak veri kitaplığı panelsiz: kayıt, sürüm, mükerrer, otomatik kopya, şifre kilidi, doğrudan erişim
 ```
 
@@ -274,7 +281,7 @@ node tests/test-studio-ortak.js        # ortak veri kitaplığı panelsiz: kayı
 
 ## Açık konular
 
-- **Gerçek arka uç:** henüz yazılmadı. Kullanacağı kitaplık hazır (aşağıda "Ortak veri kitaplığı").
-- **Panelin test kurulumu:** panel (`../index.php`) ayar yolunu `private/studio-v1` olarak sabit yazar. `public_html/studio-test/v1/` kurulursa canlı veriyi kullanır. MCP klasör adından türetir; panelde de aynı türetme gerekir.
+- **Panelin test kurulumu:** panel (`../index.php`) ayar yolunu `private/studio-v1` olarak sabit yazar. `public_html/studio-test/v1/` kurulursa panel canlı veriyi kullanır. MCP (gerçek arka uç dahil) klasör adından türetir: `studio-test` için `private/studio-test-v1/config.php` ve oradaki `dsn` kullanılır. Test kurulumunda bu `dsn` mutlaka ayrı bir veritabanı olmalı (canlı ayar dosyası kopyalanırsa sohbet canlı veriye yazar).
+- **Belirsiz saat ifadeleri:** sunucu yalnız `YYYY-AA-GG` ve `SS:DD` kabul eder; "öğleden sonra" gibi ifadeleri sohbet modeli sormalıdır (araç açıklamaları ve talimat bunu söyler). Model yine de bir saat uydurursa sunucu bunu ayırt edemez.
 - **ChatGPT `connector/oauth/{callback_id}`:** önek varsayılan olarak izinlidir. Daha dar tutmak için yönetim sayfasında görünen tam adres `mcp_redirect_izinli`'ye yazılabilir.
 - **Kayıt kotası:** günlük 50'lik genel kota çok IP'li biri tarafından geçerli kayıtlarla doldurulabilir (yukarıda "Kalan risk"). Ayarlar ekranına "kayıt sayacını sıfırla" düğmesi eklenmeli (`mcp_kayit_sayaci_sifirla()`).

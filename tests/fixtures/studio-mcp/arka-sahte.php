@@ -126,7 +126,7 @@ return new class($C, $ozel) implements McpSahipDogrulayici, McpStudioArka {
             case 'studio_takvim':
                 $l = $this->hepsi('SELECT * FROM etkinlik WHERE substr(bas, 1, 10) <= ? AND substr(bit, 1, 10) >= ? ORDER BY bas', [$g['bitis_tarihi'], $g['baslangic_tarihi']]);
                 if (isset($g['musteri_id'])) $l = array_values(array_filter($l, fn ($r) => $r['musteri_id'] === $g['musteri_id']));
-                return McpSonuc::tamam(['etkinlikler' => array_map([$this, 'etkinlikDisa'], $l), 'paylasimlar' => []]);
+                return McpSonuc::tamam(['etkinlikler' => array_map([$this, 'etkinlikDisa'], $l), 'bloklar' => [], 'teslimler' => [], 'paylasimlar' => [], 'ozel_gunler' => []]);
             case 'studio_icerik_listele':
                 $l = $this->hepsi('SELECT * FROM icerik ORDER BY id');
                 $l = array_values(array_filter($l, fn ($r) => (!isset($g['musteri_id']) || $r['musteri_id'] === $g['musteri_id']) && (!isset($g['durum']) || $r['durum'] === $g['durum'])));
@@ -148,11 +148,11 @@ return new class($C, $ozel) implements McpSahipDogrulayici, McpStudioArka {
                 return $this->islem(function () use ($g, $b) {
                     $id = $b->kayit_kimligi($g['istek_anahtari']);
                     if ($r = $this->tek('SELECT * FROM etkinlik WHERE id = ?', [$id])) return McpSonuc::tamam(['durum' => 'zaten_vardi', 'etkinlik' => $this->etkinlikDisa($r), 'cakisanlar' => [], 'mesaj' => 'Bu istek daha önce işlendi.']);
-                    $this->musteriVarMi($g['musteri_id']);
+                    $this->musteriVarMi($g['musteri_id'] ?? null);
                     [$bas, $bit, $tg] = $this->aralik($g);
                     $c = $this->cakisanlar($bas, $bit, $tg);
                     if ($c && $g['cakismayi_onayla'] !== true) return McpSonuc::tamam(['durum' => 'cakisma', 'etkinlik' => null, 'cakisanlar' => $c, 'mesaj' => 'Çakışma var; kaydedilmedi. Kullanıcıya sor.']);
-                    $this->yaz('INSERT INTO etkinlik VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [$id, $g['musteri_id'], $g['baslik'], $g['tur'], $tg ? 1 : 0, $bas, $bit, 'planlandi', $g['konum'] ?? '', $this->surum()]);
+                    $this->yaz('INSERT INTO etkinlik VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [$id, $g['musteri_id'] ?? null, $g['baslik'], $g['tur'], $tg ? 1 : 0, $bas, $bit, 'planlandi', $g['konum'] ?? '', $this->surum()]);
                     return McpSonuc::tamam(['durum' => 'olusturuldu', 'etkinlik' => $this->etkinlikDisa($this->tek('SELECT * FROM etkinlik WHERE id = ?', [$id])), 'cakisanlar' => $c, 'mesaj' => 'Kaydedildi.'],
                         'Etkinlik kaydedildi.', [$id], 'Cekim: ' . $g['baslik']);
                 });
@@ -186,7 +186,8 @@ return new class($C, $ozel) implements McpSahipDogrulayici, McpStudioArka {
                     $r = $this->tek("SELECT * FROM $tablo WHERE id = ?", [$id]);
                     if (!$r) throw new McpAracHatasi('Kayıt bulunamadı.');
                     $disa = fn ($r) => $tablo === 'icerik' ? $this->icerikDisa($r) : $this->etkinlikDisa($r);
-                    if ((int)$r['surum'] !== $g['beklenen_surum']) return McpSonuc::tamam(['durum' => 'surum_uyusmadi', $anahtar => $disa($r)], 'Kayıt bu arada değişmiş; güncellenmedi.');
+                    // gercek arka uc gibi: surum uyusmazligi is hatasidir (409), guncel kayit structuredContent'te
+                    if ((int)$r['surum'] !== $g['beklenen_surum']) return McpSonuc::hata('409 Sürüm uyuşmazlığı: kayıt bu arada değişmiş; güncellenmedi.', ['durum' => 'surum_uyusmadi', $anahtar => $disa($r)]);
                     if ($r['durum'] === $g['yeni_durum']) return McpSonuc::tamam(['durum' => 'degisiklik_yok', $anahtar => $disa($r)]);
                     $this->yaz("UPDATE $tablo SET durum = ?, surum = ? WHERE id = ? AND surum = ?", [$g['yeni_durum'], $this->surum(), $id, $r['surum']]);
                     return McpSonuc::tamam(['durum' => 'guncellendi', $anahtar => $disa($this->tek("SELECT * FROM $tablo WHERE id = ?", [$id]))], 'Güncellendi.', [$id], 'Durum: ' . $g['yeni_durum']);
