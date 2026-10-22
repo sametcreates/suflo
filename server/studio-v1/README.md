@@ -90,6 +90,7 @@ Klasör yapısı, Pro servisiyle aynı kök altında şöyle olmalı:
 public_html/studio/index.html        <- (yalnız seçenek B) arayüz: index.html, studio.css, studio-core.js, studio.js, favicon.svg
 public_html/studio/.htaccess         <- (yalnız seçenek B) server/studio-v1/arayuz.htaccess (MCP kuruluysa: server/studio-v1/mcp/studio.htaccess)
 public_html/studio/v1/index.php      <- server/studio-v1/index.php
+public_html/studio/v1/studio-ortak.php <- server/studio-v1/studio-ortak.php (ortak veri kitaplığı; index.php onsuz çalışmaz)
 public_html/studio/v1/.htaccess      <- server/studio-v1/.htaccess
 private/studio-v1/config.php         <- config.example.php'nin doldurulmuş kopyası
 private/studio-v1/studio.sqlite      <- sunucu ilk istekte kendisi oluşturur
@@ -97,7 +98,9 @@ private/studio-v1/studio.sqlite      <- sunucu ilk istekte kendisi oluşturur
 
 Adımlar:
 
-1. `public_html/studio/v1/` klasörünü aç; `index.php` ve `.htaccess` dosyalarını yükle.
+1. `public_html/studio/v1/` klasörünü aç; `index.php`, `studio-ortak.php` ve `.htaccess` dosyalarını yükle.
+   - `studio-ortak.php` ortak veri kitaplığıdır (veritabanı, doğrulama, kayıt yazma, otomatik kopya, şifre kilidi). Panel ve sohbet bağlantısı (MCP) aynı kodu kullanır. `index.php` ile **aynı klasörde** olmalı; eksikse panel "Sunucu dosyası eksik (studio-ortak.php)" der.
+   - Dışarıdan açılamaz: `.htaccess` onu reddeder (403); `.htaccess` işlemese bile dosya kendi başına çağrılınca hiçbir şey yapmadan 403 ile çıkar. Bu yüzden `.htaccess`'i atlama ve iki dosyayı her güncellemede **birlikte** yükle.
    - Seçenek B'de ayrıca: arayüz dosyalarını (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle ve `arayuz.htaccess` dosyasını aynı klasöre `.htaccess` adıyla koy. Bu dosya güvenlik başlıklarını (çerçeveye gömmeyi engelleme dahil) ekler; atlanmamalı. MCP kuruluysa `arayuz.htaccess` yerine `mcp/studio.htaccess` dosyasını `.htaccess` adıyla koy (bkz. mcp/README.md).
 2. `private/studio-v1/` klasörünü aç. `config.example.php` dosyasını buraya `config.php` adıyla koy.
 3. Şifre özetini üret. Tercihen Hostinger SSH terminalinde, ya da kendi bilgisayarında (PHP kuruluysa) `php sifre-ozeti.php` komutunu çalıştır. Windows terminalinde yazdığın şifre ekranda görünür; yanında kimse yokken çalıştır. Şifreyi iki kez yaz (en az 12 karakter). Çıkan `$argon2id$...` ya da `$2y$...` satırını `config.php` içindeki `'password_hash'` alanına yapıştır. `sifre-ozeti.php` dosyasını `public_html` içine **koyma**.
@@ -167,7 +170,7 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
   - Yedek, içe aktarma, otomatik kopya ve kopyaya dönüş bu türleri de taşır.
 - **Takvim güncellemesi ve geri dönüş:**
   - Güncellemeden **önce** Ayarlar → **JSON yedeği indir** ile yedek al. Dosyaları yükledikten sonra ilk kaydetmede sunucu ayrıca günlük otomatik kopya alır.
-  - Eski dosyalara (`index.php` ve arayüz) dönülebilir. Eski sürüm `blok` ve `ozelgun` kayıtlarını görmez, göstermez ama silmez; veritabanında kalırlar ve yeni sürüme dönülünce yine görünürler.
+  - Eski dosyalara (`index.php` ve arayüz) dönülebilir. Takvim sürümünün `index.php`'si tek dosyadır, `studio-ortak.php`'yi kullanmaz; dönüşte o dosya klasörde kalabilir. Eski sürüm `blok` ve `ozelgun` kayıtlarını görmez, göstermez ama silmez; veritabanında kalırlar ve yeni sürüme dönülünce yine görünürler.
   - Eski sürümdeyken dikkat:
     - Bir çekimi kaydetmek o çekimin `tamamZaman` alanını siler.
     - Ayar kaydetmek (stok eşiği) çalışma saatlerini ve haftalık hedefi siler.
@@ -184,6 +187,7 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
 ```text
 node tests/test-studio-core.js   # stok, yayın ihtiyacı, takvim çakışması, saat dilimi, CSV (saf mantık); arayüz dosyaları ve .htaccess denetimi
 node tests/test-studio-api.js    # gerçek php -S + geçici SQLite: yetki, CSRF, kilit, kayıt, içe aktarma, geri yükleme
+node tests/test-studio-ortak.js  # ortak veri kitaplığı panelsiz: kayıt / sürüm / mükerrer / otomatik kopya / şifre kilidi; doğrudan erişim 403
 node tests/test-studio-e2e.js    # gerçek tarayıcı (Playwright): masaüstü (1280 / 1440 / 1920) + telefon (360 / 390 / 430) akışları, takvimde klavye, ekran okuyucu etiketleri, hareket azaltma, 300 iş, New York saat dilimi
 ```
 

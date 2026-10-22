@@ -59,6 +59,8 @@ function hazirla() {
   fs.mkdirSync(path.join(PUB, "studio", "v1"), { recursive: true });
   fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", ".htaccess"), path.join(PUB, "studio", "v1", ".htaccess"));
   fs.writeFileSync(path.join(PUB, "studio", "v1", "index.php"), "<?php echo 'panel-yoklama';\n");
+  // Ortak veri kitapligi index.php'nin yaninda durur; v1/.htaccess onu dogrudan HTTP erisimine kapatmali
+  fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", "studio-ortak.php"), path.join(PUB, "studio", "v1", "studio-ortak.php"));
   // Yoklama uygulamasi: ayni .htaccess, mcp-giris.php yerine basligin PHP'ye nasil ulastigini soyleyen yoklama
   fs.writeFileSync(path.join(PUB, "yoklama", "surucu.php"), "<?php echo in_array('sqlite', PDO::getAvailableDrivers()) ? 'var' : 'yok';\n");
   fs.writeFileSync(path.join(PUB, "yoklama", "mv-deneme.txt"), "multiviews-acik");
@@ -199,6 +201,13 @@ async function calis() {
   var kd = [];
   for (i = 0; i < kapali.length; i++) kd.push((await I.istek({ yol: kapali[i] })).status);
   ok("Apache: mcp-kitaplik klasoru 403 (php dosyalari ve dizin)", kd.every(function (s) { return s === 403; }), kd);
+  // studio-ortak.php: 403'u Apache verir (FilesMatch; govdede Apache'nin "Forbidden" sayfasi). PHP'ye hic ulasmaz:
+  // kitapligin kendi korumasi (STUDIO_ORTAK sabiti) bos govdeli 403 verirdi; o ikinci savunma test-studio-ortak.js'te.
+  var ortakYollar = ["/studio/v1/studio-ortak.php", "/studio/v1/studio-ortak.php/ek", "/studio/v1/STUDIO-ORTAK.php"];
+  var od = [];
+  for (i = 0; i < ortakYollar.length; i++) { var oy = await I.istek({ yol: ortakYollar[i] }); od.push([oy.status, /Forbidden/.test(oy.metin)]); }
+  ok("Apache: v1/studio-ortak.php dogrudan -> 403 (v1/.htaccess FilesMatch; PHP calismaz)", od[0][0] === 403 && od[0][1] && od[1][0] === 403 && od[1][1] &&
+    (od[2][0] === 403 || od[2][0] === 404), od);
   r = await I.istek({ yol: "/studio/oauth-giris.php" });
   r2 = await I.istek({ yol: "/studio/kesif-giris.php" });
   var r9 = await I.istek({ yol: "/studio/mcp-giris" });

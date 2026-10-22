@@ -32,7 +32,7 @@ if (phpVar.error || phpVar.status !== 0) {
 var MY = process.env.STUDIO_TEST_MYSQL || "";
 var DB_USER = MY ? (process.env.STUDIO_TEST_DB_USER || "root") : "", DB_PASS = MY ? (process.env.STUDIO_TEST_DB_PASS || "") : "";
 var sqliteVar = cp.spawnSync("php", ["-r", "echo in_array($argv[1], PDO::getAvailableDrivers()) ? 'var' : 'yok';", MY ? "mysql" : "sqlite"], { encoding: "utf8" });
-["server/studio-v1/index.php", "server/studio-v1/config.example.php", "server/studio-v1/sifre-ozeti.php"].forEach(function (f) {
+["server/studio-v1/index.php", "server/studio-v1/studio-ortak.php", "server/studio-v1/config.example.php", "server/studio-v1/sifre-ozeti.php"].forEach(function (f) {
   var r = cp.spawnSync("php", ["-l", path.join(ROOT, f)], { encoding: "utf8" });
   ok("php -l " + f, r.status === 0, r.stdout + r.stderr);
 });
@@ -56,6 +56,7 @@ var PUB = path.join(TMP, "public_html"), API_DIR = path.join(PUB, "studio", "v1"
 fs.mkdirSync(API_DIR, { recursive: true });
 fs.mkdirSync(PRIV, { recursive: true });
 fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "index.php"), path.join(API_DIR, "index.php"));
+fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "studio-ortak.php"), path.join(API_DIR, "studio-ortak.php"));
 var ozet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE], { encoding: "utf8" }).stdout;
 // Test veritabani yardimcilari (SQLite: PRIV altinda dosya; MySQL: studio_test_<pid>_<ad> veritabani)
 var DB_ONEK = "studio_test_" + process.pid + "_", acilanDblar = [];

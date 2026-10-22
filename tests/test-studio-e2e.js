@@ -44,6 +44,7 @@ fs.mkdirSync(PRIV, { recursive: true });
 ["index.html", "studio.css", "studio-core.js", "studio.js", "favicon.svg"].forEach(function (f) { fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "arayuz", f), path.join(PUB, "studio", f)); });
 fs.copyFileSync(path.join(ROOT, "docs", "favicon.svg"), path.join(PUB, "favicon.svg"));
 fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "index.php"), path.join(PUB, "studio", "v1", "index.php"));
+fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "studio-ortak.php"), path.join(PUB, "studio", "v1", "studio-ortak.php"));
 var ozet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE], { encoding: "utf8" }).stdout;
 
 var PORT, phpSurec, tarayici;

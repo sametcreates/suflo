@@ -12,7 +12,7 @@ Bu klasör şu parçaları içerir:
 
 Studio kayıtlarına dokunan araç işleyicileri **arka uç arayüzünün** arkasındadır (aşağıda). Gerçek arka uç henüz bağlanmadı: `mcp-kitaplik/arka-studio.php` bilerek "kurulmadı" der. Bu sürüm canlıya yüklense bile hiçbir şifre kabul edilmez ve hiçbir bağlantı açılmaz.
 
-Tasarımın kaynağı `mcp-tasarim.md` (v1) belgesidir. Panel (`../index.php`), Studio şeması ve `pro` dosyaları değişmedi.
+Tasarımın kaynağı `mcp-tasarim.md` (v1) belgesidir. Studio şeması ve `pro` dosyaları değişmedi. Panelin veri mantığı, davranışı değişmeden ortak kitaplığa (`../studio-ortak.php`) ayrıldı; gerçek arka uç onu kullanacak (aşağıda).
 
 ## Dağıtım
 
@@ -25,6 +25,7 @@ Tasarımın kaynağı `mcp-tasarim.md` (v1) belgesidir. Panel (`../index.php`), 
 | `mcp-kitaplik/` (`.htaccess` dahil) | `studio/mcp-kitaplik/` | Kitaplık. Dışarıya kapalı (403) |
 | `studio.htaccess` | `studio/.htaccess` | `../arayuz.htaccess`'in **bütün kuralları**, https yönlendirmesi ve MCP kuralları. arayuz.htaccess'in yerine yüklenir |
 | `well-known.htaccess` | `.well-known/.htaccess` | **Yeni dosya.** Yalnız tam keşif adlarını eşler; `acme-challenge`'a dokunmaz |
+| `../studio-ortak.php` | `studio/v1/studio-ortak.php` | Panelle ortak veri kitaplığı. Panelin `index.php`'si de onu ister; ikisi her zaman **birlikte** yüklenir. `v1/.htaccess` dışarıya kapatır (403) |
 
 Giriş dosyalarının adı bilerek istek yollarından farklıdır (`mcp` → `mcp-giris.php`). MultiViews açık bir sunucuda `/studio/mcp` ya da `/studio/oauth/token` isteği aksi hâlde yeniden yazmadan önce `mcp.*` / `oauth.*` adlı bir dosyaya eşlenirdi. Bu yüzden `.htaccess`'te `Options -MultiViews` yoktur; Options değişikliğine izin vermeyen sunucularda o satır 500 verirdi. Dosyaları yeniden adlandırma.
 
@@ -145,7 +146,8 @@ interface McpStudioArka {
 
 - Panelin `sifre_dene($sifre, cihaz_ozeti())` işlevini **aynen** kullanmalıdır. Aynı `girisler` tablosunu, aynı sınırları (`login_max_fail`, `login_window`) ve tanınan cihaz kuralını uygular.
 - Onay sayfası panelle aynı adreste (`assets.suflo.app`) açıldığından tarayıcı `__Host-suflo_studio_cihaz` çerezini de gönderir.
-- Bugünkü `sifre_dene()` kilitte `hata(429)` ile **çıkar** ve `index.php` üst düzey kod çalıştırır. Bu yüzden panel kodu, durum döndüren bir kitaplık işlevine ayrılmalıdır. Davranışı ve sınırları değişmemelidir.
+- Bunun için `studio-ortak.php`'deki `sahip_sifre_dene($sifre)` kullanılır: panelin `sifre_dene_durum()` kilidinden geçer (`cihaz_ozeti()` dahil), çıkmaz, `['durum', 'iz']` döner. Şifre hiç ayarlanmamışsa `kurulmadi` döner ve deneme sayılmaz. Panelin kendi `sifre_dene()`'si aynı çekirdeği kullanır; kilitte yine 429 yanıtı verir.
+- `sahip_sifre_izi()`: şu anki iz ya da şifre yoksa null. Veritabanı hatası istisna olarak gelir; arka uç bunu `McpMesgulHatasi`'na çevirir (null döndürmez).
 
 ### `arac($ad, $girdi, $b)`
 
@@ -192,7 +194,7 @@ Döner: `['gecerli' => bool, 'satirlar' => [['sira','islem','ozet','durum' => 'g
 
 Bu işlev yalnız kullanıcı kodu onayladıktan sonra çağrılır:
 
-1. Önce anlık kopyayı al: `anlik_al('mcp_toplu_oncesi')`.
+1. Önce anlık kopyayı al: `anlik_al('mcp_toplu_oncesi')` (`studio-ortak.php`; `islem()` içinde, yazmalarla aynı işlemde).
 2. Sonra **tek işlemde** hepsini ya da hiçbirini uygula.
 3. Kayıt kimliklerini `$toplu_anahtar`'dan türet, ör. `substr(sha256($toplu_anahtar.'|'.$sira), 0, 24)`. Yarıda kesilen bir uygulama yeniden denenebilir; böylece mükerrer açılmaz.
 
@@ -226,6 +228,24 @@ Tanımlar `mcp-kitaplik/araclar.php`'dedir: ad, Türkçe başlık ve açıklama,
 | `studio_toplu_onizle` | studio.yaz | readOnly (yalnız önizler ve kod verir) |
 | `studio_toplu_uygula` | studio.yaz | destructive=true, idempotent=true |
 
+## Ortak veri kitaplığı (`../studio-ortak.php`)
+
+Panelle aynı veri kodu. Arka uç onu şöyle yükler (arka uç dosyasının kapsamında `$C` ve `$ozel` vardır):
+
+```php
+define('STUDIO_ORTAK', 1);
+require_once __DIR__ . '/../v1/studio-ortak.php';   // arka uç public_html/<klasör>/mcp-kitaplik/ içinde; kitaplık <klasör>/v1/'de
+studio_ayar_kullan($C);   // varsayılanlar + kitaplığın etkin ayarı
+```
+
+- Kurulum, veritabanı ve kilit hataları `StudioHatasi` istisnasıdır (`http`, `kod`: `kurulum` / `veritabani` / `mesgul` / `kilit`). Kitaplık süreci sonlandırmaz; panel ise kendi yanıtlayıcısını `studio_dur_ayarla('hata')` ile kaydeder ve eskisi gibi JSON yanıtıyla çıkar.
+- Yazma: `kayit_kaydet($tur, $id, $veri, $surum)` panelin "kaydet" işlemidir: tek işlemde (SQLite `BEGIN IMMEDIATE`, MySQL `FOR UPDATE`) günlük otomatik kopya + `kayit_yaz`. İstemcinin verdiği kimlikle yeni kayıt tekrarlanırsa ikinci kayıt açılmaz; güncelleme yalnız `$surum` hâlâ geçerliyse yazılır. Birden çok yazma için `islem(function () { gunluk_anlik(); $var = tur_haritasi(tum_kayitlar()); … kayit_yaz(…, $var) … })`.
+- Hata türü: `yazma_hatasi_kodu($e)` → `gecersiz` | `cakisma` | `yok` | `ayni_ad` | `mesgul` | `veritabani_sinir` | `sunucu`. `cakisma`'da güncel kayıt `cakisma_guncel_json($e)`'dedir.
+- Okuma: `kayit_oku($tur, $id)`, `kayitlari_oku($tur)` (arşivdekiler dahil; `ucret` alanı da gelir, **arka uç çıktıya koymaz**), `veri_paketi()`.
+- Doğrulama: `temizle()` panelin beyaz listesidir; `tarih()`, `saat()`, `metin()` aynı Türkçe mesajları verir.
+- Kitaplık oturum ya da jeton denetimi yapmaz. Çağıran taraf (panel: oturum; MCP: Bearer jeton + kapsam) yetkiyi **önce** denetler.
+- Dışarıdan açılamaz: `v1/.htaccess` `FilesMatch` ile reddeder; ayrıca `STUDIO_ORTAK` tanımlanmadan çağrılırsa hiçbir şey yapmadan 403 ile çıkar.
+
 ## Panel entegrasyonu (Ayarlar → "Sohbet bağlantıları")
 
 Depo işlevleri `mcp-kitaplik/depo.php`'dedir:
@@ -244,7 +264,8 @@ Panelden kullanmak için: `define('SUFLO_MCP', 1); require '<public_html>/studio
 
 ```text
 node tests/test-studio-mcp.js          # php -S + .htaccess taklidi + sahte arka uç: tam OAuth akışı, iki MCP dönemi, araçlar, olumsuz durumlar
-node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php (MultiViews açık, Options yalnız Indexes): .htaccess kuralları, https yönlendirmesi, Authorization geçişi, acme-challenge, kapalı kitaplık
+node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php (MultiViews açık, Options yalnız Indexes): .htaccess kuralları, https yönlendirmesi, Authorization geçişi, acme-challenge, kapalı kitaplık, kapalı v1/studio-ortak.php
+node tests/test-studio-ortak.js        # ortak veri kitaplığı panelsiz: kayıt, sürüm, mükerrer, otomatik kopya, şifre kilidi, doğrudan erişim
 ```
 
 - `php` (ya da `pdo_sqlite`) yoksa iki test de ATLA der. Apache ya da `mod_php` yoksa Apache testi ATLA der.
@@ -253,7 +274,7 @@ node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php (MultiViews a�
 
 ## Açık konular
 
-- **Gerçek arka uç:** panelin `sifre_dene` / `sifre_izi` / kayıt işlevleri çağrılabilir bir kitaplığa ayrılmalı (yukarıda).
+- **Gerçek arka uç:** henüz yazılmadı. Kullanacağı kitaplık hazır (aşağıda "Ortak veri kitaplığı").
 - **Panelin test kurulumu:** panel (`../index.php`) ayar yolunu `private/studio-v1` olarak sabit yazar. `public_html/studio-test/v1/` kurulursa canlı veriyi kullanır. MCP klasör adından türetir; panelde de aynı türetme gerekir.
 - **ChatGPT `connector/oauth/{callback_id}`:** önek varsayılan olarak izinlidir. Daha dar tutmak için yönetim sayfasında görünen tam adres `mcp_redirect_izinli`'ye yazılabilir.
 - **Kayıt kotası:** günlük 50'lik genel kota çok IP'li biri tarafından geçerli kayıtlarla doldurulabilir (yukarıda "Kalan risk"). Ayarlar ekranına "kayıt sayacını sıfırla" düğmesi eklenmeli (`mcp_kayit_sayaci_sifirla()`).

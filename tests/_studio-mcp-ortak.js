@@ -21,7 +21,8 @@ var DAGITIM = [
   ["mcp-onay.css", "<u>/mcp-onay.css"],
   ["mcp-kitaplik/", "<u>/mcp-kitaplik/"],
   ["studio.htaccess", "<u>/.htaccess"],
-  ["well-known.htaccess", ".well-known/.htaccess"]
+  ["well-known.htaccess", ".well-known/.htaccess"],
+  ["../studio-ortak.php", "<u>/v1/studio-ortak.php"]     // panelle ortak veri kitapligi (gercek arka uc bunu yukler)
 ];
 
 function phpDizi(o) {

@@ -42,8 +42,9 @@ jobs:
         run: node tests/test-referral-server.js
       - name: Suflo Studio sunucusu (sozdizimi + php -S + SQLite)
         run: |
-          php -l server/studio-v1/index.php && php -l server/studio-v1/config.example.php && php -l server/studio-v1/sifre-ozeti.php
+          php -l server/studio-v1/index.php && php -l server/studio-v1/studio-ortak.php && php -l server/studio-v1/config.example.php && php -l server/studio-v1/sifre-ozeti.php
           node tests/test-studio-api.js
+          node tests/test-studio-ortak.js
 
   # Suflo Studio uctan uca: gercek Chromium + php -S + SQLite, masaustu ve telefon. studio.js baska hicbir CI isinde
   # tarayicida yuklenmez; bu iste Playwright ya da pdo_sqlite yoksa test atlanmaz, kalir (STUDIO_E2E_ZORUNLU).
