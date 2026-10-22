@@ -1,0 +1,40 @@
+# public_html/studio/.htaccess (ve test kurulumunda public_html/studio-test/.htaccess)
+# = server/studio-v1/arayuz.htaccess'in BUTUN kurallari (degistirilmeden) + Suflo Studio MCP kurallari.
+# Bu dosya arayuz.htaccess'in yerine yuklenir; arayuz.htaccess repoda oldugu gibi kalir.
+Options -Indexes
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Robots-Tag "noindex, nofollow"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'"
+</IfModule>
+
+# ---- Suflo Studio MCP (sohbet baglantisi) ----
+# Kaldirmak icin bu bolumu silmek yeter (ya da config.php'de 'mcp_acik' => false); arayuz ve panel etkilenmez.
+# Giris dosyalarinin adi (mcp-giris.php, oauth-giris.php, kesif-giris.php) bilerek istek yollarindan farkli: MultiViews
+# acik bir sunucuda "mcp" ya da "oauth/token" istegi bir mcp.* / oauth.* dosyasina eslenmez. Bu yuzden "Options -MultiViews"
+# gerekmez (Options degisikligine izin vermeyen sunucularda 500 verirdi).
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # Bu klasorde RewriteEngine acik oldugu icin public_html/.htaccess'teki https yonlendirmesi /studio/ altinda (panel
+  # /studio/v1/ dahil) artik uygulanmaz; ayni yonlendirme burada acikca yapilir (vekil arkasinda X-Forwarded-Proto'ya bakilir).
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+  # Kitaplik klasoru disariya kapali (kendi .htaccess'i de var)
+  RewriteRule ^mcp-kitaplik(/|$) - [F,L]
+  # MCP uc noktasi: /studio/mcp. Klasor degil, dosyaya ic yonlendirme: 301 / sonda / yok.
+  # E=: FastCGI / LiteSpeed'de Authorization basligi PHP'ye ulassin (PHP REDIRECT_HTTP_AUTHORIZATION olarak da okur).
+  RewriteRule ^mcp$ mcp-giris.php [L,QSA,E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+  # OAuth uclari (oauth-giris.php hangi uc oldugunu istek yolundan okur)
+  RewriteRule ^oauth/(authorize|token|register|revoke)$ oauth-giris.php [L,QSA,E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+  # Kesif: issuer yolunun sonuna eklenen OIDC (ve eski RFC 8414) bicimi
+  RewriteRule ^\.well-known/(openid-configuration|oauth-authorization-server)$ kesif-giris.php [L]
+</IfModule>
+<IfModule mod_headers.c>
+  <FilesMatch "^(mcp|oauth|kesif)-giris\.php$">
+    Header always set Cache-Control "no-store"
+    Header always set X-LiteSpeed-Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

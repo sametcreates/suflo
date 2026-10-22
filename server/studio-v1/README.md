@@ -69,7 +69,7 @@ Tarayıcıda aynı adresten (origin) yüklenen her betik, o adresin izin verdiğ
   - Kurulumu en kolay seçenek. Yukarıdaki risk kalır.
 - **B — `https://assets.suflo.app/studio/` (önerilen; örnek ayar dosyasının varsayılanı)**
   - Arayüz ve API aynı adreste olur. Bu adreste üçüncü taraf betik yoktur.
-  - `server/studio-v1/arayuz/` içindeki dosyaları (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle. `arayuz.htaccess` dosyasını da aynı yere `.htaccess` adıyla koy.
+  - `server/studio-v1/arayuz/` içindeki dosyaları (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle. `arayuz.htaccess` dosyasını da aynı yere `.htaccess` adıyla koy. MCP kuruluysa `arayuz.htaccess` yerine `mcp/studio.htaccess` dosyasını `.htaccess` adıyla koy (bkz. mcp/README.md).
   - `allowed_origins = ['https://assets.suflo.app']`.
   - `suflo.app/studio/` (`docs/studio/index.html`) yalnız yönlendirme sayfasıdır ve hiçbir veriye erişmez. Arayüz kaynağı yayımlanmayan `server/studio-v1/arayuz/` klasöründedir; testler de oradan okur.
   - **Seçilen: B** (sahibinin onayıyla).
@@ -88,7 +88,7 @@ Klasör yapısı, Pro servisiyle aynı kök altında şöyle olmalı:
 
 ```text
 public_html/studio/index.html        <- (yalnız seçenek B) arayüz: index.html, studio.css, studio-core.js, studio.js, favicon.svg
-public_html/studio/.htaccess         <- (yalnız seçenek B) server/studio-v1/arayuz.htaccess
+public_html/studio/.htaccess         <- (yalnız seçenek B) server/studio-v1/arayuz.htaccess (MCP kuruluysa: server/studio-v1/mcp/studio.htaccess)
 public_html/studio/v1/index.php      <- server/studio-v1/index.php
 public_html/studio/v1/.htaccess      <- server/studio-v1/.htaccess
 private/studio-v1/config.php         <- config.example.php'nin doldurulmuş kopyası
@@ -98,7 +98,7 @@ private/studio-v1/studio.sqlite      <- sunucu ilk istekte kendisi oluşturur
 Adımlar:
 
 1. `public_html/studio/v1/` klasörünü aç; `index.php` ve `.htaccess` dosyalarını yükle.
-   - Seçenek B'de ayrıca: arayüz dosyalarını (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle ve `arayuz.htaccess` dosyasını aynı klasöre `.htaccess` adıyla koy. Bu dosya güvenlik başlıklarını (çerçeveye gömmeyi engelleme dahil) ekler; atlanmamalı.
+   - Seçenek B'de ayrıca: arayüz dosyalarını (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle ve `arayuz.htaccess` dosyasını aynı klasöre `.htaccess` adıyla koy. Bu dosya güvenlik başlıklarını (çerçeveye gömmeyi engelleme dahil) ekler; atlanmamalı. MCP kuruluysa `arayuz.htaccess` yerine `mcp/studio.htaccess` dosyasını `.htaccess` adıyla koy (bkz. mcp/README.md).
 2. `private/studio-v1/` klasörünü aç. `config.example.php` dosyasını buraya `config.php` adıyla koy.
 3. Şifre özetini üret. Tercihen Hostinger SSH terminalinde, ya da kendi bilgisayarında (PHP kuruluysa) `php sifre-ozeti.php` komutunu çalıştır. Windows terminalinde yazdığın şifre ekranda görünür; yanında kimse yokken çalıştır. Şifreyi iki kez yaz (en az 12 karakter). Çıkan `$argon2id$...` ya da `$2y$...` satırını `config.php` içindeki `'password_hash'` alanına yapıştır. `sifre-ozeti.php` dosyasını `public_html` içine **koyma**.
 4. `allowed_origins`: seçenek A için `['https://suflo.app']`, seçenek B için `['https://assets.suflo.app']` (yalnız biri).

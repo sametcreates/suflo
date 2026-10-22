@@ -1,0 +1,10 @@
+# public_html/.well-known/.htaccess  (YENI dosya; bu klasorde baska .htaccess varsa satirlari ona eklenir)
+# YALNIZ Suflo Studio MCP kesif adlari (studio ve studio-test) /<uygulama>/kesif-giris.php'ye yonlenir.
+# acme-challenge (SSL sertifikasi yenileme) ve bu klasordeki diger her sey oldugu gibi sunulur:
+# burada yasaklama, yonlendirme ya da "her seyi yakala" kurali YOK.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^oauth-protected-resource/(studio|studio-test)/mcp$ /$1/kesif-giris.php [L]
+  RewriteRule ^oauth-authorization-server/(studio|studio-test)$ /$1/kesif-giris.php [L]
+  RewriteRule ^openid-configuration/(studio|studio-test)$ /$1/kesif-giris.php [L]
+</IfModule>
