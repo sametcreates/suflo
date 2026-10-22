@@ -723,6 +723,22 @@ async function calis() {
   var bTekrar = Object.assign({}, bToplu.kayitlar[1].veri, { basSaat: "15:00" });
   r = await kaydetK("blok", bTekrar, yeniBlokId);
   ok("ayni blok kimligi farkli icerikle: 409 (sessizce ezilmez)", r.status === 409 && r.json.guncel.basSaat === "14:00", j(r.json));
+  // Geri donus: blogu tanimayan eski index.php bloktaki bir icerigin musterisini degistirmis (blok denetimi yok). Yeni surumde
+  // blok yine tasinabilir / tamamlanabilir: o icerik bloktan cikar; yeni eklenen baska musteri icerigi yine reddedilir.
+  var rbI = (await kaydetK("icerik", { musteriId: tm1.id, baslik: "Geri dönüş reels", durum: "kurguda" })).json.kayit;
+  var rbI2 = (await kaydetK("icerik", { musteriId: tm1.id, baslik: "Geri dönüş reels 2", durum: "kurguda" })).json.kayit;
+  var rbB = (await kaydetK("blok", { musteriId: tm1.id, icerikIdler: [rbI.id, rbI2.id], basTarih: "2030-06-24", basSaat: "10:00", bitSaat: "11:00" })).json.kayit;
+  var rbVeri = JSON.parse(JSON.parse(dbPdo(ANA_DSN, [], "SELECT veri FROM kayitlar WHERE id = '" + rbI.id + "'"))[0][0]);
+  rbVeri.musteriId = tm2.id;
+  dbPdo(ANA_DSN, ["UPDATE kayitlar SET veri = '" + JSON.stringify(rbVeri).replace(/'/g, "''") + "' WHERE id = '" + rbI.id + "'"]);
+  r = await kaydetK("blok", Object.assign({}, rbB, { basSaat: "13:00", bitSaat: "14:00" }), rbB.id, rbB.surum);
+  ok("eski surumde musterisi degisen icerik: blok yine tasinir, o icerik bloktan cikar (diger icerik kalir)", r.status === 200 && r.json.kayit.basSaat === "13:00" &&
+    j(r.json.kayit.icerikIdler) === j([rbI2.id]), j(r.json));
+  var rbB2 = r.json.kayit;
+  r = await kaydetK("blok", Object.assign({}, rbB2, { icerikIdler: [rbI2.id, rbI.id] }), rbB.id, rbB2.surum);
+  ok("bloktan cikan baska musteri icerigi yeniden eklenemez (422)", r.status === 422 && /başka bir müşteriye/.test(r.json.mesaj), j(r.json));
+  r = await kaydetK("blok", Object.assign({}, rbB2, { musteriId: tm2.id, icerikIdler: [rbI2.id] }), rbB.id, rbB2.surum);
+  ok("blogun musterisi degisirken eski musterinin icerigi sessizce cikarilmaz (422)", r.status === 422, j(r.json));
 
   // ozel gunler
   var ogId = "e1b2c3d4e5f6a7b8c9d0e1f2", ogVeri = { baslik: "Örnek doğum günü", tarih: "2028-02-29", tur: "dogum", herYil: true, bilinmeyen: 1 };

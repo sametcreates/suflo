@@ -1609,7 +1609,9 @@ async function calis() {
   await bekle(100);
   var duyuru = await kp.locator("#tk-duyuru").textContent();
   var odak = await kp.evaluate(function () { return document.activeElement && document.activeElement.getAttribute("data-id"); });
-  ok("klavye: asagi ok 15 dk tasir (10:15-12:15), duyurulur, odak kartta", ea.bitSaat === "12:15" && /10:15/.test(duyuru) && odak === kid("ea"), JSON.stringify([ea.basSaat, duyuru, odak]));
+  // kayit donunce ayni degisiklik ikinci kez duyurulmaz (bildirim bolgesi metni zaten okur): duyuru yer bilgisi olarak kalir
+  ok("klavye: asagi ok 15 dk tasir (10:15-12:15), bir kez duyurulur, odak kartta", ea.bitSaat === "12:15" && /10:15/.test(duyuru) && !/^Taşındı/.test(duyuru) && odak === kid("ea"),
+    JSON.stringify([ea.basSaat, duyuru, odak]));
   await odakEA(); await kp.keyboard.press("Shift+ArrowUp");
   ea = await kBekle("etkinlikler", kid("ea"), function (k) { return k.bitSaat === "12:00"; });
   await kp.waitForSelector(".tk-kayit.tamam");
@@ -1702,10 +1704,10 @@ async function calis() {
   await td2.locator("button:has-text('Vazgeç')").click();
   await kp.waitForSelector("dialog[open]", { state: "detached" });
 
-  // Kaydetme hatasi (sunucu 500): ekran sunucudaki hale doner, acik hata + "Tekrar dene"
+  // Kaydetme hatasi (sunucu kesin reddetti: 503 mesgul): ekran sunucudaki hale doner, acik hata + "Tekrar dene"
   await kp.route("**/studio/v1/index.php", function (rt) {
     var g = JSON.parse(rt.request().postData() || "{}");
-    if (g.islem === "toplu") return rt.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ ok: false, hata: "sunucu", mesaj: "Sunucu hatası" }) });
+    if (g.islem === "toplu") return rt.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false, hata: "mesgul", mesaj: "Meşgul" }) });
     return rt.continue();
   });
   t0 = await kartTut("eb");
@@ -1719,6 +1721,49 @@ async function calis() {
   await kp.click(".toast button:has-text('Tekrar dene')");
   eb = await kBekle("etkinlikler", kid("eb"), function (k) { return k.basTarih === "2099-12-09"; });
   ok("'Tekrar dene' ayni degisikligi kaydeder", eb.basSaat === "11:00" && (await kp.locator(".tk-kayit").first().textContent()) === "✓ Kaydedildi", JSON.stringify(eb));
+
+  // Yaniti kaybolan kaydetme: sunucu yazdi, baglanti koptu. "Değişiklik geri alındı" denmez; sunucudaki hal yuklenir
+  // (kart yeni yerinde kalir); "Tekrar dene" ikinci kez yazmaz.
+  var kopuk = 0;
+  await kp.route("**/studio/v1/index.php", async function (rt) {
+    var g = JSON.parse(rt.request().postData() || "{}");
+    if (g.islem === "toplu" && !kopuk++) { await rt.fetch(); return rt.abort("connectionreset"); }
+    return rt.continue();
+  });
+  t0 = await kartTut("eb");
+  hedef = await kolonY("2099-12-09", 13 * 60);
+  await surukle(t0.x, t0.y, hedef.x, hedef.y + 10);
+  await kp.waitForSelector(".toast.hata:has-text('kaydedilip kaydedilmediği bilinmiyor') button:has-text('Tekrar dene')", { timeout: 8000 }).catch(function () {});
+  eb = await kKayit("etkinlikler", kid("eb"));
+  var kopukRozet = await kp.locator(".tk-kayit").first().evaluate(function (e) { return e.textContent + "|" + e.title; });
+  ok("yaniti kaybolan kaydetme: 'geri alındı' denmez, sunucudaki hal (13:00) ekranda; gosterge sonucun bilinmedigini yazar",
+    eb.basSaat === "13:00" && (await kp.locator(".toast:has-text('Değişiklik geri alındı')").count()) === 0 &&
+    (await kp.locator(".tk-kolon[data-gun='2099-12-09'] " + kart("eb")).count()) === 1 && /^Kaydedilemedi\|.*bilinmiyor/.test(kopukRozet) &&
+    /13:00/.test(await kp.locator(kart("eb") + " .zaman").textContent()), JSON.stringify([eb.basSaat, kopukRozet]));
+  await kp.unroute("**/studio/v1/index.php");
+  var ebSurum = eb.surum;
+  await kp.click(".toast button:has-text('Tekrar dene')");
+  await kp.waitForSelector(".tk-kayit.tamam");
+  eb = await kKayit("etkinlikler", kid("eb"));
+  ok("yaniti kaybolan kaydetmede 'Tekrar dene' ikinci kez yazmaz (ayni surum), gosterge ✓", eb.surum === ebSurum && eb.basSaat === "13:00" &&
+    (await kp.locator(".tk-kayit").first().textContent()) === "✓ Kaydedildi", JSON.stringify(eb));
+  // Kaydetme surerken sayfa kapatilir / yenilenirse tarayici sorar (kuyruktaki degisiklik kaybolmasin)
+  var tutulan = null;
+  await kp.route("**/studio/v1/index.php", function (rt) {
+    var g = JSON.parse(rt.request().postData() || "{}");
+    if (g.islem === "toplu" && !tutulan) { tutulan = rt; return; }
+    return rt.continue();
+  });
+  var ayrilSor = function () { return kp.evaluate(function () { var e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; }); };
+  await kp.focus(kart("eb"));
+  await kp.keyboard.press("ArrowDown");
+  await kp.waitForSelector(".tk-kayit.surer");
+  var surerkenSorar = await ayrilSor();
+  while (!tutulan) await bekle(20);
+  await tutulan.continue();
+  await kp.unroute("**/studio/v1/index.php");
+  await kp.waitForSelector(".tk-kayit.tamam");
+  ok("kaydetme surerken ayrilmak sorulur; bitince sorulmaz", surerkenSorar === true && (await ayrilSor()) === false);
 
   // Eszamanli degisiklik: ikinci sayfa ayni kaydi degistirir; bu sayfadaki eski surum sessizce ezmez
   var kp2 = await kctx.newPage();
@@ -1752,11 +1797,23 @@ async function calis() {
   ok("tik animasyonu ve 'Bugün N iş tamamladın' bir artar", (await bugunSayi()) === sayi0 + 1 &&
     await kp.locator(kart("bc") + " .tk-tik.cizil").evaluate(function (e) { return getComputedStyle(e).animationName; }) === "tkTikBuyu");
   ok("ses varsayilan kapali (AudioContext kurulmadi)", await kp.evaluate(function () { return window.__ses; }) === 0);
+  // "Edit işini tamamla" tkKaydet disindan kaydeder: basarisizsa gosterge "Kaydedilemedi" olur (✓ kalmaz)
+  await kp.route("**/studio/v1/index.php", function (rt) {
+    var g = JSON.parse(rt.request().postData() || "{}");
+    if (g.islem === "toplu") return rt.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false, hata: "mesgul", mesaj: "Meşgul" }) });
+    return rt.continue();
+  });
+  await kp.click(kart("bc"));
+  await kp.click(".tk-acilir button:has-text('Edit işini tamamla')");
+  await kp.waitForSelector(".toast.hata:has-text('meşgul')");
+  ok("'Edit işini tamamla' kaydedilemezse gosterge 'Kaydedilemedi'", (await kp.locator(".tk-kayit").first().textContent()) === "Kaydedilemedi" &&
+    (await kKayit("icerikler", kid("ic1"))).durum === "kurguda");
+  await kp.unroute("**/studio/v1/index.php");
   await kp.click(kart("bc"));
   await kp.click(".tk-acilir button:has-text('Edit işini tamamla')");
   await kp.waitForSelector(".toast:has-text('→ Yayına hazır') button:has-text('Geri al')");
-  ok("'Edit işini tamamla': bagli icerik 'Yayına hazır' (mevcut durum akisi), sayac artar", (await kBekle("icerikler", kid("ic1"), function (k) { return k.durum === "hazir"; })).durum === "hazir" &&
-    (await bugunSayi()) === sayi0 + 2);
+  ok("'Edit işini tamamla': bagli icerik 'Yayına hazır' (mevcut durum akisi), sayac artar; gosterge yeniden ✓", (await kBekle("icerikler", kid("ic1"), function (k) { return k.durum === "hazir"; })).durum === "hazir" &&
+    (await bugunSayi()) === sayi0 + 2 && (await kp.locator(".tk-kayit").first().textContent()) === "✓ Kaydedildi");
   await kp.click(".toast button:has-text('Geri al')");
   ok("geri al: icerik yeniden 'Kurguda'", (await kBekle("icerikler", kid("ic1"), function (k) { return k.durum === "kurguda"; })).durum === "kurguda");
   // Cekimi tamamlamak icerikleri degistirmez; bildirimde acik secim olarak teklif
@@ -1841,6 +1898,101 @@ async function calis() {
   await kp.waitForSelector(".toast:has-text('Edit zamanı ayrıldı')");
   for (bn = 0; bn < 50 && (await kApi({ islem: "veri" })).veri.bloklar.length === blokSayi; bn++) await bekle(100);
   ok("simdi ne yapayim: basinca blok eklenir", (await kApi({ islem: "veri" })).veri.bloklar.length === blokSayi + 1);
+  // Takvim ayarlari yalniz degisen alani yazar: dokunulmayan saat yuvarlanmaz (08:30 kalir), baska cihazin degistirdigi
+  // saatler hedefi degistiren kaydetmeyle geri donmez; ayni alan iki yerde degistiyse sessizce ezilmez.
+  async function ayarYaz(ek) {
+    var a = (await kApi({ islem: "veri" })).veri.ayar;
+    return kApi({ islem: "kaydet", tur: "ayar", id: "ayar", surum: a.surum, veri: Object.assign({ varsayilanStokUyari: a.varsayilanStokUyari === undefined ? null : a.varsayilanStokUyari }, ek) });
+  }
+  var ayarIlk = (await kApi({ islem: "veri" })).veri.ayar;
+  await ayarYaz({ calismaBas: 510, calismaBit: 1140 });
+  await kp.goto(HAFTA);
+  await kp.reload();
+  await kp.waitForSelector(kart("ea"));
+  var toastSil = function () { return kp.evaluate(function () { document.querySelectorAll(".toast").forEach(function (t) { t.remove(); }); }); };
+  await kp.click(".tk-arac button[aria-label='Takvim ayarları']");
+  var basSecim = await kp.locator(".tk-acilir select[aria-label='Çalışma başı']").evaluate(function (e) { return e.value + "|" + e.options[e.selectedIndex].textContent; });
+  await kp.fill(".tk-acilir input[aria-label='Haftalık hedef']", "41");
+  await toastSil();
+  await kp.click(".tk-acilir button:has-text('Kaydet')");
+  await kp.waitForSelector(".toast:has-text('Takvim ayarları kaydedildi.')");
+  var ay = (await kApi({ islem: "veri" })).veri.ayar;
+  ok("takvim ayarlari: kayitli 08:30 secili gorunur; yalniz hedef degisince 510 yuvarlanmaz", basSecim === "510|08:30" && ay.calismaBas === 510 && ay.calismaBit === 1140 && ay.haftalikHedef === 41,
+    JSON.stringify([basSecim, ay]));
+  await ayarYaz({ calismaBas: 480, calismaBit: 1260 }); // baska cihaz saatleri degistirir; bu sayfa eski surumu biliyor
+  await kp.click(".tk-arac button[aria-label='Takvim ayarları']");
+  await kp.fill(".tk-acilir input[aria-label='Haftalık hedef']", "42");
+  await toastSil();
+  await kp.click(".tk-acilir button:has-text('Kaydet')");
+  await kp.waitForSelector(".toast:has-text('Takvim ayarları kaydedildi.')");
+  ay = (await kApi({ islem: "veri" })).veri.ayar;
+  ok("takvim ayarlari 409: baska cihazin saatleri (480/1260) korunur, yalniz hedef yazilir", ay.calismaBas === 480 && ay.calismaBit === 1260 && ay.haftalikHedef === 42, JSON.stringify(ay));
+  await ayarYaz({ haftalikHedef: 7 }); // baska cihaz ayni alani (hedef) degistirir
+  await kp.click(".tk-arac button[aria-label='Takvim ayarları']");
+  await kp.fill(".tk-acilir input[aria-label='Haftalık hedef']", "9");
+  await toastSil();
+  await kp.click(".tk-acilir button:has-text('Kaydet')");
+  await kp.waitForSelector(".tk-acilir .tk-hata:has-text('başka bir yerde')", { timeout: 8000 }).catch(function () {});
+  ay = (await kApi({ islem: "veri" })).veri.ayar;
+  var ayPen = (await kp.locator(".tk-acilir input[aria-label='Haftalık hedef']").count()) ? [await kp.locator(".tk-acilir input[aria-label='Haftalık hedef']").inputValue(),
+    await kp.locator(".tk-acilir select[aria-label='Çalışma sonu']").inputValue()] : ["pencere kapandı"];
+  ok("takvim ayarlari: ayni alan baska yerde de degistiyse ustune yazilmaz; guncel deger yuklenir ve soylenir", ay.haftalikHedef === 7 && ayPen.join() === "7,1260", JSON.stringify([ay, ayPen]));
+  if (await kp.locator(".tk-acilir .tk-kapat").count()) await kp.click(".tk-acilir .tk-kapat");
+  await ayarYaz({ calismaBas: 540, calismaBit: 1140, haftalikHedef: ayarIlk.haftalikHedef === undefined ? null : ayarIlk.haftalikHedef });
+
+  // Eski (tamamZaman'i olmayan) tamamlanmis cekimin baska alani duzenlenince bugun tamamlanmis sayilmaz
+  await kApi({ islem: "kaydet", tur: "etkinlik", id: kid("eleg"), veri: { musteriId: kid("ta"), tur: "cekim", baslik: "Eski tamamlanmış çekim", tumGun: false, konum: "", not: "",
+    durum: "tamamlandi", basTarih: "2099-12-12", basSaat: "16:00", bitTarih: "2099-12-12", bitSaat: "17:00", arsiv: false } });
+  await kp.goto(HAFTA);
+  await kp.reload();
+  await kp.waitForSelector(kart("eleg"));
+  var bugunOnce = await bugunSayi();
+  await kp.click(kart("eleg") + " .is");
+  await kp.click(".tk-acilir button:has-text('Düzenle')");
+  var ld = kp.locator("dialog[open]");
+  await alanGirdi(ld, "Konum", "input").fill("Yeni stüdyo");
+  await ld.locator("button[type=submit]").click();
+  await kp.waitForSelector("dialog[open]", { state: "detached" });
+  var leg = await kBekle("etkinlikler", kid("eleg"), function (k) { return k.konum === "Yeni stüdyo"; });
+  ok("eski tamamlanmis cekim duzenlenince tamamZaman uydurulmaz; 'Bugün' sayisi degismez", leg.konum === "Yeni stüdyo" && leg.tamamZaman === null && (await bugunSayi()) === bugunOnce,
+    JSON.stringify([leg.tamamZaman, bugunOnce]));
+  await kApi({ islem: "kaydet", tur: "blok", id: kid("bleg"), veri: { musteriId: kid("ta"), icerikIdler: [], baslik: "Eski tamamlanmış blok", basTarih: "2099-12-12", basSaat: "18:00",
+    bitTarih: "2099-12-12", bitSaat: "19:00", durum: "tamamlandi", not: "" } });
+  await kp.reload();
+  await kp.waitForSelector(kart("bleg"));
+  await kp.click(kart("bleg") + " .is");
+  await kp.click(".tk-acilir button:has-text('Düzenle')");
+  ld = kp.locator("dialog[open]");
+  await alanGirdi(ld, "Not", "textarea").fill("Not eklendi");
+  await ld.locator("button[type=submit]").click();
+  await kp.waitForSelector("dialog[open]", { state: "detached" });
+  var blg = await kBekle("bloklar", kid("bleg"), function (k) { return k.not === "Not eklendi"; });
+  ok("eski tamamlanmis blok duzenlenince de tamamZaman uydurulmaz", blg.not === "Not eklendi" && blg.tamamZaman === null && (await bugunSayi()) === bugunOnce, JSON.stringify(blg));
+
+  // Takvimde tek "Geri al" bildirimi: tasima sonrasi pencereden kaydetme onceki geri almayi kaldirir; kalan geri al calisir
+  var eaOnce = await kKayit("etkinlikler", kid("ea"));
+  await kp.focus(kart("ea"));
+  await kp.keyboard.press("ArrowDown");
+  await kp.waitForSelector(".toast:has-text('Taşındı') button:has-text('Geri al')");
+  await kp.waitForSelector(".tk-kayit.tamam");
+  await kp.click(kart("ea") + " .is");
+  await kp.click(".tk-acilir button:has-text('Düzenle')");
+  ld = kp.locator("dialog[open]");
+  await alanGirdi(ld, "Konum", "input").fill("Pencereden konum");
+  await ld.locator("button[type=submit]").click();
+  await kp.waitForSelector("dialog[open]", { state: "detached" });
+  await kp.waitForSelector(".toast:has-text('Kaydedildi.') button:has-text('Geri al')");
+  ok("takvimde pencereden kaydetme: tek 'Geri al' bildirimi kalir", (await kp.locator(".toast button:has-text('Geri al')").count()) === 1 &&
+    (await kp.locator(".toast:has-text('Taşındı')").count()) === 0);
+  await kp.click(".toast button:has-text('Geri al')");
+  var eaG = await kBekle("etkinlikler", kid("ea"), function (k) { return k.konum !== "Pencereden konum"; });
+  ok("kalan 'Geri al' pencere degisikligini geri alir (409 yok, tasima yerinde kalir)", eaG.konum === eaOnce.konum && eaG.basSaat !== eaOnce.basSaat &&
+    eaG.basTarih === eaOnce.basTarih && (await kp.locator(".toast.hata").count()) === 0, JSON.stringify([eaOnce, eaG]));
+  await kp.focus(kart("ea"));
+  await kp.keyboard.press("ArrowUp");
+  await kBekle("etkinlikler", kid("ea"), function (k) { return k.basSaat === eaOnce.basSaat; });
+  await kp.waitForSelector(".tk-kayit.tamam");
+
   // Eski baglantilar: #/takvim de ayni sayfa; masaustunde yatay tasma yok
   await kp.goto(URL_ + "#/takvim?g=hafta&t=2099-12-08");
   await kp.waitForSelector(kart("ea"));
@@ -1925,6 +2077,26 @@ async function calis() {
   await tp2.waitForSelector(".tk-acilir.tk-alt:has-text('Yeni iş')", { timeout: 5000 }).catch(function () {});
   ok("telefon: bos saate dokununca 'Yeni iş' (bir saat, musteri zorunlu)", /11:00–12:00/.test(await tp2.locator(".tk-acilir").textContent().catch(function () { return ""; })));
   await tp2.locator(".tk-acilir .tk-kapat").tap();
+  await tp2.waitForSelector(".tk-acilir", { state: "detached" });
+  // Dokunmanin ardindan gelen click yeni alt sayfaya dusmez: gorunur izgaranin ustunde (perde), ortasinda (tur dugmeleri)
+  // ve altinda (girdiler) dokununca pencere acik kalir, tur Edit kalir, klavye acan girdiye odaklanilmaz
+  var hayalet = [];
+  var kyG = await tp2.locator(".tk-kaydirma").boundingBox(), kolG = await tp2.locator(".tk-kolon").boundingBox();
+  var ustY = Math.max(kyG.y, kolG.y) + 12, altY = Math.min(kyG.y + kyG.height, 844 - 100);
+  for (var hf of [0, 0.25, 0.45, 0.6, 0.75, 0.9]) {
+    var hy = Math.round(ustY + (altY - ustY) * hf), hx = Math.round(kolG.x + kolG.width * 0.6);
+    var hedefEl = await tp2.evaluate(function (n) { var e = document.elementFromPoint(n[0], n[1]); return e ? e.className : ""; }, [hx, hy]);
+    if (!/tk-kolon|tk-dilim|tk-disari/.test(hedefEl)) continue;
+    await tp2.touchscreen.tap(hx, hy);
+    await bekle(400);
+    hayalet.push(await tp2.evaluate(function (y) {
+      var a = document.querySelector(".tk-acilir"), ed = a && a.querySelector(".tk-secim button[aria-pressed=true]"), od = document.activeElement;
+      return y + ":" + (a ? "acik" : "kapali") + "," + (ed ? ed.textContent : "-") + "," + (od ? od.tagName : "-");
+    }, hy));
+    if (await tp2.locator(".tk-acilir").count()) { await tp2.locator(".tk-acilir .tk-kapat").tap(); await tp2.waitForSelector(".tk-acilir", { state: "detached" }); }
+  }
+  ok("telefon: bos saate dokunmanin ardindaki click alt sayfayi kapatmaz, turu degistirmez, klavyeyi acmaz", hayalet.length >= 4 &&
+    hayalet.every(function (x) { return /:acik,Edit,(DIV)$/.test(x); }), JSON.stringify(hayalet));
   await tp2.locator(".tk-tel-alt button:has-text('Planlanacaklar')").tap();
   await tp2.waitForSelector(".tk-acilir.tk-alt:has-text('Planlanacaklar') .tk-cek-kart");
   ok("telefon: Planlanacaklar alttan, 'Zaman ayır' dugmeli", (await tp2.locator(".tk-acilir .tk-cek-kart button:has-text('Zaman ayır')").count()) > 0);
@@ -2059,12 +2231,16 @@ async function calis() {
     }).map(function (b) { return b.outerHTML.slice(0, 80); });
     var kartlar = [].map.call(document.querySelectorAll(".tk-kart"), function (k) { return k.getAttribute("aria-label"); });
     var kol = document.querySelector(".tk-kolon[data-gun='2099-12-15']");
-    return { adsiz: adsiz, kartlar: kartlar, kolon: kol.getAttribute("role") + "|" + kol.getAttribute("aria-label"), kayit: document.querySelector(".tk-kayit").getAttribute("role"),
+    return { adsiz: adsiz, kartlar: kartlar, kolon: kol.getAttribute("role") + "|" + kol.getAttribute("aria-label"),
+      kayit: document.querySelector(".tk-kayit").getAttribute("role") + "|" + document.querySelector(".tk-kayit").getAttribute("aria-live"),
+      kartRol: [].map.call(document.querySelectorAll(".tk-kart"), function (k) { return k.getAttribute("role"); }).filter(function (x, i, a) { return a.indexOf(x) === i; }).join(),
+      icIce: document.querySelectorAll(".tk [role=button] button, .tk button button").length,
       gruplar: [].map.call(document.querySelectorAll(".tk-secim"), function (g) { return g.getAttribute("role") + ":" + g.getAttribute("aria-label"); }).join(",") };
   });
-  ok("ekran okuyucu: her dugme / girdi adli; kart etiketi tur, musteri, is, gun ve saat icerir; kolon 'Salı 15 Aralık' grubu; kayit durumu role=status",
+  ok("ekran okuyucu: her dugme / girdi adli; kart etiketi tur, musteri, is, gun ve saat icerir; kolon 'Salı 15 Aralık' grubu; kart role=group (tamamla dugmesi ayri denetim, dugme icinde dugme yok); kayit gostergesi canli bolge degil",
     !etiket.adsiz.length && etiket.kartlar.every(function (l) { return /^(Çekim|Edit bloğu|Toplantı|Etkinlik): .+, .+, \S+ \d\d:\d\d–\d\d:\d\d/.test(l); }) &&
-    etiket.kolon === "group|Salı 15 Aralık" && etiket.kayit === "status" && etiket.gruplar === "group:Gösterilen işler,group:Görünüm", JSON.stringify(etiket).slice(0, 600));
+    etiket.kolon === "group|Salı 15 Aralık" && etiket.kayit === "null|off" && etiket.kartRol === "group" && etiket.icIce === 0 &&
+    etiket.gruplar === "group:Gösterilen işler,group:Görünüm", JSON.stringify(etiket).slice(0, 600));
 
   /* ---- Yalniz klavye: Yeni -> musteri sec -> kaydet -> ok ile tasi -> Enter ayrinti -> bloku tamamla -> Esc odak kartta ---- */
   async function tabla(p, kosul, en) {
@@ -2229,6 +2405,47 @@ async function calis() {
     });
     var td_ = await kolonDenetle(tq, "2099-12-15");
     ok("telefon " + tg + ": tasma yok, butun hedefler en az 44 px (hafta seridi en az 30x44)", to.tasma <= 1 && !to.kucuk.length, JSON.stringify(to));
+    // Izgaradaki hedefler (gercek dokunma alani, elementFromPoint ile): tamamla dugmesi, tum gun seritleri (gun ve hafta),
+    // "+N" ve gece ipuclari en az 44 px; haftada 7 kolon dar oldugundan genislik kolonun izin verdigi kadar
+    var hedefler = [];
+    var olc = async function (adres, bekleSecici, secici) {
+      await tq.goto(URL_ + adres);
+      await tq.waitForSelector(bekleSecici);
+      await bekle(150);
+      if (secici === ".tk-kart .tk-tik") await tq.locator(ekart("x1")).evaluate(function (e) { e.scrollIntoView({ block: "center" }); });
+      else await tq.evaluate(function (secici) { var e = document.querySelector(secici); if (e) e.scrollIntoView({ block: "center" }); }, secici);
+      await bekle(100);
+      return tq.evaluate(function (secici) {
+        return [].filter.call(document.querySelectorAll(secici), function (el) {
+          var r = el.getBoundingClientRect();
+          return el.offsetParent && getComputedStyle(el).display !== "none" && r.top >= 0 && r.bottom <= window.innerHeight - 100 && r.width > 0;
+        }).map(function (el) {
+          var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+          for (var y = Math.round(cy - 40); y <= cy + 40; y++) for (var x = Math.round(cx - 40); x <= cx + 40; x++) {
+            var e = document.elementFromPoint(x, y);
+            if (e && (e === el || el.contains(e))) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+          }
+          var kap = el.closest(".tk-kolon, .hucre"), sinir = kap ? Math.min(44, kap.getBoundingClientRect().width - 8) : 44;
+          return { ad: secici + " " + (el.getAttribute("aria-label") || el.textContent).slice(0, 18), w: x1 - x0 + 1, h: y1 - y0 + 1, sinir: Math.floor(sinir) };
+        });
+      }, secici);
+    };
+    hedefler = hedefler.concat(await olc("#/takvim?g=gun&t=2099-12-15", ".tk-tel " + ekart("x1"), ".tk-kart .tk-tik"));
+    hedefler = hedefler.concat(await olc("#/takvim?g=gun&t=2099-10-29", ".tk-tumgun .tk-serit.tatil", ".tk-tumgun .tk-serit"));
+    hedefler = hedefler.concat(await olc("#/takvim?g=hafta&t=2099-10-29", ".tk-tumgun .tk-serit.tatil", ".tk-tumgun .tk-serit"));
+    hedefler = hedefler.concat(await olc("#/takvim?g=gun&t=2150-06-11", ".tk-gece-ipucu", ".tk-gece-ipucu"));
+    hedefler = hedefler.concat(await olc("#/takvim?g=hafta&t=2099-12-15", ".tk-fazla", ".tk-fazla"));
+    var kucukHedef = hedefler.filter(function (x) { return x.h < 44 || x.w < x.sinir; });
+    ok("telefon " + tg + ": izgara hedefleri (tamamla, tum gun seritleri, '+N', gece ipucu) en az 44 px", hedefler.length >= 5 && !kucukHedef.length &&
+      // 360'ta uc cakisan kart dar seride duser (tamamla dugmesi gizli, ayrinti penceresinden); 390 ve 430'da olculur
+      (tg === 360 ? [] : ["tk-tik"]).concat(["tk-serit", "tk-fazla", "tk-gece-ipucu"]).every(function (c) { return hedefler.some(function (x) { return x.ad.indexOf(c) !== -1; }); }),
+      JSON.stringify(kucukHedef.length ? kucukHedef : hedefler).slice(0, 600));
+    var haftaFazla = await tq.evaluate(function () {
+      var l = [].map.call(document.querySelectorAll(".tk-kolon[data-gun='2099-12-15'] .tk-fazla"), function (b) { return b.textContent; });
+      var gorunenKart = [].filter.call(document.querySelectorAll(".tk-kolon[data-gun='2099-12-15'] .tk-kart"), function (k) { return !k.hidden && k.getBoundingClientRect().width < 30; }).length;
+      return { l: l, ince: gorunenKart };
+    });
+    ok("telefon " + tg + " hafta: cakisan isler ince serit yerine tek dugmede ('3 iş'), ince kart yok", haftaFazla.l.indexOf("3 iş") !== -1 && haftaFazla.ince === 0, JSON.stringify(haftaFazla));
     ok("telefon " + tg + ": cakisan uc kart yan yana, ust uste binmez, musteri adlari okunur; kisa cakisan kartta ⚠", !td_.sorun.length && ["x1", "x2", "x3"].every(function (k) { return td_.kartlar.indexOf(eid(k)) !== -1; }) &&
       /⚠/.test(await tq.locator(ekart("bk1")).textContent()), JSON.stringify(td_));
     if (EKRAN) await tq.screenshot({ path: path.join(EKRAN, "takvim-telefon-" + tg + ".png") });

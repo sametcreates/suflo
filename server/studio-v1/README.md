@@ -172,6 +172,7 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
     - Bir çekimi kaydetmek o çekimin `tamamZaman` alanını siler.
     - Ayar kaydetmek (stok eşiği) çalışma saatlerini ve haftalık hedefi siler.
     - "Tüm veriyi bu dosyayla değiştir" ve kopyaya dönüş, bloklar ile özel günleri de siler.
+    - Bir içeriğin müşterisini değiştirmek, o içeriği içeren çalışma bloğunu bozmaz; yeni sürüme dönünce blok ilk kaydedilişinde (taşıma, tamamlama ya da düzenleme) o içerik bloktan kendiliğinden çıkar.
     - Gerekirse yeni sürüme dönüp güncellemeden önce aldığın JSON yedeğini "Yalnız yenileri ekle" ile içe aktar.
 - **Sunucu mesajları:** Türkçe harfli ve ekrandaki alan adlarıyla yazılır (ör. "Aylık ücret 0 ile 100.000.000 arasında tam sayı olmalı"; içe aktarma önizlemesinde "2. müşteri (Ad): …"). Hata kodları (`hata`) değişmez; arayüz koda göre davranır. Mesajlarda sunucu yolu ya da SQL yer almaz.
 - **Şifre değiştirme:** Ayarlar → Güvenlik. Yeni özet veritabanına yazılır ve diğer tüm oturumlar kapanır.

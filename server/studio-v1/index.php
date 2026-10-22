@@ -546,7 +546,12 @@ function nesne($v, string $alan): array {
 }
 /** Duz liste mi ([] ya da 0'dan sirali anahtarli dizi; JSON nesnesi degil). */
 function liste_mi($v): bool { return is_array($v) && ($v === [] || array_keys($v) === range(0, count($v) - 1)); }
-function temizle(string $tur, array $v, array $var): array {
+/**
+ * $saklananBlok: guncellenen blogun sunucudaki icerik kimlikleri (yalniz blogun musterisi degismiyorsa). Eski surum
+ * (blogu tanimayan index.php) bu iceriklerden birinin musterisini degistirmis olabilir: o kimlik bloktan sessizce cikar
+ * (ice aktarma da boyle yapar), blok tasinip tamamlanabilir. Yeni eklenen baska musteri icerigi yine reddedilir.
+ */
+function temizle(string $tur, array $v, array $var, array $saklananBlok = []): array {
     if ($tur === 'musteri') {
         $s = nesne($v['siklik'] ?? null, 'siklik');
         $gunler = [];
@@ -671,7 +676,10 @@ function temizle(string $tur, array $v, array $var): array {
         foreach ($gelen as $iid) {
             // arsivlenmis icerik de gecerli referanstir (blok sessizce bozulmaz); yalniz var olmali ve ayni musteriye ait olmali
             if (!id_bicim($iid) || ($var[$iid] ?? '') !== 'icerik') throw new InvalidArgumentException('Bloktaki içeriklerden biri bulunamadı');
-            if (($ICERIK_MUSTERI[$iid] ?? null) !== $mid) throw new InvalidArgumentException('Bloktaki içeriklerden biri başka bir müşteriye ait; blokta yalnız bu müşterinin içerikleri olabilir');
+            if (($ICERIK_MUSTERI[$iid] ?? null) !== $mid) {
+                if (in_array($iid, $saklananBlok, true)) continue;
+                throw new InvalidArgumentException('Bloktaki içeriklerden biri başka bir müşteriye ait; blokta yalnız bu müşterinin içerikleri olabilir');
+            }
             if (in_array($iid, $icerikler, true)) throw new InvalidArgumentException('Aynı içerik blokta iki kez geçiyor');
             $icerikler[] = $iid;
         }
@@ -842,7 +850,10 @@ function kayit_yaz(string $tur, ?string $id, array $veri, ?int $surum, array &$v
             } catch (InvalidArgumentException $e) { /* bozuksa tasinmaz */ }
         }
     }
-    $temiz = temizle($tur, $veri, $var);
+    global $BLOK_BAG;
+    $saklanan = [];
+    if ($tur === 'blok' && is_string($id) && isset($BLOK_BAG[$id]) && $BLOK_BAG[$id][0] === ($veri['musteriId'] ?? null)) $saklanan = $BLOK_BAG[$id][1];
+    $temiz = temizle($tur, $veri, $var, $saklanan);
     $anahtar = anahtar($tur, $temiz);
     $n = simdi();
     if ($tur === 'ayar') $id = 'ayar';

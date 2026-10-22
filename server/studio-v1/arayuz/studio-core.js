@@ -488,6 +488,9 @@
       ["05-15", "Kurban Bayramı arifesi", true], ["05-16", "Kurban Bayramı 1. gün"], ["05-17", "Kurban Bayramı 2. gün"], ["05-18", "Kurban Bayramı 3. gün"], ["05-19", "Kurban Bayramı 4. gün"]]
   };
   var DINI_EKSIK_NOT = "Dini bayram tarihleri Diyanet takvimi yayımlanınca eklenecek";
+  // Tablonun ilk yilindan onceki yillarin tarihleri yayimlanmis ve gecmistir: "yayımlanınca eklenecek" yanlis olur
+  var ILK_DINI_YIL = Math.min.apply(null, Object.keys(DINI_BAYRAMLAR).map(Number));
+  var DINI_GECMIS_NOT = "Bu yıl için dini bayram tarihleri eklenmedi";
   var tatilOnbellek = {};
   /**
    * Yilin resmi tatilleri: { yil, gunler: [{ tarih, ad, tur: "tatil", yarim, yarimSaat }], diniBilinen, not }.
@@ -503,7 +506,7 @@
         return { tarih: yil + "-" + x[0], ad: x[1], tur: "tatil", yarim: !!x[2], yarimSaat: x[2] ? "13:00" : null };
       });
       gunler.sort(function (a, b) { return a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0; });
-      tatilOnbellek[yil] = { yil: yil, gunler: gunler, diniBilinen: !!dini, not: dini ? null : DINI_EKSIK_NOT };
+      tatilOnbellek[yil] = { yil: yil, gunler: gunler, diniBilinen: !!dini, not: dini ? null : yil < ILK_DINI_YIL ? DINI_GECMIS_NOT : DINI_EKSIK_NOT };
     }
     return kopya(tatilOnbellek[yil]);
   }

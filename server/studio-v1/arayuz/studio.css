@@ -526,7 +526,23 @@ body:has(.tk-tel-alt) .toastlar{bottom:calc(84px + env(safe-area-inset-bottom))}
   .tk-ay{grid-auto-rows:minmax(64px,auto)}
   .tk-ay .tk-cip span{display:none}
   .tk-ay .tk-hucre .tk-serit span{display:none}
+  /* dokunma hedefleri 44 px: tamamla dugmesi gorunuste ayni yerde, dokunma alani kartin sag ust kosesinden 44x44
+     (alan kartin icinde kalir; alcak kartta sigmaz, orada tamamlama ayrinti penceresinden). Satir yerlesimi degismez:
+     dugmenin eski yeri bos birakilir (dar seritte musteri adi okunur kalir). */
+  .tk-kolon{cursor:pointer} /* iOS Safari bos alana dokunmada click'i yalniz "tiklanabilir" ogeye gonderir */
+  .tk-kart .tk-tik{position:absolute;top:3px;right:7px}
+  .tk-kart .tk-tik::before{content:"";position:absolute;top:-4.6px;right:-8.6px;width:44px;height:44px}
+  .tk-kart .ust-s:has(.tk-tik){padding-right:23px}
+  .tk-kart.alcak .tk-tik{display:none}
+  .tk-kart.alcak .ust-s:has(.tk-tik),.tk-kart.dar .ust-s:has(.tk-tik){padding-right:0}
+  .tk-tumgun .tk-serit{min-height:44px}
+  .tk-gece-ipucu{min-height:44px;display:flex;align-items:center;justify-content:center}
+  .tk-fazla{width:44px;align-items:center}
 }
+/* telefonda haftada tek serit bile sigmayan cakisma: tek dugme kolon genisliginde butun isleri listeler */
+.tk-fazla.hepsi{left:3px;right:3px;width:auto}
+/* cok dar kartta tamamla dugmesi gizli (yukaridaki @container): telefondaki sag bosluk da kalkar */
+@container (max-width:84px){.tk-kart .ust-s:has(.tk-tik){padding-right:0}}
 @media (prefers-reduced-motion:reduce){
   .tk *,.tk *::before,.tk *::after,.tk-acilir,.toast{animation:none!important;transition:none!important}
   .tk-tik.dolu svg{stroke-dashoffset:0}

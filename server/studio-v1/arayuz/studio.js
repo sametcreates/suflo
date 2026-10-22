@@ -545,7 +545,8 @@
   window.addEventListener("hashchange", function () { var st = history.state; ciz(false, st && typeof st.y === "number" ? st.y : null); });
   // Degisiklik yapilmis bir pencere acikken sekme kapatilir ya da sayfa yenilenirse tarayici sorar
   window.addEventListener("beforeunload", function (ev) {
-    if (!Array.prototype.some.call(document.querySelectorAll("dialog[open]"), function (d) { return d.kirli && d.kirli(); })) return;
+    // takvimde iyimser gosterilip henuz sunucuya yazilmamis (kuyrukta / gonderilmekte) degisiklik varsa da sorar
+    if (!TK.calisiyor && !TK.kuyruk.length && !Array.prototype.some.call(document.querySelectorAll("dialog[open]"), function (d) { return d.kirli && d.kirli(); })) return;
     ev.preventDefault();
     ev.returnValue = "";
   });
@@ -872,7 +873,8 @@
     var n = C.kopya(e);
     n.durum = durum;
     // "Bugün N iş tamamladın" sayimi icin tamamlanma ani (tamamlanmadiysa bos)
-    n.tamamZaman = durum === "tamamlandi" ? (e.durum === "tamamlandi" && e.tamamZaman ? e.tamamZaman : C.damga()) : null;
+    // zaten tamamlanmis kayit yeniden tamamlandi yapilirsa ani uydurulmaz (eski kayitta yoksa bos kalir)
+    n.tamamZaman = durum === "tamamlandi" ? (e.durum === "tamamlandi" ? (e.tamamZaman || null) : C.damga()) : null;
     return uygula([{ tur: "etkinlik", yeni: n, onceki: C.kopya(e) }], "“" + e.baslik + "” → " + C.ETKINLIK_DURUM_AD[durum]).then(function (ok) {
       if (ok && durum === "tamamlandi" && e.durum !== "tamamlandi") cekimBittiTeklifi(etkinlik(e.id) || n);
       return ok;
@@ -1461,8 +1463,10 @@
         if (!k) return;
         ref.d.close();
         yenile();
-        if (!ic_) toast("İçerik eklendi.");
-        else toast("Kaydedildi.", "", { ad: "Geri al", f: function () { geriAl([{ tur: "icerik", onceki: taban, sonraki: k }]); } });
+        // takvimde tek "Geri al" bildirimi: onceki takvim geri alma bildirimi (eski surumle 409 olurdu) kalkar
+        var bildir = tkRotada() ? tkToast : toast;
+        if (!ic_) bildir("İçerik eklendi.");
+        else bildir("Kaydedildi.", "", { ad: "Geri al", f: function () { geriAl([{ tur: "icerik", onceki: taban, sonraki: k }]); } });
       });
     }, true);
   }
@@ -1624,14 +1628,18 @@
       }
       var n = degisenleriUygula(v, ilk, formDegeri());
       if (!e) n.id = yeniKimlik;
-      if (n.durum === "tamamlandi" && !n.tamamZaman) n.tamamZaman = C.damga();
+      // tamamlanma ani yalniz durum simdi tamamlandi'ya geciyorsa yazilir: eski tamamlanmis kayit (tamamZaman yok)
+      // baska bir alani duzenlenince bugun tamamlanmis sayilmaz
+      if (n.durum === "tamamlandi" && v.durum !== "tamamlandi" && !n.tamamZaman) n.tamamZaman = C.damga();
       if (n.durum !== "tamamlandi") n.tamamZaman = null;
       var cak = C.cakisanlar(S.veri.etkinlikler, n).length, taban = C.kopya(v);
-      return pencereKaydet("etkinlik", n, hataP, tabanYenile).then(function (k) {
+      var pk = pencereKaydet("etkinlik", n, hataP, tabanYenile);
+      if (tkRotada()) tkKayitIzle(pk);
+      return pk.then(function (k) {
         if (!k) return;
         ref.d.close();
         yenile();
-        toast((e ? "Kaydedildi." : "Çekim / etkinlik eklendi.") + (cak ? " Dikkat: " + cak + " etkinlikle çakışıyor." : ""), cak ? "hata" : "",
+        (tkRotada() ? tkToast : toast)((e ? "Kaydedildi." : "Çekim / etkinlik eklendi.") + (cak ? " Dikkat: " + cak + " etkinlikle çakışıyor." : ""), cak ? "hata" : "",
           e ? { ad: "Geri al", f: function () { geriAl([{ tur: "etkinlik", onceki: taban, sonraki: k }]); } } : null);
         if (k.durum === "tamamlandi" && taban.durum !== "tamamlandi") cekimBittiTeklifi(k);
       });
@@ -1687,7 +1695,7 @@
   // Satir ici stil yalniz CSSOM ile (CSP style-src 'self' satir ici style ozniteligine izin vermez)
   function stil(e, o) { Object.keys(o).forEach(function (k) { e.style[k] = o[k]; }); return e; }
 
-  var TK = { kayit: "tamam", kuyruk: [], calisiyor: false, sonKayit: {}, oneriSira: 0, sonTik: null, kaydirma: null, kolonlar: [], suruk: null, odakId: null, gorunum: null, ref: null };
+  var TK = { kayit: "tamam", kayitNot: null, kuyruk: [], calisiyor: false, sonKayit: {}, oneriSira: 0, sonTik: null, kaydirma: null, kolonlar: [], suruk: null, odakId: null, gorunum: null, ref: null };
   var TK_SAAT_YUK = { masa: 52, tel: 56 };
   function tkMod() { return window.innerWidth < 700 ? "tel" : "masa"; }
   function tkKatman() {
@@ -1758,9 +1766,25 @@
     e.textContent = "";
     // telefonda yalniz isaret gorunur (yazi ekran okuyucuda kalir); hata yazisi her zaman gorunur
     ekle(e, [s === "tamam" ? h("span", { "aria-hidden": "true" }, "✓ ") : null, h("span", { class: "ad" }, s === "surer" ? "Kaydediliyor…" : s === "hata" ? "Kaydedilemedi" : "Kaydedildi")]);
-    e.title = s === "hata" ? "Son değişiklik sunucuya yazılamadı; ekran sunucudaki hale döndü." : "";
+    e.title = s === "hata" ? (TK.kayitNot || "Son değişiklik sunucuya yazılamadı; ekran sunucudaki hale döndü.") : "";
     return e;
   }
+  /**
+   * Takvimden baslayip tkKaydet disindan giden kaydetmeler (pencere, "Edit işini tamamla", takvim ayarlari) da kayit
+   * gostergesini gunceller. pr: Promise (true ya da kayit = basarili). Ayni sonucu doner.
+   */
+  function tkKayitIzle(pr) {
+    TK.kayit = "surer";
+    TK.kayitNot = null;
+    tkKayitGoster();
+    return pr.then(function (ok) {
+      TK.kayit = ok === true || (ok && typeof ok === "object") ? (TK.kuyruk.length || TK.calisiyor ? "surer" : "tamam") : "hata";
+      if (TK.kayit === "hata") TK.kayitNot = "Son değişiklik sunucuya yazılamadı; açıklama bildirimde ya da pencerede.";
+      tkKayitGoster();
+      return ok;
+    });
+  }
+  function tkRotada() { return !!(S.rota && (S.rota.ad === "cekim" || S.rota.ad === "takvim")); }
   /** Klavyeyle tasinan kart yeniden cizimden hemen sonra odagi geri alir (sonraki tus kaybolmasin). */
   function tkOdakla() {
     if (!TK.odakId) return;
@@ -1787,6 +1811,7 @@
     tkKapat();
     degisim.forEach(function (d) { yerlestir(d.tur, d.yeni); });
     TK.kayit = "surer";
+    TK.kayitNot = null;
     if (opt.odak) TK.odakId = opt.odak;
     yenile();
     if (opt.odak) { tkOdakla(); TK.odakId = opt.odak; } // kayit donunce yeniden cizilir: odak orada da korunur
@@ -1819,7 +1844,8 @@
         if (is_.opt.geriAlinabilir) {
           tkToast(is_.metin, "", [{ ad: "Geri al", f: function () { tkGeriAl(is_.degisim); } }].concat(is_.opt.eylemler || []));
         } else if (is_.metin) tkToast(is_.metin, "", is_.opt.eylemler || null);
-        duyur(is_.metin || "Kaydedildi");
+        // bildirim bolgesi metni zaten okur; bildirimsiz kayitta kisa duyuru (ayni degisiklik iki kez okunmasin)
+        if (!is_.metin) duyur("Kaydedildi");
         if (is_.opt.sonra) is_.opt.sonra(j.kayitlar);
         if (is_.opt.odak) TK.odakId = is_.opt.odak;
         is_.coz(true);
@@ -1840,7 +1866,30 @@
         veriYukle().then(function () {
           yenile();
           tkToast("Kaydedilmedi: bu kayıt bu arada başka bir yerde (başka sekme ya da cihaz) değişti. Güncel hali yüklendi; istersen değişikliği yeniden yap.", "hata");
-          duyur("Kaydedilmedi, kayıt başka yerde değişti; güncel hali yüklendi");
+        });
+      } else if (j.hata === "ag" || j.status === 0 || j.hata === "yanit" || j.hata === "sunucu") {
+        // Sonuc belirsiz: istek sunucuya ulasip yazilmis, yaniti kaybolmus olabilir. Geri alindi denmez; sunucudaki
+        // guncel hal yuklenir (ekran sunucuya doner). "Tekrar dene" ayni kimlik / surumle gider: yazilmissa ikinci kez yazilmaz.
+        bekleyen = TK.kuyruk.splice(0);
+        bekleyen.forEach(function (q) { q.coz(false); });
+        TK.kayit = "hata";
+        TK.kayitNot = "Sonuç bilinmiyor; sunucudaki güncel hal yükleniyor.";
+        TK.calisiyor = true; // yukleme bitene kadar yeni degisiklik gonderilmez (eski surumle gitmesin)
+        is_.coz(false);
+        var tekrar2 = is_.degisim.map(function (d) { return { tur: d.tur, yeni: C.kopya(d.yeni), onceki: d.onceki }; });
+        var neden = j.hata === "ag" || j.status === 0 ? "Bağlantı koptu" : "Sunucu yanıtı alınamadı";
+        veriYukle().then(function (yuklendi) {
+          TK.calisiyor = false;
+          // yukleme sirasinda kuyruga giren iyimser degisiklikler ekranda kalsin
+          TK.kuyruk.forEach(function (q) { q.degisim.forEach(function (d) { yerlestir(d.tur, d.yeni); }); });
+          if (!yuklendi) { bekleyen.slice().reverse().forEach(function (q) { tkGeriKoy(q.degisim); }); tkGeriKoy(is_.degisim); }
+          TK.kayitNot = yuklendi ? "Değişikliğin kaydedilip kaydedilmediği bilinmiyor; ekran sunucudaki güncel hali gösteriyor." :
+            "Sunucuya ulaşılamadı; değişikliğin kaydedilip kaydedilmediği bilinmiyor.";
+          yenile();
+          tkToast(neden + "; değişikliğin kaydedilip kaydedilmediği bilinmiyor." + (yuklendi ? " Güncel hal yüklendi." : " Bağlantı gelince yeniden dene."), "hata",
+            { ad: "Tekrar dene", f: function () { tkKaydet(tekrar2, is_.metin, is_.opt); } });
+          tkKayitGoster();
+          tkKuyrukIsle();
         });
       } else {
         // Sunucu / ag hatasi: bu ve kuyruktaki degisiklikler geri alinir, ekran sunucudaki hale doner
@@ -1853,7 +1902,6 @@
         var tekrar = is_.degisim.map(function (d) { return { tur: d.tur, yeni: C.kopya(d.yeni), onceki: d.onceki }; });
         tkToast((j.hata === "gecersiz" ? hataMetni(j) : "Kaydedilemedi: " + hataMetni(j)) + " Değişiklik geri alındı.", "hata",
           { ad: "Tekrar dene", f: function () { tkKaydet(tekrar, is_.metin, is_.opt); } });
-        duyur("Kaydedilemedi, değişiklik geri alındı");
       }
       tkKayitGoster();
       tkKuyrukIsle();
@@ -1862,6 +1910,9 @@
   /** Geri al: onceki degerlerle yeni kaydetme (degisiklikten hemen sonraki surumle; arada degistiyse 409). Yeni kayit arsivlenir. */
   function tkGeriAl(degisim) {
     var zaman = C.damga();
+    // Kayit bu sekmede sonradan (ör. pencereden) degistiyse eski surumle gonderilmez: 409 "başka sekme ya da cihaz" demesin
+    var sonradan = degisim.some(function (d) { var g = d.sonraki && kayitBul(d.tur, d.sonraki.id); return g && g.surum !== d.sonraki.surum; });
+    if (sonradan) { tkToast("Bu kayıt sonradan değişti; geri alınamadı.", "hata"); return; }
     var ters = degisim.filter(function (d) { return d.sonraki; }).map(function (d) {
       var guncel = kayitBul(d.tur, d.sonraki.id) || d.sonraki, n;
       if (!d.onceki) { n = C.kopya(d.sonraki); n.arsiv = true; }
@@ -1941,7 +1992,7 @@
     var once = haftaTamam();
     tkKapat();
     toastTemizle();
-    return durumlariDegistir(ids, "hazir").then(function (ok) {
+    return tkKayitIzle(durumlariDegistir(ids, "hazir")).then(function (ok) {
       if (ok) { sesCal(); hedefKontrol(once); }
       return ok;
     });
@@ -2084,7 +2135,8 @@
       hd ? h("span", { class: "tk-hedef", title: "Haftalık hedef (Ayarlar → takvim ayarları)" }, "· Hafta " + Math.min(ht, hd) + "/" + hd,
         h("span", { class: "tk-cubuk" }, stil(h("i"), { width: Math.min(100, ht / hd * 100) + "%" }))) : null);
   }
-  function kayitRozeti() { return kayitDoldur(h("span", { class: "tk-kayit", "data-tk-kayit": "", role: "status" })); }
+  // Kayit durumu canli bolge degil: basari ve hata bildirimi (toast) zaten okunur; gosterge ayni seyi ikinci kez okutmaz
+  function kayitRozeti() { return kayitDoldur(h("span", { class: "tk-kayit", "data-tk-kayit": "", "aria-live": "off" })); }
   function musteriFiltresi() {
     var mf = TK.gorunum.mf;
     return h("select", { "aria-label": "Müşteri", value: mf, onchange: function (ev) { tkGit({ musteri: ev.target.value }); } },
@@ -2332,7 +2384,7 @@
    * sigmayan seritlerdeki isler gizlenir ve kumenin sagindaki "+N" dugmesi onlari listeler (hicbir is kaydirilmaz).
    * Kolon genisligi sayfa yerlesince olculur: ciz() sonrasi ve pencere boyutu degisince cagrilir.
    */
-  var TK_SERIT_EN = 60, TK_FAZLA_GEN = 22;
+  var TK_SERIT_EN = 60, TK_FAZLA_GEN = 22, TK_FAZLA_GEN_TEL = 46;
   function tkSeritSigdir() {
     if (TK.suruk) return; // surukleme sirasinda kart gizlenmez (bir sonraki cizimde sigdirilir)
     var genler = {};
@@ -2341,7 +2393,12 @@
       var W = genler[km.kol.getAttribute("data-gun")] = genler[km.kol.getAttribute("data-gun")] || km.kol.clientWidth, n = km.toplam, V = n, pay = 0;
       if (!W) return; // olculemedi (gizli sayfa): kartlar esit seritlerde kalir
       if (km.fazla) { km.fazla.remove(); km.fazla = null; }
-      if (n > 1 && n * TK_SERIT_EN > W) { V = Math.max(1, Math.floor((W - TK_FAZLA_GEN) / TK_SERIT_EN)); pay = TK_FAZLA_GEN; }
+      // telefonda "+N" dugmesi 44 px genis (dokunma hedefi)
+      var fg = tkMod() === "tel" ? TK_FAZLA_GEN_TEL : TK_FAZLA_GEN;
+      if (n > 1 && n * TK_SERIT_EN > W) { V = Math.max(1, Math.floor((W - fg) / TK_SERIT_EN)); pay = fg; }
+      // tek serit bile "+N" ile sigmiyorsa (telefonda hafta) ince serit cizilmez: hepsi gizlenir, tek dugme kolon genisliginde hepsini listeler
+      var hepsi = n > 1 && W - fg - 6 < TK_SERIT_EN;
+      if (hepsi) { V = 0; pay = 0; }
       var gizli = [];
       km.uyeler.forEach(function (u) {
         u.el.hidden = u.serit >= V;
@@ -2353,9 +2410,11 @@
       if (!gizli.length) return;
       var ust = Math.min.apply(null, gizli.map(function (u) { return u.ust; })), alt = Math.max.apply(null, gizli.map(function (u) { return u.alt; }));
       var adlar = gizli.map(function (u) { return tkMusteriAd(u.o.k) + " (" + u.o.k.basSaat + ")"; }).join(", ");
-      var b = h("button", { class: "tk-fazla", type: "button", "aria-label": gizli.length + " iş daha bu saatlerde: " + adlar, title: gizli.length + " iş daha: " + adlar,
-        onclick: function (ev) { ev.stopPropagation(); fazlaPenceresi(gizli.map(function (u) { return u.o; }), ev); } }, "+" + gizli.length, h("span", { class: "tk-sr" }, " iş daha"));
-      stil(b, { top: ust + "px", height: Math.max(20, alt - ust) + "px" });
+      var b = h("button", { class: "tk-fazla" + (hepsi ? " hepsi" : ""), type: "button", "aria-label": gizli.length + (hepsi ? " iş" : " iş daha") + " bu saatlerde: " + adlar,
+        title: gizli.length + (hepsi ? " iş: " : " iş daha: ") + adlar,
+        onclick: function (ev) { ev.stopPropagation(); fazlaPenceresi(gizli.map(function (u) { return u.o; }), ev); } },
+        hepsi ? [String(gizli.length), h("span", { class: "tk-sr" }, " iş")] : ["+" + gizli.length, h("span", { class: "tk-sr" }, " iş daha")]);
+      stil(b, { top: ust + "px", height: Math.max(tkMod() === "tel" ? 44 : 20, alt - ust) + "px" });
       km.kol.appendChild(b);
       km.fazla = b;
       gizli.forEach(function (u) { u.el._fazla = b; });
@@ -2409,7 +2468,9 @@
       onpointerdown: function (e) { e.stopPropagation(); }, onclick: function (e) { e.stopPropagation(); tkTamamla(o); } }, tikSvg());
     // cakisma renkten bagimsiz: buyuk kartta "⚠ Çakışma" satiri, bilgi satiri olmayan kartta ⚠ isareti
     var cakIsaret = cakVar && (kisa || yuk <= 66) ? h("span", { class: "cak-isaret", "aria-hidden": "true" }, "⚠") : null;
-    var el = h("div", { class: "tk-kart " + o.tip + (o.tamam ? " tamam" : "") + (o.iptal ? " iptal" : "") + (kisa ? " kucuk-kart" : ""), tabindex: "0", role: "button", "data-id": k.id,
+    // role group: kartin icindeki tamamla dugmesi ekran okuyucuda ayri bir denetim olarak kalir (role=button icindeki
+    // dugme sunumsal sayilir). alcak: telefonda 44 px'lik dokunma alani sigmaz, tamamlama ayrinti penceresinden yapilir.
+    var el = h("div", { class: "tk-kart " + o.tip + (o.tamam ? " tamam" : "") + (o.iptal ? " iptal" : "") + (kisa ? " kucuk-kart" : "") + (yuk < 44 ? " alcak" : ""), tabindex: "0", role: "group", "data-id": k.id,
       title: TIP_AD[o.tip] + ": " + tkMusteriAd(k) + " · " + tkOgeAd(o) + " · " + tkZamanMetni(k) + (o.tamam ? " · tamamlandı" : o.iptal ? " · iptal" : "") + (cakVar ? " · çakışma var" : ""),
       "aria-label": TIP_AD[o.tip] + ": " + tkMusteriAd(k) + ", " + tkOgeAd(o) + ", " + tkGunAdi(k.basTarih) + " " + tkZamanMetni(k) + (o.tamam ? ", tamamlandı" : o.iptal ? ", iptal" : "") +
         (cakVar ? ", çakışma var" : "") + (tasinir ? ". Ok tuşlarıyla taşı, Shift ile süreyi değiştir, Enter ile ayrıntı." : ". Enter ile ayrıntı.") },
@@ -2538,7 +2599,18 @@
         temizle();
         if (ev.pointerId !== e.pointerId || Math.abs(ev.clientY - y0) + Math.abs(ev.clientX - x0) > 10 || Date.now() - t0 > 800) return;
         var b0 = Math.floor(kolonDk(k, ev.clientY) / 30) * 30;
-        hizliOlustur(gun, b0, Math.min(1440, b0 + 60), ev);
+        // Alt sayfa pointerup'ta acilirsa tarayicinin ardindan gonderdigi click ayni noktada yeni pencereye duser
+        // (perdeye: pencere kapanir; tur dugmesine: Çekim olur; girdiye: klavye acilir). Pencere o click'te acilir;
+        // click hic gelmezse (tarayici gondermedi) kisa bir sure sonra yine acilir.
+        var acildi = false;
+        var ac = function (olay) {
+          if (acildi) return;
+          acildi = true;
+          kol.removeEventListener("click", ac);
+          if (kol.isConnected) hizliOlustur(gun, b0, Math.min(1440, b0 + 60), olay);
+        };
+        kol.addEventListener("click", ac);
+        setTimeout(function () { ac(ev); }, 600);
       };
       kol.addEventListener("pointerup", birak);
       kol.addEventListener("pointercancel", temizle);
@@ -2861,18 +2933,53 @@
         var y = tkKatman(); y[k] = e.target.checked; tercih("takvimKatman", JSON.stringify(y)); yenileAcik();
       } }), ikon(ik), ad);
     };
+    // Secenekler tam saatler; kayitli deger tam saat degilse (ör. 08:30, ice aktarma ya da API) kendisi de secenek olur:
+    // pencere dokunulmayan saati yuvarlayip geri yazmaz
     var saatSec = function (deger, ad) {
-      return h("select", { "aria-label": ad, value: String(deger) }, Array.apply(null, Array(25)).map(function (x, i) { return h("option", { value: String(i * 60) }, i === 24 ? "24:00" : C.dkSaat(i * 60)); }));
+      var dk = [];
+      for (var i = 0; i <= 24; i++) dk.push(i * 60);
+      if (dk.indexOf(deger) === -1) { dk.push(deger); dk.sort(function (x, y) { return x - y; }); }
+      return h("select", { "aria-label": ad, value: String(deger) }, dk.map(function (m) { return h("option", { value: String(m) }, m === 1440 ? "24:00" : C.dkSaat(m)); }));
     };
-    var basS = saatSec(Math.floor(cs.bas / 60) * 60, "Çalışma başı"), bitS = saatSec(Math.ceil(cs.bit / 60) * 60, "Çalışma sonu");
+    var basS = saatSec(cs.bas, "Çalışma başı"), bitS = saatSec(cs.bit, "Çalışma sonu");
     var hedefS = h("input", { type: "number", min: "0", max: "99", value: a.haftalikHedef ? String(a.haftalikHedef) : "", placeholder: "Hedef yok", "aria-label": "Haftalık hedef" });
     var hataP = h("div", { class: "tk-hata", role: "alert" });
+    // Pencerenin acildigi (ya da cakismada yuklenen) degerler: yalniz kullanicinin degistirdigi alanlar gonderilir
+    var ilk = { bas: basS.value, bit: bitS.value, hedef: hedefS.value };
+    var alanlariDoldur = function (ayar) {
+      var c2 = C.calismaSaatleri(ayar);
+      [[basS, c2.bas, "Çalışma başı"], [bitS, c2.bit, "Çalışma sonu"]].forEach(function (x) {
+        var yeni = saatSec(x[1], x[2]);
+        x[0].textContent = "";
+        ekle(x[0], Array.prototype.slice.call(yeni.children));
+        x[0].value = String(x[1]);
+      });
+      hedefS.value = ayar && ayar.haftalikHedef ? String(ayar.haftalikHedef) : "";
+      ilk = { bas: basS.value, bit: bitS.value, hedef: hedefS.value };
+    };
     var kaydetD = h("button", { class: "btn ince birincil", type: "button", onclick: function () {
       var cb = +basS.value, ce = +bitS.value, hd = hedefS.value === "" ? null : parseInt(hedefS.value, 10);
       if (ce <= cb) { hataP.textContent = "Çalışma sonu başlangıçtan sonra olmalı."; return; }
       if (hd !== null && !(hd >= 0 && hd <= 99)) { hataP.textContent = "Haftalık hedef 0 ile 99 arasında olmalı (boş = hedef yok)."; return; }
+      var degisen = {};
+      if (basS.value !== ilk.bas) degisen.calismaBas = cb;
+      if (bitS.value !== ilk.bit) degisen.calismaBit = ce;
+      if (hedefS.value !== ilk.hedef) degisen.haftalikHedef = hd;
+      if (!Object.keys(degisen).length) { tkKapat(); return; }
       kaydetD.disabled = true;
-      calismaAyariKaydet(cb, ce, hd).then(function (ok) { kaydetD.disabled = false; if (ok) tkKapat(); else hataP.textContent = "Kaydedilemedi; bildirimdeki açıklamaya bak."; });
+      hataP.textContent = "";
+      tkKayitIzle(calismaAyariKaydet(degisen, { bas: +ilk.bas, bit: +ilk.bit, hedef: ilk.hedef === "" ? null : parseInt(ilk.hedef, 10) })).then(function (ok) {
+        kaydetD.disabled = false;
+        if (ok === true) { tkKapat(); return; }
+        if (ok === "cakisma") {
+          // Kullanicinin degistirdigi alan baska yerde de degismis: ustune yazilmaz, guncel degerler yuklenir ve soylenir
+          if (!kaydetD.isConnected) { tkToast("Kaydedilmedi: takvim ayarları bu arada başka bir yerde değişti. Güncel değerler yüklendi.", "hata"); return; }
+          alanlariDoldur(S.veri.ayar);
+          hataP.textContent = "Bu ayarlar bu arada başka bir yerde (başka sekme ya da cihaz) değişti; güncel değerler yüklendi. İstersen değişikliğini yeniden yap.";
+          return;
+        }
+        hataP.textContent = "Kaydedilemedi; bildirimdeki açıklamaya bak.";
+      });
     } }, "Kaydet");
     var ozel = (S.veri.ozelgunler || []).slice().sort(function (x, y) { return x.tarih < y.tarih ? -1 : x.tarih > y.tarih ? 1 : 0; });
     var aktifOzel = ozel.filter(C.aktif), arsivOzel = ozel.filter(function (o) { return o.arsiv; });
@@ -2905,13 +3012,26 @@
     yenile();
     if (p) { document.body.appendChild(p); if (pr && !document.querySelector(".tk-perde")) document.body.insertBefore(pr, p); }
   }
-  function calismaAyariKaydet(cb, ce, hd, tekrar) {
-    var a = S.veri.ayar, n = { calismaBas: cb, calismaBit: ce, haftalikHedef: hd };
-    // eski arayuz alanlari (esik) korunur; gonderilmeyen son yedek sunucuda korunur
+  /**
+   * Takvim ayarlari: degisen yalniz kullanicinin degistirdigi alanlar ({ calismaBas, calismaBit, haftalikHedef } alt kumesi);
+   * gonderilmeyen alani sunucu saklananla korur. ilk: pencerenin acildigi degerler { bas, bit, hedef }.
+   * Surum cakismasinda (baska sekme / cihaz): kullanicinin degistirdigi alan orada da degistiyse yazilmaz ("cakisma" doner,
+   * S.veri.ayar guncel); degismediyse yalniz bu alanlar guncel surumle bir kez yeniden gonderilir. Promise<true | false | "cakisma">
+   */
+  function calismaAyariKaydet(degisen, ilk, tekrar) {
+    var a = S.veri.ayar, n = C.kopya(degisen);
+    // eski arayuz alanlari (esik) korunur; gonderilmeyen son yedek ve takvim alanlari sunucuda korunur
     if (a) { n.id = "ayar"; n.surum = a.surum; n.varsayilanStokUyari = a.varsayilanStokUyari === undefined ? null : a.varsayilanStokUyari; }
     return kaydetHam([{ tur: "ayar", kayit: n }]).then(function (j) {
       if (j.ok) { yenile(); tkToast("Takvim ayarları kaydedildi."); return true; }
-      if (j.hata === "cakisma" && j.guncel && !tekrar) { S.veri.ayar = j.guncel; return calismaAyariKaydet(cb, ce, hd, true); }
+      if (j.hata === "cakisma" && j.guncel) {
+        S.veri.ayar = j.guncel;
+        var g = C.calismaSaatleri(j.guncel), gh = typeof j.guncel.haftalikHedef === "number" && j.guncel.haftalikHedef > 0 ? j.guncel.haftalikHedef : null;
+        var baskaYerde = ("calismaBas" in degisen && g.bas !== ilk.bas) || ("calismaBit" in degisen && g.bit !== ilk.bit) || ("haftalikHedef" in degisen && gh !== (ilk.hedef || null));
+        if (!baskaYerde && !tekrar) return calismaAyariKaydet(degisen, ilk, true);
+        yenileAcik();
+        return "cakisma";
+      }
       if (j.hata !== "oturum") tkToast(hataMetni(j), "hata");
       return false;
     });
@@ -3021,11 +3141,13 @@
       }
       if (f.icerikIdler.length > 50) { hataP.textContent = "Bir blokta en çok 50 içerik olabilir."; return; }
       var n = degisenleriUygula(v, ilk, f);
-      if (n.durum === "tamamlandi" && !n.tamamZaman) n.tamamZaman = C.damga();
+      if (n.durum === "tamamlandi" && v.durum !== "tamamlandi" && !n.tamamZaman) n.tamamZaman = C.damga();
       if (n.durum !== "tamamlandi") n.tamamZaman = null;
       if (!b) n.id = yeniKimlik;
       var taban = C.kopya(v);
-      return pencereKaydet("blok", n, hataP, tabanYenile).then(function (k) {
+      var pk = pencereKaydet("blok", n, hataP, tabanYenile);
+      if (tkRotada()) tkKayitIzle(pk);
+      return pk.then(function (k) {
         if (!k) return;
         ref.d.close();
         yenile();
