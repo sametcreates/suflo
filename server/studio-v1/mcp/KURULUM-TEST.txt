@@ -1,0 +1,181 @@
+SUFLO STUDIO - SOHBET BAĞLANTISI (MCP) TEST KURULUMU
+====================================================
+
+Bu klasörde ne var
+------------------
+  suflo-studio-test-paket.zip   TEST ortamı. public_html içinde açılır: studio-test/ klasörü + .well-known/.htaccess
+  suflo-studio-canli-paket.zip  CANLI güncelleme (SONRA, testten sonra). public_html içinde açılır: studio/ + .well-known/.htaccess
+  well-known.htaccess           .well-known klasöründe zaten bir .htaccess varsa satırları elle eklemek için
+  SHA256SUMS.txt                ZIP'lerin özeti ve içindeki dosyaların listesi
+  ozel-test/config.php          TEST ayar dosyası (yalnız şifre özeti var). public_html'e KOYMA.
+  ozel-test/test-sifre.txt      TEST şifresi (düz metin). Kimseyle, sohbette de paylaşma. Test bitince sil.
+
+Paketler repodan şu komutla üretilir (ZIP'ler repo dışına yazılır):
+  node tools/studio-paket.js paket --cikis <klasör>
+  node tools/studio-paket.js ayar --cikis <klasör>/ozel-test
+
+İki ZIP'te de config.php, veritabanı, yedek ya da şifre YOK (paket betiği bunu denetler).
+Test kurulumu canlı Studio'ya dokunmaz: kendi ayarı (private/studio-test-v1), kendi veritabanı,
+kendi oturum çerezi ve kendi bağlantı deposu (mcp.sqlite) vardır. Test şifresi canlı şifreden farklıdır.
+
+
+A. ÖN KONTROL (5 dakika)
+------------------------
+1. hPanel -> Gelişmiş -> PHP Yapılandırması: PHP 8.1 veya üstü (8.3 önerilir), "pdo_sqlite" açık olmalı (MCP kodu 8.1 gerektirir; 8.0 ile keşif, OAuth ve MCP 503 verir).
+2. hPanel -> Dosya Yöneticisi: assets.suflo.app sitesini aç. Sağ üstteki ayarlardan "Gizli dosyaları göster"i aç
+   (.htaccess dosyalarını görmek için).
+3. Şu yapıyı gör: public_html/studio/v1/index.php ve public_html'in YANINDA private/studio-v1/config.php.
+   (Canlı Studio klasörünün adı "studio" olmalı. Farklıysa dur, bana yaz.)
+4. public_html/.well-known/ klasöründe bir ".htaccess" dosyası VAR MI? Not al:
+     - YOKSA: ZIP'teki dosya doğrudan kullanılır (B.3).
+     - VARSA: önce o dosyayı bilgisayarına indir (yedek). B.3'teki "dosya vardıysa" adımını uygula.
+   (.well-known/acme-challenge klasörüne ve içine hiçbir şey yapma; SSL yenilemesi oradan çalışır.)
+
+
+B. TEST ORTAMINI KUR
+--------------------
+1. Ayar klasörü:
+   private/ klasörünün içinde (private/studio-v1'in yanında) yeni klasör aç:  studio-test-v1
+   Sonuç:  private/studio-test-v1/
+
+2. Ayar dosyası:
+   ozel-test/config.php dosyasını private/studio-test-v1/ içine yükle.
+   Sonuç:  private/studio-test-v1/config.php
+   (Bu dosyada düz şifre yok, yalnız özeti var. Veritabanı aynı klasörde ilk açılışta kendiliğinden oluşur:
+    private/studio-test-v1/studio.sqlite ve mcp.sqlite. Canlının private/studio-v1 klasörüne DOKUNULMAZ.)
+
+3. Test paketi:
+   a) suflo-studio-test-paket.zip dosyasını public_html/ içine yükle.
+   b) .well-known/.htaccess dosyası önceden YOKSA: ZIP'e sağ tıkla -> "Extract" (Çıkart) -> hedef: public_html
+      (Hedefi değiştirme; ZIP zaten studio-test/ ve .well-known/ klasörlerini içeriyor.)
+      .well-known/.htaccess dosyası önceden VARSA: ZIP'i yine public_html'e çıkart; sonra public_html/.well-known/.htaccess
+      dosyasını aç, A.4'te indirdiğin eski içeriği geri yapıştır ve SONUNA well-known.htaccess dosyasındaki
+      "<IfModule mod_rewrite.c> ... </IfModule>" bloğunu ekle. Eski dosyada zaten "RewriteEngine On" varsa
+      yalnız üç "RewriteRule" satırını ekle.
+   c) public_html/suflo-studio-test-paket.zip dosyasını sil (çıkarttıktan sonra gerek yok).
+   d) Kontrol: public_html/studio-test/ içinde şunlar olmalı:
+        index.html, studio.css, studio-core.js, studio.js, favicon.svg, .htaccess,
+        mcp-giris.php, oauth-giris.php, kesif-giris.php, mcp-onay.js, mcp-onay.css,
+        v1/ (index.php, studio-ortak.php, .htaccess), mcp-kitaplik/ (10 dosya, .htaccess dahil)
+      ve public_html/.well-known/.htaccess.
+      .htaccess dosyaları görünmüyorsa "gizli dosyaları göster" açık mı bak. Eksikse bana yaz.
+
+4. Tarayıcıda kontrol (her adres beklendiği gibi olmalı):
+   - https://assets.suflo.app/studio-test/
+       -> Suflo Studio giriş ekranı. ozel-test/test-sifre.txt içindeki şifreyle gir. Boş bir Studio açılır.
+   - https://assets.suflo.app/.well-known/oauth-protected-resource/studio-test/mcp
+       -> JSON. İçinde: "resource": "https://assets.suflo.app/studio-test/mcp"
+          ve "authorization_servers": ["https://assets.suflo.app/studio-test"]
+   - https://assets.suflo.app/.well-known/oauth-authorization-server/studio-test
+       -> JSON. İçinde: "issuer": "https://assets.suflo.app/studio-test"
+          ve "authorization_endpoint": "https://assets.suflo.app/studio-test/oauth/authorize"
+   - https://assets.suflo.app/studio-test/.well-known/openid-configuration
+       -> bir öncekiyle aynı JSON
+   - https://assets.suflo.app/studio-test/mcp
+       -> "Method not allowed" yazan kısa JSON (405). Bu doğru: uç nokta yalnız sohbet uygulamasının POST isteğini kabul eder.
+   - https://assets.suflo.app/studio-test/mcp-kitaplik/ortak.php  -> 403 (Erişim yok). Doğru.
+   - https://assets.suflo.app/studio-test/v1/studio-ortak.php     -> 403. Doğru.
+   - https://assets.suflo.app/studio/  -> CANLI Studio eskisi gibi açılır, canlı şifre çalışır, veriler yerinde.
+   - hPanel -> SSL: assets.suflo.app sertifikası "Etkin" görünmeli.
+   Bir adres 404 / 500 veriyorsa dur, adresi ve gördüğün metni bana yaz.
+
+5. Test verisi (isteğe bağlı ama önerilir):
+   Test Studio'da (https://assets.suflo.app/studio-test/) iki deneme müşterisi aç: "Özge" ve "Yusuf".
+   Bunlar yalnız test veritabanındadır; canlıya gitmez.
+
+
+C. CLAUDE'DA TEST BAĞLAYICISINI EKLE
+------------------------------------
+1. claude.ai -> sol altta adın -> Ayarlar (Settings) -> Bağlayıcılar (Connectors)
+   -> "Özel bağlayıcı ekle" (Add custom connector).
+   (Ekip / Kurumsal planda bu düğmeyi yalnız yönetici görür.)
+2. Ad:   Suflo Studio TEST
+   URL:  https://assets.suflo.app/studio-test/mcp
+   "Gelişmiş ayarlar"daki OAuth Client ID / Secret alanlarını BOŞ bırak (sunucu kendi kaydını yapar).
+   -> Ekle (Add).
+3. Listede "Suflo Studio TEST"in yanındaki "Bağlan" (Connect) düğmesine bas.
+   Yeni sekmede "Suflo Studio" onay sayfası açılır. Adres çubuğu https://assets.suflo.app/studio-test/oauth/authorize ile başlamalı.
+   - Uygulama adı (Claude) ve dönüş adresi (claude.ai) görünür.
+   - "Kayıt ekleme ve durum güncelleme" kutusunu işaretli bırak (yazma izni; silme yok).
+   - TEST şifresini yaz -> İzin ver.
+   Sekme Claude'a döner, bağlayıcı "Bağlı" görünür.
+4. Yeni bir sohbet aç. Mesaj kutusundaki araç / "+" menüsünden "Suflo Studio TEST"in açık olduğunu kontrol et.
+   (Aynı anda canlı bir "Suflo Studio" bağlayıcısı da varsa testte onu kapat ki karışmasın.)
+
+
+D. CÜMLEYİ DENE VE KAYDI KONTROL ET
+-----------------------------------
+1. Sohbete yaz:
+     Yarın 14.00 Özge çekim, 2 saat. Cuma Yusuf'a 3 reels teslim.
+   Beklenen:
+   - Claude önce bugünün tarihini Studio'dan alır (Türkiye saati) ve günleri adıyla yazar.
+   - Müşterileri arar. "Özge" / "Yusuf" bulunamazsa ya da birden çok eşleşme varsa TAHMİN ETMEZ, sana sorar.
+   - Çekimi yarın 14:00-16:00 olarak kaydeder. Takvimde o saatte başka iş varsa kaydetmez, çakışmayı söyler ve sorar.
+   - 3 reels birden olduğu için önce önizleme gösterir ve onay ister. "Onaylıyorum" de.
+     Toplu yazmadan önce Studio otomatik bir kopya alır (Ayarlar -> Otomatik kopyalar: "Sohbet toplu işlemi öncesi").
+   - Claude bazı adımlarda "araç kullanımına izin ver" diye sorabilir; izin ver.
+2. Kaydı kontrol et:  https://assets.suflo.app/studio-test/
+   - Takvim: yarın 14:00-16:00 "Özge" çekimi.
+   - İçerikler: Yusuf için 3 reels, teslim tarihi Cuma.
+   - Ayarlar -> Sohbet bağlantıları: "Claude" bağlı; işlem günlüğünde araç satırları (ne zaman, hangi işlem, sonuç).
+3. Güvenlik denemeleri (önerilir):
+   - Aynı cümleyi aynı sohbette tekrar yaz: yeni kopya AÇILMAMALI ("zaten vardı").
+   - "Öğleden sonra Ahmet'le çekim koy" yaz: saat ve müşteri belirsiz; Claude SORMALI, kaydetmemeli.
+   - "Özge'nin çekimini sil" yaz: silme aracı yok; Claude yapamayacağını söylemeli.
+   - "Yusuf'un aylık ücreti ne?" yaz: ücret bilgisi verilmez.
+   - Studio test panelinde Ayarlar -> Sohbet bağlantıları -> "Bağlantıyı kes": Claude bir sonraki istekte erişemez
+     (yeniden bağlanmak için C.3 tekrar).
+4. Test bitince:
+   - claude.ai -> Ayarlar -> Bağlayıcılar -> "Suflo Studio TEST" -> Kaldır (Remove).
+   - ozel-test/test-sifre.txt dosyasını bilgisayarından sil (şifreyi bir şifre yöneticisinde tutmak istersen oraya taşı).
+
+
+E. GERİ ALMA (TEST)
+-------------------
+Anında kapatma (dosya silmeden):
+   private/studio-test-v1/config.php içinde   'mcp_acik' => true,   satırını   'mcp_acik' => false,   yap, kaydet.
+   Sohbet bağlantısı, onay sayfası ve keşif adresleri hemen kapanır (503). Test paneli çalışmaya devam eder.
+   Geri açmak için tekrar true yap; mevcut bağlantılar sürer.
+
+Tamamen kaldırma:
+   1. claude.ai'den "Suflo Studio TEST" bağlayıcısını kaldır.
+   2. public_html/studio-test/ klasörünü sil.
+   3. private/studio-test-v1/ klasörünü sil (test verisi ve test bağlantıları da gider).
+   4. public_html/.well-known/.htaccess:
+        - Bu dosya bu kurulumla YENİ geldiyse: dosyayı sil. (Canlı kurulum yapıldıysa SİLME; o zaman canlı için gerekir.)
+        - Önceden vardıysa: yalnız eklenen "Suflo Studio MCP" satırlarını (üç RewriteRule satırı ve eklediysen
+          RewriteEngine On / IfModule satırları) sil, gerisine dokunma.
+   Canlı Studio (public_html/studio, private/studio-v1) bu adımlardan hiç etkilenmez.
+
+
+F. SONRA: CANLIYA ALMA (yalnız test başarılıysa ve "canlıya al" dediğinde)
+-------------------------------------------------------------------------
+Önce yedek:
+   1. Canlı Studio -> Ayarlar -> "JSON yedeği indir". Bilgisayarında sakla.
+   2. Dosya Yöneticisi: public_html/studio klasörüne sağ tıkla -> Sıkıştır (Compress) -> ZIP'i bilgisayarına indir,
+      sonra sunucudaki bu yedek ZIP'i sil. Bu, geri dönüş için eski paket.
+Kurulum:
+   3. suflo-studio-canli-paket.zip'i public_html/ içine yükle, "Extract" ile public_html'e çıkart. Var olan dosyaların
+      üzerine yazılmasını onayla. Güncellenenler: studio/ içindeki arayüz dosyaları, studio/.htaccess (MCP kurallı sürüm),
+      studio/v1/index.php + studio/v1/studio-ortak.php (ikisi BİRLİKTE), studio/v1/.htaccess. Yeni gelenler:
+      mcp-giris.php, oauth-giris.php, kesif-giris.php, mcp-onay.js, mcp-onay.css, mcp-kitaplik/.
+      .well-known/.htaccess test adımında zaten kuruldu (studio ve studio-test adlarını birlikte tanır); içine elle satır
+      eklediysen çıkarırken bu dosyanın üzerine yazmayı ATLA.
+   4. public_html/suflo-studio-canli-paket.zip'i sil.
+   5. private/studio-v1/config.php'ye DOKUNMA. Yeni ayar gerekmez (mcp_acik varsayılan açık, kok_url varsayılan
+      https://assets.suflo.app). Paket config.php içermez; canlı şifre ve veriler aynı kalır. Oturumun açık kalır.
+Kontrol:
+   6. https://assets.suflo.app/studio/ -> canlı Studio açılır, veriler yerinde.
+      https://assets.suflo.app/.well-known/oauth-protected-resource/studio/mcp -> "resource": "https://assets.suflo.app/studio/mcp"
+      https://assets.suflo.app/.well-known/oauth-authorization-server/studio   -> "issuer": "https://assets.suflo.app/studio"
+      https://assets.suflo.app/studio/mcp -> 405 JSON (doğru).
+   7. claude.ai -> Bağlayıcılar -> Özel bağlayıcı ekle: Ad "Suflo Studio", URL https://assets.suflo.app/studio/mcp
+      -> Bağlan -> onay sayfasında CANLI şifre -> İzin ver.
+   8. Test bağlayıcısını kaldır; test klasörlerini E bölümündeki gibi silebilirsin
+      (.well-known/.htaccess'i SİLME, canlı da kullanıyor).
+Canlı geri alma:
+   - Anında: private/studio-v1/config.php içindeki dizinin içine   'mcp_acik' => false,   satırını ekle. Sohbet bağlantısı
+     kapanır, panel ve veriler etkilenmez.
+   - Tamamen: 2. adımdaki eski studio yedek ZIP'ini geri yükleyip çıkart (eski .htaccess ve eski index.php geri gelir),
+     sonra mcp-giris.php, oauth-giris.php, kesif-giris.php, mcp-onay.js, mcp-onay.css ve mcp-kitaplik/ klasörünü sil.
+     private/studio-v1/mcp.sqlite silinebilir (bütün sohbet bağlantıları biter). Studio verisi (studio.sqlite) etkilenmez.
