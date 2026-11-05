@@ -35,9 +35,9 @@
         <span>PRO</span>
       </button>
       <span class="brand-ver" id="brand-ver">v…</span>
-      <span class="host-status" title="Premiere bağlantısı">
+      <span class="host-status" id="host-status" title="Premiere bağlantısı">
         <span id="host-dot" class="host-dot"></span>
-        <span>PREMIERE</span>
+        <span id="host-ad">PREMIERE</span>
       </span>
       <button class="tab tab-gear solo-gear" data-tab="settings" title="Ayarlar (motor, dil, sözlük, ffmpeg)">
         <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -171,6 +171,12 @@
   </aside>
   <main class="icerik">
 
+  <!-- After Effects (deneysel): yalnız AE'de görünür (body.host-ae, js/ae-panel.js); Premiere'de CSS gizler -->
+  <div id="ae-not" class="ae-not" data-yalniz-ae role="note">
+    <b>After Effects (deneysel)</b>
+    <span>Burada yalnız altyazı araçları açık: transkript, düzenleme ve kompozisyona metin katmanı olarak ekleme. Kesim, zoom, geçiş, kütüphane gibi araçlar Premiere Pro'ya özgü olduğu için gizlendi.</span>
+  </div>
+
   <div id="context-strip" class="context-strip">
     <span id="ctx-text" class="dim">bağlanıyor…</span>
   </div>
@@ -273,8 +279,8 @@
     <div id="cap-main">
       <div class="seg-ctl full" id="cap-scope">
         <button class="on" data-s="clip">Seçili klip</button>
-        <button data-s="inout">In → Out</button>
-        <button data-s="entire">Sekans</button>
+        <button data-s="inout" data-yalniz-premiere>In → Out</button>
+        <button data-s="entire" data-yalniz-premiere>Sekans</button>
       </div>
 
       <div class="card">
@@ -600,7 +606,7 @@
                  denenmiş yol. Premiere yerel (Beta): pakette gelen şablon (assets/mogrt/altyazi-efekt-v1.mogrt), render yok;
                  gerçek Premiere'de henüz denenmedi. Kullanıcının açıkça seçtiği değer (suflo.efektCikti) korunur.
                  Premiere 2022 öncesinde ya da şablon açılamazsa gizlenir / katmana düşülür. -->
-            <div class="field efekt-cikti" id="cap-efekt-cikti-sar">
+            <div class="field efekt-cikti" id="cap-efekt-cikti-sar" data-yalniz-premiere>
               <label for="cap-efekt-cikti">Çıktı</label>
               <select id="cap-efekt-cikti" title="Video katmanı: Suflo motoruyla şeffaf video · Premiere yerel (Beta): render yok, yazı ve zamanlar Premiere'de düzenlenebilir">
                 <option value="katman" selected>Video katmanı</option>
@@ -644,7 +650,7 @@
         </details>
 
         <!-- Premiere Şablonları (MOGRT): kartlar captions.js mogrtStilleriniCiz ile çizilir -->
-        <div class="stil-grid" id="cap-stil-grid"></div>
+        <div class="stil-grid" id="cap-stil-grid" data-yalniz-premiere></div>
 
         <!--
           Eski (3.0 öncesi "Özel") kayıtların değer taşıyıcıları: arayüzde gösterilmez. Hareket şiddeti
@@ -678,7 +684,7 @@
         </div>
       </div>
 
-      <div class="card" id="cap-tracks-card" hidden>
+      <div class="card" id="cap-tracks-card" hidden data-yalniz-premiere>
         <div class="card-title">Ses katmanları</div>
         <div id="cap-tracks" class="tracks"></div>
       </div>
@@ -689,7 +695,7 @@
       <!-- İş sürerken "Altyazı oluştur"un yerini alır (js/captions.js setBusy); ses dışa aktarımı sırasında kapalı -->
       <button id="cap-cancel" class="btn outline big iptal-btn" type="button" hidden title="İşi durdurur: geçici ses ve çıktı dosyaları silinir (kurulu motor ve model kalır), ekrandaki altyazı olduğu gibi kalır.">İptal</button>
       <button id="cap-restore" class="btn outline big" hidden></button>
-      <button id="cap-shorts-al" class="btn outline big" type="button" hidden title="Bu sekans Suflo'nun Shorts sekansı: ana videonun transkriptinden bu anın satırları yüklenir"></button>
+      <button id="cap-shorts-al" class="btn outline big" type="button" hidden data-yalniz-premiere title="Bu sekans Suflo'nun Shorts sekansı: ana videonun transkriptinden bu anın satırları yüklenir"></button>
       <button id="cap-import-srt" class="btn outline big">
         <svg viewBox="0 0 16 16" class="btn-ic"><path d="M9 1.8 H4.4 a1.6 1.6 0 0 0 -1.6 1.6 v9.2 a1.6 1.6 0 0 0 1.6 1.6 h7.2 a1.6 1.6 0 0 0 1.6-1.6 V6 z M9 1.8 V6 h4.2" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
         SRT içe aktar
@@ -865,7 +871,7 @@
           <div class="row" id="cap-ch-actions" hidden>
             <button id="cap-ch-add" class="btn tiny" type="button">+ bölüm</button>
             <button id="cap-ch-copy" class="btn tiny" type="button" style="margin-left:auto">YouTube metnini kopyala</button>
-            <button id="cap-ch-markers" class="btn tiny" type="button">Marker olarak ekle</button>
+            <button id="cap-ch-markers" class="btn tiny" type="button" data-yalniz-premiere>Marker olarak ekle</button>
           </div>
           <div class="yt-ayrac"></div>
           <div class="row">
@@ -893,7 +899,7 @@
           </div>
         </details>
 
-        <details class="adv" id="cap-vr-box">
+        <details class="adv" id="cap-vr-box" data-yalniz-premiere>
           <summary>Viral anlar (Shorts) <span class="tc-yeni">YENİ</span></summary>
           <p class="hint" style="margin:6px 0 8px">Uzun videodan kancayla başlayan, tek başına anlaşılan anları bulur; her ana nedenini açıklayan 0–100 puan ve 3 kanca başlığı verir. Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez.</p>
           <div class="vr-ayarlar">
@@ -1002,7 +1008,7 @@
           </details>
         </details>
 
-        <details class="adv" id="cap-br-box">
+        <details class="adv" id="cap-br-box" data-yalniz-premiere>
           <summary>B-roll önerileri <span class="tc-yeni">PRO</span></summary>
           <p class="hint" style="margin:6px 0 8px">Konuşmada ara görüntü konacak anları ve stok sitelerinde aranacak kelimeleri bulur. Altyazı metni bulut yedeğine gönderilir; ses gönderilmez.</p>
           <div class="row">
@@ -1030,14 +1036,14 @@
           </div>
         </details>
 
-        <div class="caption-apply-actions" aria-label="Altyazıyı sekansa ekleme biçimi">
+        <div class="caption-apply-actions" aria-label="Altyazıyı sekansa ekleme biçimi" data-yalniz-premiere>
           <button id="cap-apply" class="btn outline big">Normal altyazı izi ekle</button>
           <button id="cap-apply-style" class="btn primary big" disabled>Görünüm seçerek ekle</button>
         </div>
-        <p class="hint" id="cap-apply-hint" style="margin:-4px 0 8px">
+        <p class="hint" id="cap-apply-hint" style="margin:-4px 0 8px" data-yalniz-premiere>
           Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Bir stil seçersen animasyonlu MOGRT olarak da ekleyebilirsin.
         </p>
-        <button type="button" id="cap-style-upsell" class="cross-tip cap-style-upsell" hidden>
+        <button type="button" id="cap-style-upsell" class="cross-tip cap-style-upsell" hidden data-yalniz-premiere>
           <span class="ct-ikon" aria-hidden="true">Aa</span>
           <span class="ct-metin"><b>Altyazın hazırsa tasarım da hazır olsun.</b> 17 gerçek animasyonlu stil; Reels, YouTube ve kare video oranı otomatik.</span>
           <span class="ct-ok" aria-hidden="true">17 STİL →</span>
@@ -1055,7 +1061,16 @@
           .cap-style-upsell .ct-ikon{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--grad);color:#fff;font-size:12px;font-weight:900}
           .cap-style-upsell .ct-ok{font-size:9px;font-weight:850;letter-spacing:.04em;white-space:nowrap}
         </style>
-        <button type="button" class="cross-tip"
+        <!-- After Effects (deneysel): kompozisyona metin katmanı olarak ekleme (js/ae-panel.js); Premiere'de CSS gizler -->
+        <div class="ae-altyazi" id="ae-altyazi" data-yalniz-ae>
+          <div class="caption-apply-actions" aria-label="Altyazıyı kompozisyona ekleme biçimi">
+            <button id="ae-ekle" class="btn outline big" type="button">Metin katmanı olarak ekle</button>
+            <button id="ae-ekle-stil" class="btn primary big" type="button">Altyazı Efektleriyle ekle</button>
+          </div>
+          <p class="hint" style="margin:-4px 0 8px">Her altyazı kompozisyonda düzenlenebilir bir metin katmanı olur. Düz ekleme ücretsiz; Altyazı Efektleri (renk, kontur, gölge, giriş ve etkin kelime animasyonu) Pro, deneme hakkıyla filigranlı.</p>
+          <button id="ae-kaldir" class="link-btn" type="button" title="Yalnız Suflo'nun eklediği altyazı katmanlarını siler (tek adımda geri alınır)">Suflo altyazılarını kaldır</button>
+        </div>
+        <button type="button" class="cross-tip" data-yalniz-premiere
           onclick="var els=document.querySelectorAll('.yan-menu .ky-oge');for(var i=0;i&lt;els.length;i++){if(els[i].getAttribute('data-tab')==='cut'){els[i].click();break;}}">
           <span class="ct-ikon" aria-hidden="true">✂️</span>
           <span class="ct-metin"><b>Konuşma videon mu?</b> Ölü anları <b>Otomatik Kesim</b> ile saniyede temizle — jump-cut dakikalar değil saniyeler.</span>
@@ -2866,6 +2881,8 @@
   <script src="i18n/en.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/ag-dayanim.js"></script>
+  <!-- After Effects (deneysel): ana uygulama ve K.call eşlemesi bridge.js'ten önce gerekir (saf modül) -->
+  <script src="js/ae-plan.js"></script>
   <script src="js/bridge.js"></script>
   <script src="js/deneme.js"></script>
   <script src="js/pro.js"></script>
@@ -2952,6 +2969,7 @@
   <script src="js/otomasyon.js"></script>
   <script src="js/otomasyon-sunucu.js"></script>
   <script src="js/otomasyon-panel.js"></script>
+  <script src="js/ae-panel.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

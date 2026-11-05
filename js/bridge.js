@@ -55,6 +55,19 @@ window.K = (function () {
     catch (e) { return ""; }
   }
 
+  /* ---------------- Ana uygulama ---------------- */
+
+  /*
+   * Panel Premiere Pro'da ("PPRO") mı After Effects'te ("AEFT", deneysel) mi? CSInterface'in host ortamından bir kez
+   * okunur (js/ae-plan.js uygulamaKodu); tarayıcı önizlemesinde / okunamazsa "" (Premiere davranışı). After Effects'te
+   * K.call Premiere işlevlerinin AE karşılığını çağırır, karşılığı olmayanı hiç göndermez (SufloAePlan.hostCagrisi).
+   */
+  var HOST_KODU = "";
+  try {
+    if (window.SufloAePlan && typeof cs.getHostEnvironment === "function") HOST_KODU = window.SufloAePlan.uygulamaKodu(cs.getHostEnvironment());
+  } catch (eH) { HOST_KODU = ""; }
+  function hostKodu() { return HOST_KODU; }
+
   /* ---------------- ExtendScript ---------------- */
 
   /*
@@ -91,6 +104,14 @@ window.K = (function () {
    * eskisi gibi atılır. Zaman aşımı sonucu zamanAsimi: true taşır.
    */
   function call(fn, arg, timeout, gec) {
+    // After Effects: Premiere işlevinin karşılığı (cevabı Premiere biçimine çevrilir) ya da hiç gönderilmeyen engel
+    var es = HOST_KODU === "AEFT" && window.SufloAePlan ? window.SufloAePlan.hostCagrisi(fn, HOST_KODU) : null;
+    if (es && es.engel) {
+      log("jsx " + fn + ": After Effects'te karsiligi yok, gonderilmedi");
+      return Promise.resolve(es.engel);
+    }
+    var hostFn = es ? es.ad : fn;
+    var donustur = es ? es.donustur : null;
     return new Promise(function (resolve) {
       var bitti = false, asildi = false;
       var id = ++cagriNo;
@@ -116,8 +137,8 @@ window.K = (function () {
       }, timeout || 60000);
 
       var script = arg === undefined
-        ? fn + "()"
-        : fn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
+        ? hostFn + "()"
+        : hostFn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
       try {
         cs.evalScript(script, function (res) {
           cevapGeldi();
@@ -128,6 +149,7 @@ window.K = (function () {
           }
           try {
             var parsed = JSON.parse(res);
+            if (donustur) parsed = donustur(parsed);
             if (parsed && parsed.ok === false) log("jsx " + fn + ": " + parsed.error);
             son(parsed);
           }
@@ -2014,6 +2036,7 @@ window.K = (function () {
     nodeOK: nodeOK,
     fs: fs, path: path, os: os,
     call: call,
+    hostKodu: hostKodu,
     hostMesgul: hostMesgul,
     run: run,
     runAkis: runAkis,

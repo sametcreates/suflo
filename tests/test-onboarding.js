@@ -747,7 +747,8 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     /* ================= 9) index.html / app.js bağlantıları ================= */
     var appSrc = fs.readFileSync(path.join(KOK, "js", "app.js"), "utf8");
     ok("app.js: rehber guvenli('Onboarding') ile başlar", /guvenli\("Onboarding", function \(\) \{ if \(window\.KOnboarding\) KOnboarding\.init\(\); \}\)/.test(appSrc));
-    ok("app.js: rehber tam kartken yenilikler penceresi açılmaz", /if \(rehber !== "tam"\) yenilikleriGoster\(\)/.test(appSrc));
+    ok("app.js: rehber tam kartken yenilikler penceresi açılmaz (After Effects'te hiç açılmaz: maddeleri gizli sekmelere gider)",
+      /if \(rehber !== "tam" && !aeMod\) yenilikleriGoster\(\)/.test(appSrc) && /var aeMod = window\.SufloAePanel && SufloAePanel\.aktif\(\);/.test(appSrc));
     var sira = ["js/captions.js", "js/onboarding-steps.js", "js/onboarding.js", "js/app.js"].map(function (f) { return html.indexOf('<script src="' + f + '"'); });
     ok("betik sırası: captions → onboarding-steps → onboarding → app", sira.every(function (x, i) { return x > 0 && (i === 0 || x > sira[i - 1]); }), J(sira));
     ok("kart Altyazı sekmesinin en üstünde, kurulum notundan önce", html.indexOf('id="ilk-adim"') > html.indexOf('id="tab-captions"') && html.indexOf('id="ilk-adim"') < html.indexOf('id="cap-setup"'));

@@ -267,7 +267,8 @@ function extractHost(src, file) {
   var toks = tokenize(src), out = [];
   for (var k = 0; k + 1 < toks.length; k++) {
     var t = toks[k];
-    if (t.t !== "id" || (t.v !== "KS_err" && t.v !== "KS_errKod")) continue;
+    // KSAE_err: After Effects tarafı (jsx/host-ae.jsx, deneysel); KS_err gibi panelde gösterilir
+    if (t.t !== "id" || (t.v !== "KS_err" && t.v !== "KS_errKod" && t.v !== "KSAE_err")) continue;
     if (!(toks[k + 1].t === "p" && toks[k + 1].v === "(")) continue;
     if (toks[k - 1] && toks[k - 1].t === "id" && toks[k - 1].v === "function") continue;   // tanımın kendisi
     // argümanların sonu
@@ -358,7 +359,8 @@ function rapor() {
     var ok = tam.some(function (s) { return cevrildi(I, s); }) || cevrildi(I, x.text);
     if (!ok) jEksik.push(x);
   });
-  var hostTum = extractHost(fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8"), "jsx/host.jsx");
+  var hostTum = extractHost(fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8"), "jsx/host.jsx")
+    .concat(extractHost(fs.readFileSync(path.join(KOK, "jsx", "host-ae.jsx"), "utf8"), "jsx/host-ae.jsx"));
   var xTekil = {}, xEksik = [], xToplam = 0;
   hostTum.forEach(function (x) {
     if (xTekil[x.text]) return;
@@ -391,7 +393,7 @@ if (require.main === module) {
   yaz("js/*.js kullanıcı metinleri", r.js, function (x) {
     return x.file + ":" + x.line + " " + x.template.map(function (p) { return p.lit === null ? "{…}" : p.lit; }).join("").replace(/\n/g, "\\n").slice(0, 110);
   });
-  yaz("jsx/host.jsx hata metinleri (KS_err)", r.host, function (x) {
+  yaz("jsx/host.jsx + host-ae.jsx hata metinleri (KS_err, KSAE_err)", r.host, function (x) {
     return x.file + ":" + x.line + " " + x.text.replace(/\n/g, "\\n").slice(0, 110);
   });
   var gecti = r.html.yuzde >= ESIK && r.host.yuzde >= ESIK;

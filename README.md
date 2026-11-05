@@ -230,6 +230,19 @@ Paket yöneticisine (winget) bilerek güvenilmiyor: her Windows'ta bulunmuyor, k
 
 **Altyazı.** Kapsamı seç (klip / In–Out / sequence), dili seç, "Altyazı oluştur". Liste gelince satırları düzenle, stilini seç, "Sequence'a uygula" — Premiere caption izi oluşturur; olmazsa SRT projeye alınır, timeline'a sürüklersin. "SRT indir" ile dosya olarak da alabilirsin. Yerel motor ses süresinin ~1,5-2 katı sürede çalışır; acelen varsa Groq'a geç.
 
+### After Effects (deneysel)
+
+> **Gerçek After Effects'te henüz denenmedi.** Kod yalnız sahte AE nesneleriyle test edildi (`tests/test-host-ae.js`); ilk sürümde hata çıkabilir.
+
+Panel After Effects 2020 (17.0) ve üstünde de açılır (Window › Extensions › Suflo; CEP 10 gerekir). After Effects'te yalnız altyazı araçları görünür; kesim, zoom, geçiş, kütüphane gibi Premiere Pro'ya özgü araçlar gizlenir ve üstte bunu söyleyen bir not çıkar.
+
+- **Transkript:** kompozisyonda sesi olan bir katman seç (video ya da ses dosyası), "Altyazı oluştur". Suflo katmanın kaynak dosyasını aynı motorla yazıya döker; katmanın başlangıcı, kırpılması (in / out) ve zaman esnetmesi hesaba katılır. Ön kompozisyon, Time Remap açık ya da ters çevrilmiş katmanın sesi bu sürümde okunamaz (panel nedenini söyler). Kompozisyonun sesini dışa aktarıp okumak sonraki adım.
+- **Metin katmanı olarak ekle (ücretsiz):** her altyazı satırı aktif kompozisyonda düzenlenebilir bir metin katmanı olur (beyaz Arial Bold, siyah kontur, alt güvenli bölgede; 9:16'da platform arayüzünün üstünde).
+- **Altyazı Efektleriyle ekle (Pro; Altyazı Efektleri video katmanıyla aynı deneme hakkı):** kartlar önizlemeyle aynı kurulur; yazı tipi, renk, kontur, gölge (Drop Shadow), konum, giriş animasyonu ve etkin kelime vurgusu (metin animatörü, kelime dizinli Range Selector) After Effects'in kendi özellikleriyle yazılır. Deneme hakkıyla eklenende sağ üstte kilitli bir "suflo.app" metin katmanı olur. Arka plan kutusu ile Titre / Glitch kelime hareketleri henüz yok (panel uyarır); kurulu olmayan font AE'de değişir (panel söyler).
+- **Suflo altyazılarını kaldır:** yalnız Suflo'nun eklediği katmanları (yorumu `Suflo altyazi` ile başlar, etiket rengi aynı) siler. Ekleme ve kaldırma tek Ctrl+Z ile geri alınır.
+
+Kararlar `js/ae-plan.js`'te (saf, Node'da test edilir), After Effects tarafı `jsx/host-ae.jsx` yalnız planı yürütür; panel `js/ae-panel.js`. Premiere davranışı değişmez.
+
 ## Sık sorulanlar
 
 **Gerçekten ücretsiz mi?** Çekirdek: evet, sonsuza dek. Transkripsiyon (99 dil, çevrimdışı), altyazı editörü, düz stiller, SRT/VTT/TXT dışa aktarım ve caption izine uygulama MIT lisanslı ve ücretsiz; yerel motor bilgisayarında çalışır, kimseye ödeme yapmazsın. Animasyonlu altyazı, otomatik kesim ve ritim marker'ları gibi ileri özellikler 2.4.0'dan itibaren [Suflo Pro](https://suflo.app/pro)'da — tek seferlik 749 TL, abonelik yok. Dürüst olalım: 2.3.0'da bunlar da ücretsizdi. Güncellemek zorunda değilsin; eski sürüm çalışmaya devam eder, kod da MIT.
@@ -252,6 +265,9 @@ js/kayit-kaldir.js Geçiş / Zoom / Hareket önayarı kayıtlarını saklar, kay
 js/egri-model.js  Eğri sekmesinin saf modeli: yoklama kararı, anahtar kare çifti, bake grupları, varışta yaylanma (varışlar ve öğeler), düzenleyici geometrisi
 js/egri.js        Eğri sekmesi + SVG eğri düzenleyicisi (SufloEgriEditor; 'hiz' modu Hız Rampası özel eğrisi), kart ızgarası ve araçların Eğri seçicisi (SufloEgriIzgara, SufloEgriSecici), paylaşım yapıştırıcısı (SufloEgriPaylas: pano, dosya pencereleri)
 jsx/host.jsx      Premiere ExtendScript tarafı
+js/ae-plan.js     After Effects (deneysel): ana uygulama tespiti, K.call eşlemesi, katman zamanı, metin katmanı planı (SufloAePlan)
+js/ae-panel.js    After Effects paneli: Premiere araçlarını gizler, host-ae.jsx'i yükler, ekle / kaldır (SufloAePanel)
+jsx/host-ae.jsx   After Effects ExtendScript tarafı (yalnız AE'de yüklenir; planı yürütür)
 tests/            testler (panelin gerçek kaynağını çalıştırır)
 tools/            kur/kaldır/paketle/yayınla/dev-server/test
 ```
@@ -280,6 +296,9 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir; 3.4: kurumsal HTTPS denetimi taklidi (test kökü) — ek kök yokken tek deneme, sertifika hatasında yalnız bir yeniden deneme, kurumsal kökle iner, HEAD ve zaman aşımı (bağlanamayan istek ve yanıtsız vekil CONNECT dahil duvar saatiyle), sistem kökleri yalnız istenince, başarısız kök dışa aktarması önbelleğe girmez, "bir kez daha denedi" yalnız deneme yapıldıysa, `rejectUnauthorized` hiçbir yerde yok, Umbrella / 0.0.0.0 DNS ipucu |
 | `test-model-ice-aktar.js` | Çevrimdışı model içe aktarma: ggml imzası, Git LFS işaretçisi, 1 MB / 4 GB sınırları, GGUF; dosya adından katalog kimliği (nicemlenmiş adlar, " (1)" eki); yarım katalog dosyası, SHA-256 doğrulaması, uyuşmazlıkta `.part` temizliği, çevrimdışı "doğrulanmadı" onayı, var olan model onaysız ezilmez, Özel model kaydı ve seçimi, taşıma düşerse eski model korunur, dosyası silinen Özel model yerine Turbo kurulur, "doğrulanmadı" işareti ve Doğrula, iki aynada DNS teşhisi korunur, macOS motor kaynağı, motor yokken durum satırı, panel bağlantısı |
 | `test-ag-dayanim.js` | `js/ag-dayanim.js`: dört sertifika kodu (ileti metninden de), PEM ayıklama ve 64 sütun, `caListesi`, sabit Windows / macOS dışa aktarma komutları (argüman dizisi), Umbrella aralığı, hata açıklamaları, Doctor kaynak satırları, İngilizce çeviri |
+| `test-ae-plan.js` | After Effects (deneysel) planı: ana uygulama tespiti, K.call eşlemesi (Premiere'de değişmez, AE'de karşılığı olmayan KS_* gönderilmez), katman zamanı (startTime, esnetme, kompozisyon sınırı, Time Remap / ters / dosyasız ret), düz plan (kareye oturan çakışmasız zaman, güvenli bölge, punto sığdırma), stilli plan (önizlemeyle aynı kartlar, kelime dizini anahtarları, *vurgu*, giriş, gölge), filigran, kayıt işareti, deterministiklik |
+| `test-host-ae.js` | `jsx/host-ae.jsx` sahte After Effects nesneleriyle: host.jsx AE'de zararsız yüklenir, bağlam ve seçili katmanlar, metin katmanı (in / out, çapa, yazı, Drop Shadow, giriş anahtarları), animatörler (Index / Words, Hold), addProperty sonrası geçersizleşen nesneler, eksik font / italik, hatada geri sarma, tek geri al grubu, yalnız Suflo katmanlarını kaldırma |
+| `test-ae-panel.js` | Manifest (AEFT) ve .debug, köprünün AE eşlemesi, index.html / CSS işaretleri, `js/ae-panel.js` sahte DOM'da (Premiere'de etkisiz; AE'de gizleme, betik yükleme, ücretsiz düz ekleme, `overlay` kapısı + filigran + hak yalnız başarıda, kaldırma), paketleme |
 | `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü, ölçülmüş kelimelerden k1/kc/wN, ses etiketi filtresi (Türkçe/İngilizce etiketler, ♪ satırları, `*vurgu*` korunur, karışık satır, "Ses etiketlerini koru") |
 | `test-sessiz-ses.js` | Sessiz ses uyarısı: WAV başlığı (LIST/bext, EXTENSIBLE, kayan nokta), parça sınırına düşen örnekte tepe (gerçek 1 MB sınırı dahil), 0,001 eşik sınırı, erken durma, volumedetect, "Yine de devam et" / "Vazgeç" ve toplu işte tek soru, panelde motordan önce denetim |
 | `test-caption-layout.js` | Okunabilir satır düzeni: 21/21 dengeli kırılım (38/4 değil), sığmayan metinde kelime atılmaz, stil motorunun `\N` bölmesiyle aynı kırılım (1800 rastgele girdi), kelimeden satır (karakter, kelime sınırı, duraklama, cümle sonu, süre), "." üstünden birleştirme yok, en kısa / en uzun süre ve çakışmasızlık, LCS kelime hizalama (Türkçe İ/ı, eklenen / silinen / değişen kelime, idempotent), Shift+Enter, bölme ve "başlangıç – bitiş" zaman düzenlemesi |
@@ -400,6 +419,11 @@ Shorts with an explained 0–100 score, animated caption styles, transitions and
   audio, styled captions and hook titles, translation, beat sync, speed ramps, offline English translation) gives you 3 free tries on your own
   footage first; content libraries (MOGRTs, SFX, Motion BGs, presets), batch clips, the Shorts
   package and Podcast Mode are Pro-only.
+- **After Effects (experimental, untested in real After Effects):** the panel also opens in After Effects
+  2020 (17.0) and later with only the caption tools. Transcribe the source file of the selected layer,
+  then add captions as native text layers (plain: free; Caption Effects styling and animation: Pro, same
+  trial as the styled caption layer, watermarked as a text layer). "Remove Suflo captions" deletes only the
+  layers Suflo added. See "After Effects (deneysel)" above for limits.
 - **New in 3.1:**
   - **One-click Shorts package:** turn the viral moments you pick into 9:16 sequences with captions,
     a hook title, a progress bar, a call to action, your logo and per-platform titles and hashtags.

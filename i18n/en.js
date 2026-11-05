@@ -4156,7 +4156,65 @@
     "Yapay zekâ köprüsü (MCP): Claude gibi bir asistan Suflo işlerini senin yerine yapar": "AI bridge (MCP): an assistant such as Claude runs Suflo tasks for you"
   });
 
-  var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE",
+  /* ================= After Effects (experimental; js/ae-panel.js, js/ae-plan.js, jsx/host-ae.jsx) ================= */
+  add({
+    "After Effects (deneysel)": "After Effects (experimental)",
+    "Burada yalnız altyazı araçları açık: transkript, düzenleme ve kompozisyona metin katmanı olarak ekleme. Kesim, zoom, geçiş, kütüphane gibi araçlar Premiere Pro'ya özgü olduğu için gizlendi.":
+      "Only the caption tools are available here: transcription, editing and adding captions to the composition as text layers. Tools such as cuts, zoom, transitions and the library are specific to Premiere Pro, so they are hidden.",
+    "Altyazıyı kompozisyona ekleme biçimi": "How to add captions to the composition",
+    "Metin katmanı olarak ekle": "Add as text layers",
+    "Altyazı Efektleriyle ekle": "Add with Caption Effects",
+    "Her altyazı kompozisyonda düzenlenebilir bir metin katmanı olur. Düz ekleme ücretsiz; Altyazı Efektleri (renk, kontur, gölge, giriş ve etkin kelime animasyonu) Pro, deneme hakkıyla filigranlı.":
+      "Each caption becomes an editable text layer in the composition. Plain captions are free; Caption Effects (colour, stroke, shadow, intro and active-word animation) are Pro, watermarked when using a free trial.",
+    "Yalnız Suflo'nun eklediği altyazı katmanlarını siler (tek adımda geri alınır)": "Deletes only the caption layers Suflo added (undone in one step)",
+    "Suflo altyazılarını kaldır": "Remove Suflo captions",
+    "After Effects bağlantısı": "After Effects connection",
+    "Seçili katman": "Selected layer",
+    "Seçili katmanlar ({})": "Selected layers ({})",
+    "Kompozisyonda konuşma içeren bir katman seç.": "Select a layer with speech in the composition.",
+    "After Effects'e bağlanılamadı": "Couldn't connect to After Effects",
+    "After Effects'e bağlanılamadı.": "Couldn't connect to After Effects.",
+    "Kompozisyon yok": "No composition",
+    "bir kompozisyon aç": "open a composition",
+    "{} katman seçili": "{} layers selected",
+    "Katman seçilmedi": "No layer selected",
+    "Önce altyazı oluştur ya da SRT içe aktar.": "Generate captions or import an SRT first.",
+    "After Effects betiği (host-ae.jsx) yüklenemedi.": "The After Effects script (host-ae.jsx) couldn't be loaded.",
+    "Kompozisyonun süresine düşen altyazı yok.": "No captions fall within the composition's duration.",
+    "Altyazı katmanları eklenemedi.": "The caption layers couldn't be added.",
+    "{} altyazı katmanı eklendi": "{} caption layers added",
+    "{} altyazı katmanı eklendi (deneme: filigranlı)": "{} caption layers added (trial: watermarked)",
+    "After Effects'te kurulu olmayan font: {}. Fontu kurup katmanlarda yeniden seçebilirsin.": "Font not installed in After Effects: {}. Install it and pick it again on the layers.",
+    "Bu After Effects sürümü italiği betikten açamıyor; yazı düz eklendi.": "This After Effects version can't turn on italics from a script; the text was added upright.",
+    "Suflo altyazıları kaldırılamadı.": "Suflo captions couldn't be removed.",
+    "{} Suflo altyazı katmanı kaldırıldı": "{} Suflo caption layers removed",
+    "Bu kompozisyonda Suflo altyazısı yok.": "There are no Suflo captions in this composition.",
+    "Suflo deneme filigranı": "Suflo trial watermark",
+    // js/ae-plan.js warnings and layer reasons
+    "Arka plan kutusu After Effects çıktısında henüz yok; yazı kutusuz eklendi.": "The background box isn't available in After Effects output yet; the text was added without it.",
+    "Titre ve Glitch kelime hareketleri After Effects çıktısında henüz yok; etkin kelime yalnız vurgu rengini alır.": "The Shake and Glitch word motions aren't available in After Effects output yet; the active word only gets the highlight colour.",
+    "Zıpla kelime hareketi After Effects'te etkin kelimeyi büyüterek gösterilir.": "In After Effects the Bounce word motion is shown by enlarging the active word.",
+    "After Effects'te bir kompozisyon aç.": "Open a composition in After Effects.",
+    "Kompozisyonda sesi olan bir katman seç (video ya da ses dosyası).": "Select a layer with audio in the composition (a video or audio file).",
+    "Seçili katmanın kaynağı bir dosya değil (ön kompozisyon, katı renk ya da metin); sesi doğrudan okunamıyor. Kaynak dosyalı bir katman seç.":
+      "The selected layer's source isn't a file (a precomp, solid or text), so its audio can't be read directly. Select a layer with a source file.",
+    "Seçili katmanda ses yok. Sesi olan bir katman seç.": "The selected layer has no audio. Select a layer with audio.",
+    "Zaman yeniden eşleme (Time Remap) açık katmanın sesi bu sürümde okunamıyor.": "Audio from a layer with Time Remapping on can't be read in this version.",
+    "Ters çevrilmiş (eksi esnetmeli) katmanın sesi okunamıyor.": "Audio from a reversed (negative stretch) layer can't be read.",
+    "Seçili katman kompozisyonun görünen süresinin dışında kalıyor.": "The selected layer is outside the composition's visible duration.",
+    "Bu işlem After Effects'te kullanılamaz (yalnız Premiere Pro).": "This action isn't available in After Effects (Premiere Pro only).",
+    // jsx/host-ae.jsx errors (ASCII Turkish)
+    "Aktif kompozisyon yok.": "No active composition.",
+    "Aktif kompozisyon yok. After Effects'te altyazilarin eklenecegi kompozisyonu acip yeniden dene.": "No active composition. Open the composition the captions should go into in After Effects and try again.",
+    "Gecersiz zaman.": "Invalid time.",
+    "Altyazi plani okunamadi (surum uyusmuyor).": "The caption plan couldn't be read (version mismatch).",
+    "Eklenecek altyazi yok.": "There are no captions to add.",
+    "Altyazi katmanlari eklenemedi: {}": "The caption layers couldn't be added: {}",
+    "Suflo altyazilari kaldirilamadi: {}": "Suflo captions couldn't be removed: {}"
+  });
+
+  var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE", "AFTER EFFECTS",
+    "Suflo altyazi",   // After Effects: Suflo's layer comment marker (js/ae-plan.js ISARET; never shown in the panel)
     "PREMIERE READY", "SFX", "Emoji Assets", "PNG · WEBP · GIF", "Motion BG", "ffmpeg", "In → Out", "Creator Punch", "Clean Pill", "Bold Box",
     "SaaS Glass", "Reels", "Pop", "Premium", "Karaoke", "YouTube", "Azərbaycanca", "Azərbaycan", "English", "Deutsch", "Español",
     "Français", "Português", "Italiano", "Anton", "Archivo Black", "Bebas Neue", "Bungee", "Lora", "Montserrat", "Arial", "Impact",

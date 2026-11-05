@@ -76,19 +76,21 @@ window.KApp = (function () {
     var elx = el("ctx-text");
     var dot = el("host-dot");
     var strip = el("context-strip");
+    // After Effects (deneysel): sekans yerine kompozisyon, klip yerine katman
+    var ae = !!(window.SufloAePanel && SufloAePanel.aktif());
     if (!ctx.connected) {
       dot.className = "host-dot off";
       strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="dim">' +
-        (K.nodeOK ? "Premiere'e bağlanılamadı" : "önizleme modu — Premiere dışında") + "</span>";
+        (K.nodeOK ? (ae ? "After Effects'e bağlanılamadı" : "Premiere'e bağlanılamadı") : "önizleme modu — Premiere dışında") + "</span>";
       return;
     }
     dot.className = "host-dot ok";
     if (!ctx.hasSeq) {
-      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="dim">Sequence yok</span>' +
-        '<span class="pill">bir sequence aç</span>';
+      strip.innerHTML = CLAP_IC + (ae ? '<span id="ctx-text" class="dim">Kompozisyon yok</span><span class="pill">bir kompozisyon aç</span>'
+        : '<span id="ctx-text" class="dim">Sequence yok</span><span class="pill">bir sequence aç</span>');
     } else if (ctx.sel) {
       var pill = (ctx.selCount > 1)
-        ? ctx.selCount + " klip seçili"
+        ? (ae ? ctx.selCount + " katman seçili" : ctx.selCount + " klip seçili")
         : ctx.sel.dur.toFixed(1) + " sn";
       strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
         '<span class="pill live"></span>';
@@ -96,7 +98,7 @@ window.KApp = (function () {
       strip.querySelector(".pill").textContent = pill;
     } else {
       strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
-        '<span class="pill">Klip seçilmedi</span>';
+        (ae ? '<span class="pill">Katman seçilmedi</span>' : '<span class="pill">Klip seçilmedi</span>');
       strip.querySelector(".sel-name").textContent = ctx.sequence;
     }
   }
@@ -405,12 +407,17 @@ window.KApp = (function () {
   function aramaKaydi() {
     var navlar = [];
     Array.prototype.forEach.call(document.querySelectorAll(".yan-menu .ky-oge[data-tab]"), function (b) {
+      // After Effects (deneysel): gizlenen Premiere araçları aranmaz (js/ae-panel.js data-ae-gizli)
+      if (b.hasAttribute && b.hasAttribute("data-ae-gizli")) return;
       var ad = b.querySelector(".ky-metin b"), alt = b.querySelector(".ky-metin i");
       navlar.push({ tab: b.getAttribute("data-tab"), kat: b.getAttribute("data-kat") || "", ad: navAdi(ad),
         alt: alt ? uiOzgun(alt).replace(/\s+/g, " ").trim() : "", pro: !!b.querySelector("[data-kilit]") });
     });
     // sekmesi panelde olmayan eylem listelenmez (3.4'te hepsinin sekmesi var; test-arac-ara denetler)
-    var kayit = AA.kayitKur(navlar, { mevcut: function (e) { return !!el("tab-" + e.tab); } });
+    var kayit = AA.kayitKur(navlar, { mevcut: function (e) {
+      var t = el("tab-" + e.tab);
+      return !!t && !(t.hasAttribute && t.hasAttribute("data-ae-gizli"));
+    } });
     kayit.forEach(function (o) {
       o.adGoster = uiMetni(o.ad);
       o.altGoster = o.alt ? uiMetni(o.alt) : "";
@@ -2080,6 +2087,8 @@ window.KApp = (function () {
     // Arayüz dili EN ÖNCE: bağlam yoklamasından ve her pencereden önce. Dil settings.json'da
     // (uiLang); eski kurulumlar Türkçe kalır, taze kurulumda rehberin 0. adımı sorar
     guvenli("Dil", arayuzDiliniBaslat);
+    // After Effects (deneysel): Premiere'e özgü araçlar gizlenir, AE betiği yüklenir. Premiere'de hiçbir şey yapmaz
+    guvenli("After Effects", function () { if (window.SufloAePanel) SufloAePanel.init(); });
 
     // Sürüm etiketleri tek kaynaktan (bridge.js VERSION) beslenir: elle yazılan
     // "v1.7" her yayında geride kalıyor, kullanıcı hangi sürümde olduğunu bilemiyordu
@@ -2185,7 +2194,9 @@ window.KApp = (function () {
     setTimeout(function () {
       try {
         var rehber = window.KOnboarding && KOnboarding.karar ? KOnboarding.karar() : "yok";
-        if (rehber !== "tam") yenilikleriGoster();
+        // After Effects'te yeniliklerin maddeleri (Eğri, Kesim, Hız Rampası) gizli sekmelere gider: gösterilmez
+        var aeMod = window.SufloAePanel && SufloAePanel.aktif();
+        if (rehber !== "tam" && !aeMod) yenilikleriGoster();
       } catch (eY) {}
     }, 900);
   }

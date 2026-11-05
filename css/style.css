@@ -4626,3 +4626,11 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .yan-menu.dar .ky-oge { justify-content: center !important; min-height: 42px; padding: 6px 0 !important; }
 .yan-menu.dar .ky-daralt { align-self: center; }
 .yan-menu.dar .ky-daralt svg { transform: rotate(180deg); }
+
+/* After Effects (deneysel; js/ae-panel.js body.host-ae): Premiere'e özgü öğeler gizli, AE öğeleri yalnız AE'de.
+   !important: captions.js gibi modüller kendi öğelerinin hidden'ını açıp kapatabilir; AE'de yine görünmezler. */
+body:not(.host-ae) [data-yalniz-ae] { display: none !important; }
+body.host-ae [data-yalniz-premiere], body.host-ae [data-ae-gizli] { display: none !important; }
+.ae-not { margin: 10px 13px 0; padding: 9px 12px; border: 1px solid rgba(114, 124, 255, .35); border-radius: var(--r); background: rgba(114, 124, 255, .08); color: var(--dim); font-size: 11.5px; line-height: 1.5; }
+.ae-not b { display: block; color: var(--text); font-size: 12px; margin-bottom: 2px; }
+.ae-altyazi #ae-kaldir { margin: 0 0 10px; }

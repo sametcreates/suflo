@@ -142,6 +142,10 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/egri\.js$',
             # 3.4 kayit tabanli guvenli kaldirma (Gecis, Zoom, Hareket onayari); host tarafi KS_removeSufloKeys
             '(^|/)js/kayit-kaldir\.js$',
+            # After Effects (deneysel): saf plan (bridge.js'ten once yuklenir), panel ve AE ExtendScript tarafi
+            '(^|/)js/ae-plan\.js$',
+            '(^|/)js/ae-panel\.js$',
+            '(^|/)jsx/host-ae\.jsx$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

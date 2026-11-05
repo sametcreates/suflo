@@ -357,16 +357,18 @@ window.KCaptions = (function () {
     var ready = engineReady() && (needSel ? !!ctx.sel : !!ctx.hasSeq);
     el("cap-go").disabled = busy || !ready;
     // coklu secimde CTA etiketi klip sayisini gostersin
+    // After Effects (deneysel): kapsam seçili katmanın kaynak dosyası (js/ae-panel.js)
+    var aeMod = !!(window.SufloAePanel && SufloAePanel.aktif());
     if (scope === "clip") {
       el("cap-go-scope").textContent = (ctx.selCount > 1)
-        ? "Seçili klipler (" + ctx.selCount + ")"
-        : "Seçili klip";
+        ? (aeMod ? "Seçili katmanlar (" + ctx.selCount + ")" : "Seçili klipler (" + ctx.selCount + ")")
+        : (aeMod ? "Seçili katman" : "Seçili klip");
     }
     // is surerken ilerleme yazisini talimatlarla ezme
     if (busy || !ctx.connected) return;
     if (!engineReady()) {
       status("Suflo Altyazı Motoru hazır değil — yerel çekirdeği kur veya Ayarlar'dan bulut yedeği ekle.");
-    } else if (needSel && !ctx.sel) status("Timeline'da konuşma içeren bir klip seç.");
+    } else if (needSel && !ctx.sel) status(aeMod ? (ctx.selUyari || "Kompozisyonda konuşma içeren bir katman seç.") : "Timeline'da konuşma içeren bir klip seç.");
     else if (!needSel && !ctx.hasSeq) status("Önce bir sequence aç.");
     else {
       // hata mesajini koru, yalnizca talimat metinlerini temizle
@@ -7345,6 +7347,16 @@ window.KCaptions = (function () {
     translationLang: function () { return ceviriDili; },
     // ekrandaki belgenin kayıtlı dili (algılanan / çevrimdışı İngilizce; "" = bilinmiyor): Shorts kaydı onu saklar
     documentLang: function () { return algilananDil; },
+    /*
+     * After Effects (deneysel, js/ae-panel.js → js/ae-plan.js plan): kompozisyona yazılacak satırlar. stilli: Altyazı
+     * Efektleri (video katmanının girdisiyle aynı: *vurgu* ve ölçülmüş kelimeler, kelime stillerinin cue türü, oluşturucu
+     * ayarı, "Platform arayüzünden kaçın"); değilse SRT / caption izinin düz satırları.
+     */
+    aeVerisi: function (stilli) {
+      if (!stilli) return { cues: cueler(), cueKind: "lines", ayar: null, guvenli: false };
+      return { cues: cueler({ vurgu: true, kelimeler: true }), cueKind: motorCueTuru(), ayar: efektAyari(),
+        guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked) };
+    },
     // Shorts sekanslari icin ham satirlar (*vurgu* ve orig korunur) ve mod
     rawSegments: function () { return JSON.parse(JSON.stringify(segments)); },
     mode: function () { return segmentsMode; },
