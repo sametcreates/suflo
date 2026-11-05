@@ -18,7 +18,7 @@
  *
  * Kipler: "duz" (ücretsiz; Premiere'in ücretsiz caption izinin karşılığı: düz beyaz yazı, siyah kontur, alt güvenli
  * bölge) ve "stilli" (Altyazı Efektleri: kartlar önizlemeyle AYNI kurulur — js/caption-mogrt-json.js satirlar →
- * stil motorunun efektSatirlari; konum js/altyazi-efekt.js konumNoktasi; Pro / deneme kapısı panelde, "overlay").
+ * stil motorunun efektSatirlari; konum js/altyazi-efekt.js konumNoktasi; denemesiz Pro kapısı panelde, "overlay").
  * Suflo'nun oluşturduğu her katmanın yorumu ISARET ile başlar: "Suflo altyazılarını kaldır" yalnız onları siler.
  *
  * After Effects'te gerçek denemesi YAPILMADI (README "After Effects (deneysel)"). DOM'a, AE'ye, dosyaya dokunmaz.
@@ -33,16 +33,18 @@
   // Bağımlılıklar çağrı anında yüklenir: bu dosya index.html'de bridge.js'ten ÖNCE gelir (K.call eşlemesi)
   var api = factory(function () { return yukle("SufloAltyaziEfekt", "./altyazi-efekt.js"); },
     function () { return yukle("SufloCaptionMogrtJson", "./caption-mogrt-json.js"); },
-    function () { return yukle("SufloStyleEngine", "./style-engine.js"); });
+    function () { return yukle("SufloStyleEngine", "./style-engine.js"); },
+    function () { return yukle("SufloCaptionLayout", "./caption-layout.js"); });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloAePlan = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (aeBul, cmjBul, seBul) {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (aeBul, cmjBul, seBul, clBul) {
   "use strict";
 
-  var AE_ = null, CMJ_ = null, SE_ = null;
+  var AE_ = null, CMJ_ = null, SE_ = null, CL_ = null;
   function AE() { if (!AE_ && aeBul) AE_ = aeBul(); return AE_; }
   function CMJ() { if (!CMJ_ && cmjBul) CMJ_ = cmjBul(); return CMJ_; }
   function SE() { if (!SE_ && seBul) SE_ = seBul(); return SE_; }
+  function CL() { if (!CL_ && clBul) CL_ = clBul(); return CL_; }
 
   var SURUM = 1;
   /*
@@ -64,6 +66,8 @@
   var DIKEY_ALT_YEDEK = 0.78;
   // Ortalama karakter genişliği (em): Arial Bold karışık harfte ~0,55 (caption-mogrt-json ARIAL_GENISLIK büyük harfli 0,62)
   var DUZ_GENISLIK = 0.55;
+  // AE metin katmanının otomatik satır aralığı (punto × ~1,2): sarılan düz altyazının yüksekliği
+  var DUZ_SATIR_ARALIGI = 1.2;
   var EN_KUCUK_PUNTO = 12;
   // Altyazı Efektleri girişi: stil motorunun T'si (300 ms, Dengeli şiddet) ve kayma payı scaled(50)
   var GIRIS_SN = 0.3;
@@ -255,7 +259,34 @@
     return out;
   }
 
-  // Ücretsiz düz kip: her altyazı satırı bir katman, alt güvenli bölgede ortalı, uzun satırda punto küçülür
+  // Kelime düşürmeden açgözlü sarma (js/caption-layout.js yüklenemezse yedek)
+  function acgozluSar(s, n) {
+    var out = [], cur = "";
+    s.split(" ").forEach(function (w) {
+      if (!w) return;
+      var aday = cur ? cur + " " + w : w;
+      if (cur && aday.length > n) { out.push(cur); cur = w; } else cur = aday;
+    });
+    if (cur) out.push(cur);
+    return out;
+  }
+
+  /*
+   * Düz kipte satırı sar (Premiere'in caption izi gibi; eskiden yalnız punto küçülüyor, 12 punto tabanında yazı kadrajdan
+   * taşıyordu). Temel puntoda sığmayan satır önce dengeli iki satıra (js/caption-layout.js dengeliSar: 21/21, 38/4 değil),
+   * iki satıra da sığmazsa kelime düşürmeden daha çok satıra bölünür. Döner: satırlar.
+   */
+  function duzSar(metin, sigan) {
+    var cl = CL(), out = [];
+    metin.split("\r").forEach(function (s) {
+      if (s.length <= sigan) { out.push(s); return; }
+      var parca = cl && cl.dengeliSar ? String(cl.dengeliSar(s, sigan, 2)).split("\n") : acgozluSar(s, sigan);
+      parca.forEach(function (p) { if (p) out.push(p); });
+    });
+    return out;
+  }
+
+  // Ücretsiz düz kip: her altyazı satırı bir katman, alt güvenli bölgede ortalı; uzun satır sarılır, punto yalnız yedek olarak küçülür
   function duzKartlar(cues, kad, guvenli) {
     var olcek = Math.min(kad.w, kad.h) / 1080, dikey = kad.h > kad.w * 1.2;
     var se = SE(), ga = se && se.GUVENLI_ALAN && se.GUVENLI_ALAN[2] ? Number(se.GUVENLI_ALAN[2].y) : DIKEY_ALT_YEDEK;
@@ -267,15 +298,22 @@
     var genislik = kad.w * (dikey && guvenli ? 0.74 : 1 - 2 * BASLIK_GUVENLI);
     var x = kad.w / 2;
     var temel = Math.max(EN_KUCUK_PUNTO, Math.round(DUZ.boyut * olcek));
+    var sigan = Math.max(1, Math.floor(genislik / (temel * DUZ_GENISLIK)));
+    // Sarılan yazı alttan çapalı yukarı büyür: üst başlık güvenli alanını aşmasın
+    var yukseklik = kad.h * (altY - BASLIK_GUVENLI);
     var out = [];
     (cues || []).forEach(function (c) {
       // Düz kipte *vurgu* işareti yazılmaz (panel zaten ayıklar; burada da ayıklanır)
       var metin = aeMetni(String(c && c.text != null ? c.text : "").replace(/\*([^*\s][^*]*?)\*/g, "$1"));
       var bas = sayi(c && c.start), son = sayi(c && c.end);
       if (!metin || bas === null || son === null || !(son > bas)) return;
+      var satirlar = duzSar(metin, sigan);
+      metin = satirlar.join("\r");
       var enUzun = 1;
-      metin.split("\r").forEach(function (s) { enUzun = Math.max(enUzun, s.length); });
-      var fs = Math.max(EN_KUCUK_PUNTO, Math.min(temel, Math.floor(genislik / (enUzun * DUZ_GENISLIK))));
+      satirlar.forEach(function (s) { enUzun = Math.max(enUzun, s.length); });
+      // Yedek küçültme: sarılsa da sığmayan tek uzun kelime ya da güvenli yüksekliği aşan çok satır
+      var fs = Math.max(EN_KUCUK_PUNTO, Math.min(temel, Math.floor(genislik / (enUzun * DUZ_GENISLIK)),
+        Math.floor(yukseklik / (satirlar.length * DUZ_SATIR_ARALIGI))));
       out.push({ bas: bas, son: son, metin: metin, konum: [yuvarla(x, 1), yuvarla(kad.h * altY, 1)], capa: [0.5, 1],
         yazi: { font: DUZ.font, boyut: fs, renk: rgb01(DUZ.renk), kontur: yuvarla(2 * DUZ.kontur * olcek, 1), konturRenk: rgb01(DUZ.konturRenk), italik: false },
         golge: null, giris: [], aktif: null, sabitVurgu: [], kelimeSayisi: metin.split(/[ \r]+/).length });
@@ -363,14 +401,18 @@
     var no = String(sira);
     while (no.length < 3) no = "0" + no;
     var ozet = String(metin).replace(/\r/g, " ");
-    if (ozet.length > 32) ozet = ozet.slice(0, 31) + "…";
+    if (ozet.length > 32) {
+      var kes = 31;
+      if (/[\ud800-\udbff]/.test(ozet.charAt(kes - 1))) kes--;   // vekil çiftini bölme (emoji katman adında yarım kalmasın)
+      ozet = ozet.slice(0, kes) + "…";
+    }
     return "Suflo " + no + " · " + ozet;
   }
 
   /*
    * plan(cues, o) — cues: panelin altyazı satırları ({ start, end, text, words? }; kompozisyon saniyesi; stilli kipte
    * *vurgu* işaretli). o: { mod: "duz" | "stilli", ayar (Altyazı Efektleri ayarı), cueKind, guvenli, font (PostScript adı,
-   * verilmezse ayarın), w, h, fps, sure (kompozisyon), filigran (deneme), isId }.
+   * verilmezse ayarın), w, h, fps, sure (kompozisyon), filigran (panel artık vermez: AE'de deneme hakkı yok; host desteği duruyor), isId }.
    * Aynı girdi aynı planı verir (zaman damgası / rastgelelik yok; iş kimliği çağırandan).
    * Döner: { surum, isaret, isId, mod, comp, katmanlar: [...], filigran: null | {...}, uyarilar: [...] }
    */
@@ -393,9 +435,10 @@
       comp: { w: kad.w, h: kad.h, fps: kad.fps, sure: kad.sure }, katmanlar: katmanlar, filigran: filigran, uyarilar: uyarilar };
   }
 
-  // Katmanın yorumu (host-ae.jsx aynısını yazar; kaldırma bu önekle tanır)
+  // Katmanın yorumu (host-ae.jsx aynısını yazar; kaldırma bu önekle tanır). Ayraç şart: yorumu yalnız "Suflo altyazi" ile
+  // BAŞLAYAN kullanıcı katmanı ("Suflo altyazisi için not") Suflo'nun sayılmaz
   function yorum(isId, tur) { return ISARET + " | " + String(isId || "") + " | " + String(tur || "satir"); }
-  function suflonunMu(yorumMetni) { return String(yorumMetni || "").indexOf(ISARET) === 0; }
+  function suflonunMu(yorumMetni) { return String(yorumMetni || "").indexOf(ISARET + " | ") === 0; }
 
   return {
     SURUM: SURUM,

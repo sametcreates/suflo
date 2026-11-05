@@ -131,6 +131,12 @@ ok("Premiere yanit vermedi -> Premiere mesgul mesaji",
   iceriyor("Premiere yanıt vermedi (KS_exportAudio) — işlem zaman aşımına uğradı.", "Premiere meşgul"),
   coz("Premiere yanıt vermedi (KS_exportAudio) — işlem zaman aşımına uğradı."));
 
+// After Effects'te zaman asimi kendi adiyla gelir: Premiere'e yollamaz, After Effects'e yollar (inceleme bulgusu)
+ok("After Effects yanit vermedi -> After Effects mesgul mesaji, Premiere'e YOLLAMIYOR",
+  iceriyor("After Effects yanıt vermedi (KSAE_altyaziOlustur) — işlem zaman aşımına uğradı.", "After Effects meşgul") &&
+  !iceriyor("After Effects yanıt vermedi (KSAE_altyaziOlustur) — işlem zaman aşımına uğradı.", "Premiere"),
+  coz("After Effects yanıt vermedi (KSAE_altyaziOlustur) — işlem zaman aşımına uğradı."));
+
 ok("indirme zaman asimi Premiere'e YOLLAMIYOR",
   !iceriyor("Motor indirilemedi: indirme zaman aşımı", "Premiere meşgul"),
   coz("Motor indirilemedi: indirme zaman aşımı"));
@@ -200,6 +206,7 @@ var ornekler = [
   "invalid_api_key",
   "rate_limit exceeded",
   "Premiere yanıt vermedi (KS_getContext)",
+  "After Effects yanıt vermedi (KSAE_baglam)",
   "Motor çalıştırılamadı: kod=1",
   "Error: spawn ffmpeg ENOENT",
   // 3.4 adım 19: DNS filtresi teşhisi ve kurumsal HTTPS denetimi

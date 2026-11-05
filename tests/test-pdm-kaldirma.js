@@ -11,6 +11,9 @@ function oku(f) { return fs.readFileSync(path.join(KOK, f), "utf8").replace(/\r\
 var ISARET = "SufloOncekiPlayerDebugMode";
 var instPs = oku("tools/install.ps1"), unPs = oku("tools/uninstall.ps1"), bat = oku("tools/kurucu/Suflo-Kur.bat");
 var instSh = oku("tools/install.sh"), cmd = oku("tools/kurucu/Suflo-Kur.command"), unSh = oku("tools/uninstall.sh");
+// İnceleme bulgusu: yayın ZIP'i (asıl dağıtım) yalnız kurucuları taşıyordu; işareti okuyan kaldırıcı yoktu
+function varsaOku(f) { return fs.existsSync(path.join(KOK, f)) ? oku(f) : ""; }
+var kaldirBat = varsaOku("tools/kurucu/Suflo-Kaldir.bat"), kaldirCmd = varsaOku("tools/kurucu/Suflo-Kaldir.command");
 
 /* ---------------- 1) Windows betikleri (metin denetimi) ---------------- */
 // install.ps1: işaret yoksa önceki değer okunur; "1" değilse (yoksa "yok") işarete yazılır; sonra PlayerDebugMode = 1
@@ -39,7 +42,37 @@ ok("Suflo-Kur.bat: işaret yoksa önceki değer okunur, '1' değilse işarete ya
 ok("Suflo-Kur.bat: gecikmeli genişletme açık (!ONCEKI! döngüde okunur), CRLF ve ASCII korunur",
   /setlocal enabledelayedexpansion/.test(bat) && /\r\n/.test(fs.readFileSync(path.join(KOK, "tools/kurucu/Suflo-Kur.bat"), "latin1")) &&
   /^[\x00-\x7f]*$/.test(fs.readFileSync(path.join(KOK, "tools/kurucu/Suflo-Kur.bat"), "latin1")));
-ok("beş betik aynı işaret adını kullanır", [instPs, unPs, bat, instSh, cmd, unSh].every(function (s) { return s.indexOf(ISARET) !== -1; }));
+ok("yedi betik aynı işaret adını kullanır", [instPs, unPs, bat, instSh, cmd, unSh, kaldirBat, kaldirCmd].every(function (s) { return s.indexOf(ISARET) !== -1; }));
+
+/* ---------------- 1b) Yayın ZIP'inin kaldırıcıları ---------------- */
+var kbDongu = kaldirBat.slice(kaldirBat.indexOf("for %%V in (9 10 11 12 13 14) do ("), kaldirBat.indexOf("rem 3)"));
+ok("Suflo-Kaldir.bat: işaret okunur; yoksa dokunulmaz, 'yok' ise PlayerDebugMode silinir, değilse eski değer yazılır; işaret silinir",
+  /set "ONCEKI="/.test(kbDongu) &&
+  /for \/f "tokens=3" %%A in \('reg query "HKCU\\Software\\Adobe\\CSXS\.%%V" \/v SufloOncekiPlayerDebugMode 2\^>nul \^\| find \/I "SufloOncekiPlayerDebugMode"'\) do set "ONCEKI=%%A"/.test(kbDongu) &&
+  /if defined ONCEKI \(/.test(kbDongu) &&
+  /if \/I "!ONCEKI!"=="yok" \(\n\s+reg delete "HKCU\\Software\\Adobe\\CSXS\.%%V" \/v PlayerDebugMode \/f/.test(kbDongu) &&
+  /\) else \(\n\s+reg add "HKCU\\Software\\Adobe\\CSXS\.%%V" \/v PlayerDebugMode \/t REG_SZ \/d "!ONCEKI!" \/f/.test(kbDongu) &&
+  /reg delete "HKCU\\Software\\Adobe\\CSXS\.%%V" \/v SufloOncekiPlayerDebugMode \/f/.test(kbDongu), kbDongu.slice(0, 300));
+ok("Suflo-Kaldir.bat: PlayerDebugMode'a döngü dışında dokunulmaz; uzantı klasörü silinir; onay sorulur",
+  (kaldirBat.match(/\/v PlayerDebugMode/g) || []).length === 2 && (kbDongu.match(/\/v PlayerDebugMode/g) || []).length === 2 &&
+  /set "HEDEF=%APPDATA%\\Adobe\\CEP\\extensions\\com\.sametcreates\.kesit"/.test(kaldirBat) && /rd \/s \/q "%HEDEF%"/.test(kaldirBat) &&
+  /set \/p DEVAM=/.test(kaldirBat) && kaldirBat.indexOf("set /p DEVAM=") < kaldirBat.indexOf("for %%V in"));
+ok("Suflo-Kaldir.bat: gecikmeli genişletme açık, CRLF ve ASCII", /setlocal enabledelayedexpansion/.test(kaldirBat) &&
+  /\r\n/.test(fs.readFileSync(path.join(KOK, "tools/kurucu/Suflo-Kaldir.bat"), "latin1")) &&
+  /^[\x00-\x7f]*$/.test(fs.readFileSync(path.join(KOK, "tools/kurucu/Suflo-Kaldir.bat"), "latin1")));
+ok("Suflo-Kaldir.command: #!/bin/bash ile başlar (BOM yok), LF", kaldirCmd.indexOf("#!/bin/bash") === 0 &&
+  !/\r/.test(fs.readFileSync(path.join(KOK, "tools/kurucu/Suflo-Kaldir.command"), "latin1")));
+var ky = oku("tools/kurucu-yap.ps1");
+ok("kurucu-yap.ps1: Suflo-Kaldir.bat kopyalanır, Suflo-Kaldir.command LF ve BOM'suz yazılır",
+  /Copy-Item \(Join-Path \$PSScriptRoot "kurucu\\Suflo-Kaldir\.bat"\) -Destination \$stage -Force/.test(ky) &&
+  /Suflo-Kaldir\.command"\)\) -replace "`r`n", "`n"/.test(ky) &&
+  /WriteAllText\(\(Join-Path \$stage "Suflo-Kaldir\.command"\), \$[A-Za-z]+, \(New-Object System\.Text\.UTF8Encoding\(\$false\)\)\)/.test(ky));
+var okubeni = ky.slice(ky.indexOf('$oku = @"'), ky.indexOf('"@', ky.indexOf('$oku = @"')));
+ok("OKUBENI: KALDIRMA bölümü iki kaldırıcıyı adıyla söyler", /\nKALDIRMA\b/.test(okubeni) && /Windows : "Suflo-Kaldir\.bat"/.test(okubeni) &&
+  /Mac     : "Suflo-Kaldir\.command"/.test(okubeni), okubeni.slice(-500));
+var izin = oku("tools/zip-izin.js");
+ok("zip-izin.js: her .command'a (Suflo-Kaldir.command dahil) çalıştırma izni", /function calistirilabilirMi\(ad\) \{\n\s+return \/\\\.\(command\|sh\)\$\/i\.test\(ad\);/.test(izin));
+ok("README: kaldırma adımları (ZIP'teki kaldırıcılar ve tools/uninstall.*)", /Suflo-Kaldir\.bat/.test(oku("README.md")) && /Suflo-Kaldir\.command/.test(oku("README.md")));
 
 /* ---------------- 2) macOS betikleri: sahte "defaults" ile gerçek çalıştırma ---------------- */
 var bashVar = !cp.spawnSync("bash", ["--version"], { stdio: "ignore" }).error;
@@ -95,6 +128,24 @@ if (!bashVar) {
       oku2(14, "PlayerDebugMode") === null && [9, 10, 11, 12, 13, 14].every(function (v) { return oku2(v, ISARET) === null; }) && /onceki haline dondu \(CSXS surumu: 5\)/.test(u.stdout),
       u.stdout + u.stderr);
   });
+  // Yayın ZIP'inin Mac kaldırıcısı: Suflo-Kur.command'dan sonra uzantı klasörünü siler, PlayerDebugMode'u geri yükler
+  ok("tools/kurucu/Suflo-Kaldir.command: bash sözdizimi geçerli", cp.spawnSync("bash", ["-n", path.join(KOK, "tools/kurucu/Suflo-Kaldir.command")]).status === 0);
+  sifirla();
+  calistir(kurulumBlogu(cmd, "V"), false);
+  var uzanti = path.join(ev, "Library", "Application Support", "Adobe", "CEP", "extensions", "com.sametcreates.kesit");
+  fs.mkdirSync(path.join(uzanti, "CSXS"), { recursive: true }); fs.writeFileSync(path.join(uzanti, "index.html"), "x");
+  var vaz = cp.spawnSync("bash", [path.join(KOK, "tools/kurucu/Suflo-Kaldir.command")], { env: ortam, encoding: "utf8", input: "h\n\n" });
+  ok("Suflo-Kaldir.command: onay verilmezse hiçbir şeye dokunmaz", vaz.status === 0 && fs.existsSync(uzanti) && oku2(9, ISARET) === "yok" && oku2(9, "PlayerDebugMode") === "1",
+    vaz.stdout + vaz.stderr);
+  var kc = cp.spawnSync("bash", [path.join(KOK, "tools/kurucu/Suflo-Kaldir.command")], { env: ortam, encoding: "utf8", input: "e\n\n" });
+  ok("Suflo-Kaldir.command: uzantı silinir; yalnız Suflo'nun değiştirdiği geri alınır (9 silinir, 10 açık, 11 → 0), işaretler gider",
+    kc.status === 0 && !fs.existsSync(uzanti) && oku2(9, "PlayerDebugMode") === null && oku2(10, "PlayerDebugMode") === "1" && oku2(11, "PlayerDebugMode") === "0" &&
+    [9, 10, 11, 12, 13, 14].every(function (v) { return oku2(v, ISARET) === null; }) && /CSXS: 5/.test(kc.stdout), kc.stdout + kc.stderr);
+  sifirla(); yaz(9, "PlayerDebugMode", "1");
+  var kc2 = cp.spawnSync("bash", [path.join(KOK, "tools/kurucu/Suflo-Kaldir.command")], { env: ortam, encoding: "utf8", input: "y\n\n" });
+  ok("Suflo-Kaldir.command: işaret yoksa PlayerDebugMode'a dokunulmaz", kc2.status === 0 && oku2(9, "PlayerDebugMode") === "1" && oku2(10, "PlayerDebugMode") === "1",
+    kc2.stdout + kc2.stderr);
+
   // İşaretsiz eski kurulum (bu sürümden önce kurulmuş): kaldırma PlayerDebugMode'a dokunmaz
   sifirla(); yaz(9, "PlayerDebugMode", "1");
   var u2 = cp.spawnSync("bash", [path.join(KOK, "tools/uninstall.sh")], { env: ortam, encoding: "utf8" });

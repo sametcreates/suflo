@@ -325,6 +325,9 @@ ok("plan sürümü uyuşmuyorsa / boşsa yürütülmez", /surum/.test(h8.call("K
 var h9 = kur();
 var benzer = h9.katmanEkle("Benzer", { comment: "Benim Suflo altyazi notum" });
 var bos = h9.katmanEkle("Boş yorum", {});
+// İnceleme bulgusu: önek ayraçsızdı; yorumu "Suflo altyazi" ile BAŞLAYAN kullanıcı katmanları da kilidi açılıp siliniyordu
+var yakin1 = h9.katmanEkle("Referans", { comment: "Suflo altyazisi icin referans", locked: true });
+var yakin2 = h9.katmanEkle("Çıplak işaret", { comment: "Suflo altyazi" });
 h9.call("KSAE_altyaziOlustur", duz);
 h9.call("KSAE_altyaziOlustur", P.plan(cues, { mod: "stilli", ayar: ayar, w: 1920, h: 1080, fps: 25, filigran: true, isId: "s2" }));
 var once = h9.comp._katmanlar.length;
@@ -333,7 +336,11 @@ ok("iş kimliğiyle kaldırma yalnız o işin katmanlarını siler", r9a.ok && r
   h9.comp._katmanlar.some(function (l) { return /\| s2 \|/.test(l.comment); }));
 var r9 = h9.call("KSAE_altyaziKaldir", {});
 ok("tümünü kaldır: kilitli filigran dahil yalnız Suflo katmanları; benzer yorumlu ve yorumsuz kullanıcı katmanı kalır", r9.ok &&
-  h9.comp._katmanlar.length === 2 && h9.comp._katmanlar.indexOf(benzer) !== -1 && h9.comp._katmanlar.indexOf(bos) !== -1, js(r9));
+  h9.comp._katmanlar.indexOf(benzer) !== -1 && h9.comp._katmanlar.indexOf(bos) !== -1 &&
+  !h9.comp._katmanlar.some(function (l) { return P.suflonunMu(l.comment); }), js(r9));
+ok("tümünü kaldır: yorumu 'Suflo altyazi' ile başlayan ama ayraçsız kullanıcı katmanları kalır (kilitli olan kilitli kalır)",
+  h9.comp._katmanlar.length === 4 && h9.comp._katmanlar.indexOf(yakin1) !== -1 && yakin1.locked === true && h9.comp._katmanlar.indexOf(yakin2) !== -1,
+  js(h9.comp._katmanlar.map(function (l) { return l.comment; })));
 ok("kaldırma her çağrıda tek geri al grubu", h9.durum.undoAc === 4 && h9.durum.undoKapa === 4 && /kaldir/.test(h9.durum.undoAdlari[3]));
 ok("Suflo katmanı yoksa 0 silinir (hata değil)", h9.call("KSAE_altyaziKaldir", {}).removed === 0);
 

@@ -3,7 +3,8 @@
  * uygulama tespiti ve K.call eşlemesi (Premiere'de betik bayt bayt aynı; AE'de karşılık / dönüştürme / engel),
  * index.html ve CSS (Premiere'e özgü öğeler işaretli, AE öğeleri yalnız AE'de), js/ae-panel.js sahte DOM'da (Premiere'de
  * hiçbir şey yapmaz; AE'de sekmeleri gizler, host-ae.jsx'i yükler; ücretsiz düz ekleme kapısız; stilli ekleme
- * Pro.gate("overlay") + deneme filigranı + hak yalnız başarıda; kaldırma), app.js / captions.js bağlantıları ve paketleme.
+ * denemesiz Pro.gate("overlay"), filigran ve hak harcama yok; kaldırma), köprünün AE'de host-ae.jsx'i KSAE_* çağrısından
+ * önce yüklemesi ve zaman aşımı metni, app.js / captions.js bağlantıları ve paketleme.
  * Çalıştır: node tests/test-ae-panel.js
  */
 var fs = require("fs");
@@ -28,7 +29,7 @@ var debug = oku(".debug");
 ok(".debug: Premiere 8092, After Effects 8093", /<Host Name="PPRO" Port="8092"\/>/.test(debug) && /<Host Name="AEFT" Port="8093"\/>/.test(debug));
 
 /* ---------------- köprü: ana uygulama ve K.call eşlemesi ---------------- */
-function kopru(env) {
+function kopru(env, aePanel) {
   var bekleyen = [];
   var sb = {
     console: console, JSON: JSON, Math: Math, Date: Date, String: String, Number: Number, Object: Object, Array: Array,
@@ -45,6 +46,7 @@ function kopru(env) {
   };
   sb.CSInterface.SystemPath = { EXTENSION: "extension", USER_DATA: "userData" };
   sb.window = sb;
+  if (aePanel) sb.SufloAePanel = aePanel;
   vm.createContext(sb);
   vm.runInContext(oku("js/ae-plan.js"), sb, { filename: "js/ae-plan.js" });
   vm.runInContext(oku("js/bridge.js"), sb, { filename: "js/bridge.js" });
@@ -90,6 +92,39 @@ function kopru(env) {
   ac4.cb(JSON.stringify({ ok: true, adet: 3 }));
   ok("After Effects: KSAE_* doğrudan gider", /^KSAE_altyaziOlustur\("/.test(ac4.s) && (await a4).adet === 3);
   ok("tarayıcı önizlemesi / okunamayan host ortamı: \"\" (Premiere davranışı)", kopru(undefined).K.hostKodu() === "" && kopru("hata").K.hostKodu() === "");
+
+  // İnceleme bulgusu: açılıştaki host-ae.jsx yüklemesi başarısızsa bağlam yoklaması ve "Altyazı oluştur" KSAE_* işlevlerini
+  // tanımsızken çağırıyordu; yalnız ekle/kaldır yeniden yüklüyordu. Köprü her KSAE_* çağrısından önce yüklemeyi bekler.
+  var yukleme = { sayi: 0, sonuc: false, otomatik: [] };
+  var aeStub = { hostYukle: function (otomatik) { yukleme.sayi++; yukleme.otomatik.push(otomatik); return Promise.resolve(yukleme.sonuc); } };
+  var aeY = kopru({ appName: "AEFT", appVersion: "24.6" }, aeStub);
+  var y1 = await aeY.K.call("KS_getContext", undefined, 1000);
+  ok("AE köprüsü: host-ae.jsx yüklenemezse KSAE_baglam gönderilmez, Türkçe neden", aeY.bekleyen.length === 0 && y1.ok === false &&
+    y1.error === "After Effects betiği (host-ae.jsx) yüklenemedi." && yukleme.sayi === 1 && yukleme.otomatik[0] === true, js(y1));
+  var y2 = await aeY.K.call("KS_getSelectedClips", undefined, 1000);
+  ok("AE köprüsü: 'Altyazı oluştur'un seçili katman çağrısı da önce yüklemeyi dener", aeY.bekleyen.length === 0 && y2.ok === false && yukleme.sayi === 2, js(y2));
+  yukleme.sonuc = true;
+  var y3 = aeY.K.call("KS_getContext", undefined, 1000);
+  await Promise.resolve(); await Promise.resolve();
+  var yc3 = aeY.bekleyen.pop();
+  ok("AE köprüsü: yükleme sonradan başarılıysa KSAE_baglam gönderilir", yc3 && yc3.s === "KSAE_baglam()" && yukleme.sayi === 3, yc3 && yc3.s);
+  yc3.cb(JSON.stringify({ ok: true, comp: null, katmanlar: [] }));
+  ok("AE köprüsü: cevap yine Premiere biçiminde", (await y3).hasSeq === false);
+  var yEngel = await aeY.K.call("KS_applyCuts", {}, 1000);
+  ok("AE köprüsü: engelli Premiere işlevi yüklemeyi tetiklemez", yEngel.kod === "after-effects" && yukleme.sayi === 3);
+  var prY = kopru({ appName: "PPRO", appVersion: "25.2" }, aeStub);
+  prY.K.call("KS_getContext", undefined, 1000);
+  ok("Premiere köprüsü: host-ae.jsx yüklemesi hiç çağrılmaz, betik hemen gider", prY.bekleyen.length === 1 && prY.bekleyen[0].s === "KS_getContext()" && yukleme.sayi === 3);
+  prY.bekleyen[0].cb(JSON.stringify({ ok: true }));
+
+  // İnceleme bulgusu: zaman aşımı After Effects'te de "Premiere yanıt vermedi" diyordu (ve Premiere ipucunu getiriyordu)
+  var zaAe = await kopru({ appName: "AEFT", appVersion: "24.6" }).K.call("KSAE_altyaziOlustur", { surum: 1 }, 5);
+  var zaPr = await kopru({ appName: "PPRO", appVersion: "25.2" }).K.call("KS_getContext", undefined, 5);
+  ok("zaman aşımı metni ana uygulamanın adıyla; Premiere metni bayt bayt aynı", zaAe.zamanAsimi === true &&
+    zaAe.error === "After Effects yanıt vermedi (KSAE_altyaziOlustur) — işlem zaman aşımına uğradı." &&
+    zaPr.error === "Premiere yanıt vermedi (KS_getContext) — işlem zaman aşımına uğradı.", js([zaAe.error, zaPr.error]));
+  var en = oku("i18n/en.js");
+  ok("i18n: After Effects zaman aşımı metni çevrili", en.indexOf('"After Effects yanıt vermedi ({}) — işlem zaman aşımına uğradı.": ') !== -1);
 
   /* ---------------- index.html, CSS ---------------- */
   var html = oku("index.html");
@@ -177,7 +212,7 @@ function kopru(env) {
         }
       },
       Pro: o.pro === null ? undefined : {
-        gate: function (f, op) { kayit.gate.push([f, op && op.deneme]); return o.kapi !== false; },
+        gate: function (f, op) { kayit.gate.push([f, op && op.deneme !== undefined ? op.deneme : null]); return o.kapi !== false; },
         filigranGerekli: function () { return o.isPro !== true; },
         denemeHarca: function (f) { kayit.harca.push(f); return 2; }
       }
@@ -214,15 +249,25 @@ function kopru(env) {
     olus[0].arg.katmanlar[0].metin === "Merhaba dünya", js(olus[0] && olus[0].arg.comp));
   ok("düz ekleme: deneme hakkı düşmez, başarı bildirimi", ap.kayit.harca.length === 0 && ap.kayit.toast.some(function (t) { return t[0] === "1 altyazı katmanı eklendi" && t[1] === "good"; }), js(ap.kayit.toast));
 
-  // stilli ekleme, deneme: kapı overlay (deneme kabul), filigran, hak başarıda
+  // İnceleme bulgusu: AE'de deneme filigranı silinebilir ayrı bir metin katmanıydı; bir deneme temiz, düzenlenebilir Pro
+  // çıktısı veriyordu. Premiere'in yerel kuralı gibi: düzenlenebilir stilli yerel çıktı yalnız Pro, deneme hakkı yok.
   var st = panel("AEFT", { eksikFont: ["Montserrat-Bold"] });
   await st.P.ekle(true);
   var so = st.kayit.cagri.filter(function (c) { return c.fn === "KSAE_altyaziOlustur"; })[0];
-  ok("stilli ekleme: Pro.gate('overlay', deneme) — Altyazı Efektleri katmanıyla aynı kapı", js(st.kayit.gate) === '[["overlay",true]]');
-  ok("stilli ekleme (deneme): plan 'stilli', filigran metin katmanı", so && so.arg.mod === "stilli" && so.arg.filigran && so.arg.filigran.metin === "suflo.app");
-  ok("stilli ekleme: hak yalnız başarıdan sonra bir kez; filigranlı bildirim; eksik font uyarısı", js(st.kayit.harca) === '["overlay"]' &&
-    st.kayit.toast.some(function (t) { return /altyazı katmanı eklendi \(deneme: filigranlı\)$/.test(t[0]); }) &&
+  ok("stilli ekleme: denemesiz Pro.gate('overlay') (deneme düğmesi sunulmaz)", js(st.kayit.gate) === '[["overlay",null]]', js(st.kayit.gate));
+  ok("stilli ekleme: plan 'stilli', filigran katmanı yok", so && so.arg.mod === "stilli" && so.arg.filigran === null);
+  ok("stilli ekleme: deneme hakkı harcanmaz; düz bildirim; eksik font uyarısı", st.kayit.harca.length === 0 &&
+    st.kayit.toast.some(function (t) { return t[0] === "1 altyazı katmanı eklendi" && t[1] === "good"; }) &&
+    !st.kayit.toast.some(function (t) { return /deneme/.test(t[0]); }) &&
     st.kayit.toast.some(function (t) { return /kurulu olmayan font: Montserrat-Bold/.test(t[0]) && t[1] === "warn"; }), js(st.kayit.toast));
+  var aeSrc = ayikla(oku("js/ae-panel.js"));
+  ok("ae-panel.js: deneme / filigran / denemeHarca yok", !/deneme|denemeHarca|filigranGerekli/.test(aeSrc.replace(/"[^"\n]*"/g, '""')), (aeSrc.match(/[^\n]*(deneme|filigran)[^\n]*/) || [""])[0]);
+  var htmlAe = oku("index.html");
+  var aeIpucu = htmlAe.slice(htmlAe.indexOf('id="ae-altyazi"'), htmlAe.indexOf('id="ae-kaldir"'));
+  ok("index.html: AE ipucu 'deneme hakkı yok' der, filigran demez", /Pro \(deneme hakkı yok\)/.test(aeIpucu) && !/filigran/.test(aeIpucu), aeIpucu.slice(-260));
+  var readme = oku("README.md");
+  ok("README: AE 'Altyazı Efektleriyle ekle' Pro, deneme hakkı yok (TR ve EN)", /\*\*Altyazı Efektleriyle ekle \(Pro; deneme hakkı yok\)/.test(readme) &&
+    !/aynı deneme hakkı\)/.test(readme) && /Caption Effects styling and animation: Pro only, no free tries/.test(readme) && !/watermarked as a text layer/.test(readme));
   var pro = panel("AEFT", { isPro: true });
   await pro.P.ekle(true);
   ok("Pro: stilli ekleme filigransız", pro.kayit.cagri.filter(function (c) { return c.fn === "KSAE_altyaziOlustur"; })[0].arg.filigran === null);
@@ -244,6 +289,16 @@ function kopru(env) {
   await yuk.P.ekle(false);
   ok("host-ae.jsx yüklenemezse: bildirilir, sonraki eylem yeniden dener", yuk.kayit.toast.some(function (t) { return /host-ae\.jsx\) yüklenemedi/.test(t[0]); }) &&
     yuk.kayit.evalScript.length === 2);
+  // Köprünün otomatik çağrıları (2,5 sn'lik bağlam yoklaması) kalıcı bir yükleme hatasında betiği her seferinde yeniden
+  // evalFile etmesin: başarısızlıktan sonra 10 sn içinde otomatik deneme beklemeden false; kullanıcı eylemi yine dener
+  var oto = await yuk.P.hostYukle(true);
+  ok("otomatik yükleme: son başarısızlıktan 10 sn geçmeden yeniden evalFile yok", oto === false && yuk.kayit.evalScript.length === 2);
+  await yuk.P.kaldir();
+  ok("kullanıcı eylemi (kaldır) 10 sn beklemeden yeniden dener", yuk.kayit.evalScript.length === 3);
+  var yukOk = panel("AEFT");
+  await Promise.resolve();
+  var okOto = await yukOk.P.hostYukle(true);
+  ok("yüklendikten sonra otomatik çağrı önbellekten (yeniden evalFile yok)", okOto === true && yukOk.kayit.evalScript.length === 1);
   await ap.P.kaldir();
   ok("kaldır: KSAE_altyaziKaldir, sayılı bildirim", ap.kayit.cagri.some(function (c) { return c.fn === "KSAE_altyaziKaldir"; }) &&
     ap.kayit.toast.some(function (t) { return t[0] === "4 Suflo altyazı katmanı kaldırıldı"; }));

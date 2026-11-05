@@ -214,6 +214,23 @@ ok("ücretsiz sütunu: kelime kelime altyazı ve terim sözlüğü", /<li>Kelime
 ok("kanca başlığı tanıtımı 5 stil (seçicideki stil sayısı)", /<strong>5<\/strong> stil/.test(blok(html, "kanca-tanitim")) && html.match(/id="kanca-stil">[\s\S]*?<\/select>/)[0].match(/<option /g).length === 5);
 ok("eski 'v1.7' ve 'ücretsiz altyazı paneli' yedekleri yok", !/v1\.7</.test(html) && !/ücretsiz altyazı paneli/.test(html));
 ok("çeviri ipucu artık 'ücretsiz' demiyor", !/başka dile çevir \(ücretsiz/.test(html));
+// İnceleme bulgusu: Sahne algılama 'sahne' denemesi ve denemesiz 'broll' kapısı kullanıcıya dönük listelere yansımamıştı
+var readme = oku("README.md");
+var denemeSatirlari = readme.split("\n").filter(function (l) { return /^(\| \*\*Pro'yu dene\*\*|\*\*Pro'yu dene\.\*\*)/.test(l); });
+ok("README: iki 'Pro'yu dene' listesi de sahne algılamayı sayar", denemeSatirlari.length === 2 && denemeSatirlari.every(function (l) { return /sahne algılama/.test(l); }),
+  denemeSatirlari.length);
+var enDeneme = readme.slice(readme.indexOf("Every code-based Pro tool"), readme.indexOf("are Pro-only.", readme.indexOf("Every code-based Pro tool")) + 13);
+ok("README (EN): deneme listesinde scene detection, Pro-only cümlesinde B-roll suggestions", /scene detection/.test(enDeneme.split("free tries")[0]) &&
+  /B-roll suggestions[^.]*are Pro-only\.$/.test(enDeneme.replace(/\s+/g, " ")), enDeneme.replace(/\s+/g, " ").slice(-200));
+ok("README Pro tablosu: B-roll önerileri denemesiz Pro satırı", /\n\| — \| \*\*B-roll önerileri\*\* \(deneme hakkı yok\)[^\n]*\|\n/.test(readme));
+ok("README test tablosu: deneme araç sayısı 14 (13 değil), sahne anahtarı anılır", !/13 araç/.test(readme) &&
+  /\| `test-deneme\.js` \| [^\n]*14 araç[^\n]*Sahne `sahne`/.test(readme) && /\| `test-deneme-baglanti\.js` \| [^\n]*14 araç/.test(readme));
+ok("Ayarlar Pro listesi: B-roll önerileri (deneme hakkı yok), çevirisi var", /<li>[^<]*B-roll önerileri \(deneme hakkı yok\)<\/li>/.test(kilitli) &&
+  oku("i18n/en.js").indexOf('"' + (kilitli.match(/<li>([^<]*B-roll önerileri \(deneme hakkı yok\))<\/li>/) || ["", "\u0000"])[1] + '": ') !== -1,
+  (kilitli.match(/<li>[^<]*B-roll[^<]*<\/li>/) || [""])[0]);
+ok("app.js: PRO kilidi yorumu denemesiz araç örneğinde Sahneleri bul'u saymaz (artık deneme hakkı var)",
+  !/deneme hakkı her Pro araçta yok \([^)]*Sahneleri bul/.test(app) && /deneme hakkı her Pro araçta yok \([^)]*B-roll/.test(app));
+ok("index.html: Sahne algılama başlığında PRO rozeti (B-roll gibi; YENİ değil)", /<b>Sahne algılama<\/b><span class="tc-yeni">PRO<\/span>/.test(html));
 
 /* ---------------- 8) davranış: gecisler.js (sahte Pro) ---------------- */
 function gecisCalistir(o) {

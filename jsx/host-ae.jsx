@@ -350,7 +350,8 @@ function KSAE_altyaziKaldir(encoded) {
     comp = KSAE_comp();
   } catch (e0) { return KSAE_err(e0); }
   if (!comp) return KSAE_err("Aktif kompozisyon yok.");
-  var onek = KSAE_ISARET + (a && a.isId ? " | " + String(a.isId) + " | " : "");
+  // Ayrac sart: yorumu yalniz "Suflo altyazi" ile BASLAYAN kullanici katmani ("Suflo altyazisi icin not") Suflo'nun sayilmaz
+  var onek = KSAE_ISARET + " | " + (a && a.isId ? String(a.isId) + " | " : "");
   var silinen = 0;
   app.beginUndoGroup("Suflo: altyazilari kaldir");
   try {

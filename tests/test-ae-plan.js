@@ -111,6 +111,20 @@ var uzun = P.plan([{ start: 0, end: 1, text: new Array(80).join("a") }], { mod: 
 ok("düz: sığmayan uzun satırda punto küçülür (başlık güvenli genişliği)", uzun.katmanlar[0].yazi.boyut < 60 &&
   79 * uzun.katmanlar[0].yazi.boyut * 0.55 <= 1920 * 0.8 + 1, uzun.katmanlar[0].yazi.boyut);
 ok("düz: kompozisyon süresi bilinmiyorsa süre sınırı yok", P.plan([{ start: 100, end: 101, text: "a" }], { mod: "duz", w: 1920, h: 1080, fps: 25 }).katmanlar.length === 1);
+// İnceleme bulgusu: düz kip uzun satırı sarmıyordu; punto 12'ye iniyor, yazı yine kadrajdan taşıyordu (Premiere'in caption izi sarar)
+var orta = "Bu altyazı satırı içe aktarılan bir SRT dosyasından geliyor ve tek satıra sığmıyor.";
+var ds = P.plan([{ start: 0, end: 2, text: orta }], { mod: "duz", w: 1920, h: 1080, fps: 25 }).katmanlar[0];
+var dsSatir = ds.metin.split("\r");
+ok("düz: iki satıra sığan uzun satır dengeli sarılır, punto temelde kalır (küçülmez)", dsSatir.length === 2 && ds.yazi.boyut === 60 &&
+  dsSatir.every(function (s) { return s.length * 60 * 0.55 <= 1920 * 0.8 + 1; }) && dsSatir.join(" ") === orta &&
+  Math.abs(dsSatir[0].length - dsSatir[1].length) <= 12 && ds.kelimeSayisi === orta.split(" ").length, js(ds.metin) + " " + ds.yazi.boyut);
+var cokUzun = new Array(31).join("kelime kel ").replace(/ $/, "");   // 329 karakter
+var dc = P.plan([{ start: 0, end: 2, text: cokUzun }], { mod: "duz", w: 1080, h: 1920, fps: 30 }).katmanlar[0];
+var dcSatir = dc.metin.split("\r");
+ok("düz: iki satıra sığmayan metin de kadraj içinde kalır (her satır güvenli genişlikte, yükseklik alt güvenli bölgenin üstünde)",
+  dcSatir.length > 2 && dc.yazi.boyut >= 12 && dcSatir.every(function (s) { return s.length * dc.yazi.boyut * 0.55 <= 1080 * 0.8 + 1; }) &&
+  dcSatir.length * dc.yazi.boyut * 1.2 <= dc.konum[1] && dcSatir.join(" ") === cokUzun, dcSatir.length + " satır, punto " + dc.yazi.boyut);
+ok("düz: kısa satır ve kendi \\r kırılımı aynen kalır", d.katmanlar[1].metin === "İkinci satır\ralt satır" && d.katmanlar[1].yazi.boyut === 60);
 
 /* ---------------- stilli plan ---------------- */
 var ayar = AE.gorunum("vurucu").ayar;
@@ -184,8 +198,17 @@ ok("Pro: filigran yok; altyazı yoksa filigran da yok", P.plan(sCues, { mod: "st
   P.plan([], { mod: "stilli", ayar: ayar, filigran: true }).filigran === null);
 ok("kayıt işareti: plan ve yorum aynı önek, ASCII; etiket rengi", s.isaret === P.ISARET && /^[\x20-\x7e]+$/.test(P.ISARET) && s.etiket === P.ETIKET &&
   P.yorum("is1", "satir") === "Suflo altyazi | is1 | satir" && P.suflonunMu(P.yorum("a", "filigran")) && !P.suflonunMu("Kullanıcı notu") && !P.suflonunMu(""));
+// İnceleme bulgusu: işaret ayraçsız aranıyordu; "Suflo altyazi" ile BAŞLAYAN kullanıcı notu da Suflo'nun sayılıyordu
+ok("kayıt işareti: yalnız ayraçlı önek Suflo'nun; 'Suflo altyazisi …' ve çıplak 'Suflo altyazi' değil",
+  !P.suflonunMu("Suflo altyazisi icin referans") && !P.suflonunMu("Suflo altyazi") && !P.suflonunMu("Suflo altyazi|x") && P.suflonunMu(P.yorum("", "satir")));
 ok("katman adı sıra numaralı, uzun metin kısaltılır", s.katmanlar[0].ad.indexOf("Suflo 001 · ") === 0 &&
   P.plan([{ start: 0, end: 1, text: new Array(60).join("b") }], { mod: "duz" }).katmanlar[0].ad.length <= 12 + 32);
+// İnceleme bulgusu: 31 kod biriminde kesim emoji vekil çiftini bölüp tek başına yüksek vekil bırakıyordu
+function yalnizVekil(t) { return /[\ud800-\udbff](?![\udc00-\udfff])|(^|[^\ud800-\udbff])[\udc00-\udfff]/.test(t); }
+var emojiAd = P.plan([{ start: 0, end: 1, text: new Array(31).join("a") + "😀 bbbbbbbb" }], { mod: "duz" }).katmanlar[0].ad;
+var emojiAd2 = P.plan([{ start: 0, end: 1, text: new Array(30).join("a") + "😀 bbbbbbbb" }], { mod: "duz" }).katmanlar[0].ad;
+ok("katman adı: kesim emoji vekil çiftini bölmez (31. kod birimi yüksek vekilse bir önceden kesilir)", !yalnizVekil(emojiAd) && !yalnizVekil(emojiAd2) &&
+  /a…$/.test(emojiAd) && /😀…$/.test(emojiAd2), js([emojiAd, emojiAd2]));
 ok("deterministik: aynı girdi aynı plan (JSON eşit), sürüm 1", js(P.plan(sCues, o)) === js(s) && s.surum === 1 && s.isId === "is1");
 ok("plan girdiyi değiştirmez", sCues[0].text === "Merhaba *dünya* bu bir deneme cümlesi" && sCues[0].start === 1);
 ok("aeMetni: kontrol karakterleri boşluk, boş satır düşer, CRLF tek kırılım", P.aeMetni("a\u0007b\r\n\n  c  ") === "a b\rc" && P.aeMetni(null) === "");

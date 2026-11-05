@@ -67,14 +67,18 @@ ok("yol ayraci DUZ BOLU (macOS klasor yapisini kurabilsin)",
   tersBolulu.length === 0,
   tersBolulu.length ? tersBolulu.map(function (k) { return k.ad; }).slice(0, 3).join(" | ") : "0 ters bolu");
 
-/* ---------- 2) mac kurucusu çalıştırılabilir mi ---------- */
-var komut = kayitlar.filter(function (k) { return /\.command$/i.test(k.ad); })[0];
+/* ---------- 2) mac kurucusu (ve kaldırıcısı) çalıştırılabilir mi ---------- */
+// Paket köküne iki .command girer (Suflo-Kur, Suflo-Kaldir); ikisi de aynı izin / satır sonu denetiminden geçer
+var komutlar = kayitlar.filter(function (k) { return /\.command$/i.test(k.ad); });
+var komut = komutlar.filter(function (k) { return /(^|\/)Suflo-Kur\.command$/.test(k.ad); })[0];
 ok("mac kurucusu (.command) pakette var", !!komut, komut ? komut.ad : "YOK");
-if (komut) {
-  ok("mac kurucusu CALISTIRILABILIR (0755)",
+ok("mac kaldırıcısı (Suflo-Kaldir.command) pakette var", komutlar.some(function (k) { return /(^|\/)Suflo-Kaldir\.command$/.test(k.ad); }),
+  komutlar.map(function (k) { return k.ad; }).join(", ") || "YOK");
+komutlar.forEach(function (komut) {
+  ok(komut.ad + " CALISTIRILABILIR (0755)",
     (komut.mod & 0o111) !== 0,
     "mod=0" + komut.mod.toString(8) + (komut.mod === 0 ? "  <- Compress-Archive izin yazmamis" : ""));
-  ok("arsiv Unix sistemi olarak isaretli (izinler yorumlansin)",
+  ok(komut.ad + ": arsiv Unix sistemi olarak isaretli (izinler yorumlansin)",
     komut.sistem === 3, "version-made-by ust bayt = " + komut.sistem);
   // CRLF'li .command macOS'ta "bad interpreter: /bin/bash^M" verir (3.0.0 ve 3.1.0 zip'lerinde oldu)
   var icerik = null;
@@ -84,14 +88,15 @@ if (komut) {
     veri = veri.slice(0, komut.sikisik);
     icerik = komut.yontem === 8 ? require("zlib").inflateRawSync(veri) : (komut.yontem === 0 ? veri : null);
   } catch (e) { icerik = null; }
-  ok("mac kurucusu LF satir sonlu ve #! ile basliyor (CR/BOM yok)",
+  ok(komut.ad + " LF satir sonlu ve #! ile basliyor (CR/BOM yok)",
     !!icerik && icerik.indexOf(13) === -1 && icerik[0] === 0x23 && icerik[1] === 0x21,
     icerik ? (icerik.indexOf(13) === -1 ? icerik.length + " bayt, CR yok" : "CR bayti var -> bad interpreter /bin/bash^M") : "icerik okunamadi");
-}
+});
 
-/* ---------- 3) Windows kurucusu ---------- */
-var bat = kayitlar.filter(function (k) { return /\.bat$/i.test(k.ad); })[0];
+/* ---------- 3) Windows kurucusu ve kaldırıcısı ---------- */
+var bat = kayitlar.filter(function (k) { return /(^|\/)Suflo-Kur\.bat$/i.test(k.ad); })[0];
 ok("Windows kurucusu (.bat) pakette var", !!bat, bat ? bat.ad : "YOK");
+ok("Windows kaldırıcısı (Suflo-Kaldir.bat) pakette var", kayitlar.some(function (k) { return /(^|\/)Suflo-Kaldir\.bat$/i.test(k.ad); }));
 
 /* ---------- 4) Panelin çalışması için gereken dosyalar ---------- */
 var gerekli = ["panel/index.html", "panel/CSXS/manifest.xml", "panel/js/captions.js",

@@ -110,6 +110,25 @@ window.K = (function () {
       log("jsx " + fn + ": After Effects'te karsiligi yok, gonderilmedi");
       return Promise.resolve(es.engel);
     }
+    /*
+     * KSAE_* işlevleri host-ae.jsx'te (panel $.evalFile ile yükler). Açılıştaki yükleme başarısız olduysa bağlam yoklaması
+     * ve "Altyazı oluştur" tanımsız işlevi çağırıp "ExtendScript hatası" alıyordu; yalnız ekle/kaldır yeniden yüklüyordu.
+     * Her KSAE_* çağrısından önce yükleme beklenir: yüklüyse önbellekteki söz (bir mikro görev), değilse yeniden denenir
+     * (otomatik çağrı: son başarısızlıktan 10 sn sonra). hostYukle K.cs.evalScript'i doğrudan kullanır, call'a dönmez.
+     */
+    if (es && /^KSAE_/.test(es.ad) && window.SufloAePanel && typeof window.SufloAePanel.hostYukle === "function") {
+      return Promise.resolve(window.SufloAePanel.hostYukle(true)).then(function (yuklendi) {
+        if (!yuklendi) {
+          log("jsx " + fn + ": host-ae.jsx yuklu degil, gonderilmedi");
+          return { ok: false, error: "After Effects betiği (host-ae.jsx) yüklenemedi." };
+        }
+        return gonder(fn, arg, timeout, gec, es);
+      }, function () { return { ok: false, error: "After Effects betiği (host-ae.jsx) yüklenemedi." }; });
+    }
+    return gonder(fn, arg, timeout, gec, es);
+  }
+
+  function gonder(fn, arg, timeout, gec, es) {
     var hostFn = es ? es.ad : fn;
     var donustur = es ? es.donustur : null;
     return new Promise(function (resolve) {
@@ -132,7 +151,8 @@ window.K = (function () {
       }
       var saat = setTimeout(function () {
         log("jsx ZAMAN ASIMI " + fn + " (" + (timeout || 60000) + " ms)");
-        son({ ok: false, zamanAsimi: true, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
+        // Ana uygulamanın adıyla (After Effects'te "Premiere yanıt vermedi" ve Premiere ipucu yanlış yönlendirirdi)
+        son({ ok: false, zamanAsimi: true, error: (HOST_KODU === "AEFT" ? "After Effects" : "Premiere") + " yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
         asildi = true;
       }, timeout || 60000);
 
@@ -1092,6 +1112,11 @@ window.K = (function () {
     {
       re: /Premiere yanıt vermedi/i,
       tip: "Premiere meşgul olabilir. Premiere'e geç, açık iletişim kutusu veya süren " +
+        "render varsa kapat, sonra tekrar dene."
+    },
+    { // aynı köprü After Effects'te (deneysel) kendi adıyla yazar
+      re: /After Effects yanıt vermedi/i,
+      tip: "After Effects meşgul olabilir. After Effects'e geç, açık iletişim kutusu veya süren " +
         "render varsa kapat, sonra tekrar dene."
     },
     { // motor bozuk / çalışmıyor

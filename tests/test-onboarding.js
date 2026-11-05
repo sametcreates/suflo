@@ -399,6 +399,7 @@ function sahte(opts) {
     httpGet: function () { return Promise.resolve({ status: 200 }); },
     cs: { evalScript: function () { say.eval++; }, openURLInDefaultBrowser: function () {} }
   };
+  if (opts.host) K.hostKodu = function () { return opts.host; };
   var win = {
     K: K,
     KEngine: {
@@ -476,6 +477,19 @@ ok("rehber açıkken kurulum: Small, cuBLAS yok; örnek yokken ffmpeg önden", J
 var tCuda = sahte({ ayarVardi: false, model: true, build: "cuda" });
 tCuda.OB.init();
 ok("rehber kurulumu çalışan cuBLAS motorunu CPU'ya düşürmez", tCuda.OB.kurulumSecenekleri().useGpu === true, J(tCuda.OB.kurulumSecenekleri()));
+// İnceleme bulgusu: After Effects'te rehber açılıyordu; "Örnekte dene" engelli KS_importSample'ı çağırıyor, gizli Premiere
+// düğmelerini (#cap-apply) gösteriyordu. AE'de karar baştan "yok"; Ayarlar › Destek'ten de açılmaz
+var tAe = sahte({ ayarVardi: false, host: "AEFT" });
+tAe.OB.init();
+ok("After Effects (taze kurulum): rehber açılmaz, karar 'yok', kurulum kartı yerinde, Premiere'e çağrı yok", tAe.OB.karar() === "yok" &&
+  tAe.ogeler["ilk-adim"].hidden === true && tAe.ogeler["cap-setup"].parentNode !== tAe.ogeler["ia-motor-govde"] && tAe.say.call === 0 &&
+  !(tAe.ayarlar.onboarding && tAe.ayarlar.onboarding.surum), J({ karar: tAe.OB.karar(), gizli: tAe.ogeler["ilk-adim"].hidden }));
+tAe.OB.ac();
+ok("After Effects: 'Kurulum rehberini aç' rehberi açmaz, nedenini söyler", tAe.OB.karar() === "yok" && tAe.ogeler["ilk-adim"].hidden === true &&
+  tAe.say.toast.indexOf("Kurulum rehberi yalnız Premiere Pro'da.") !== -1 && !(tAe.ayarlar.onboarding && tAe.ayarlar.onboarding.surum), J(tAe.say.toast));
+var tPr = sahte({ ayarVardi: false, host: "PPRO" });
+tPr.OB.init();
+ok("Premiere (hostKodu PPRO): rehber eskisi gibi açılır", tPr.OB.karar() === "tam" && tPr.ogeler["ilk-adim"].hidden === false);
 ok("adım başlıkları klavyeyle açılan düğmeler: aria-expanded senkron", /<button type="button" class="ia-adim-bas" id="ia-motor-bas" aria-expanded="false"/.test(html) &&
   ["motor", "ornek", "stil", "ai"].every(function (ad) { return html.indexOf('id="ia-' + ad + '-bas"') > 0 && html.indexOf('id="ia-' + ad + '-govde"') > 0; }) &&
   t1.ogeler["ia-motor-bas"].getAttribute("aria-expanded") === "true" && t1.ogeler["ia-ai-bas"].getAttribute("aria-expanded") === "false");

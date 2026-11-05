@@ -124,7 +124,15 @@ window.KOnboarding = (function () {
     };
   }
 
+  /*
+   * Rehber Premiere'e göre yazıldı: "Örnekte dene" KS_importSample çağırır (After Effects'te engelli), sonraki adımlar
+   * AE'de gizli Premiere düğmelerini (#cap-apply) gösterir. After Effects'te (deneysel) karar baştan "yok": kart açılmaz,
+   * #cap-setup kartın içine taşınmaz, motor kurulum kartı Altyazı sekmesinde normal yerinde kalır.
+   */
+  function aeMi() { return !!(K.hostKodu && K.hostKodu() === "AEFT"); }
+
   function kararVer() {
+    if (aeMi()) return "yok";
     var s = K.settings();
     return SO.gosterimKarari({
       ayarDosyasiVardi: K.ayarDosyasiVardi ? K.ayarDosyasiVardi() : true,
@@ -441,6 +449,8 @@ window.KOnboarding = (function () {
   }
 
   function rehberiAc() {
+    // Ayarlar › Destek › "Kurulum rehberini aç" da After Effects'te rehberi açmaz (kararVer ile aynı neden)
+    if (aeMi()) { KApp.toast("Kurulum rehberi yalnız Premiere Pro'da.", "", 5000); return; }
     kayit.kapandi = false;
     kayit.bitti = false;
     kayitYaz();

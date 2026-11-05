@@ -478,7 +478,7 @@ window.KApp = (function () {
         var kilit = document.createElement("span");
         kilit.className = "arac-ara-kilit";
         kilit.textContent = "PRO";
-        // tarafsız: deneme hakkı her Pro araçta yok (SFX, Motion Presetleri, Podcast, Sahneleri bul…; inceleme 2)
+        // tarafsız: deneme hakkı her Pro araçta yok (SFX, Motion Presetleri, Podcast, B-roll…; inceleme 2)
         kilit.title = uiMetni("Suflo Pro özelliği");
         satir.appendChild(kilit);
       }

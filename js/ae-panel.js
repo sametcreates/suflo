@@ -9,8 +9,10 @@
  *   - Transkript Premiere'deki "Seçili klip" akışıyla aynı: K.call("KS_getSelectedClips") AE'de seçili katmanın kaynak
  *     dosyasına çevrilir (js/ae-plan.js klipSekli; katmanın inPoint / startTime / esnetmesi). Motor değişmez.
  *   - "Metin katmanı olarak ekle" (ücretsiz, Premiere'in ücretsiz caption izi gibi) ve "Altyazı Efektleriyle ekle"
- *     (Pro.gate("overlay") — Altyazı Efektleri video katmanıyla aynı kapı ve deneme hakkı; denemede filigran metin katmanı;
- *     hak yalnız başarıda düşer). Plan js/ae-plan.js'te, yürütme host-ae.jsx'te.
+ *     (denemesiz Pro.gate("overlay")). Deneme hakkı YOK: AE çıktısı düzenlenebilir yerel metin katmanlarıdır, filigran da
+ *     yalnız silinebilir bir katman olurdu (Premiere'de filigran render'a gömülür); bir deneme temiz Pro çıktısı verirdi.
+ *     Premiere'in yerel kuralıyla aynı: düzenlenebilir stilli yerel çıktı yalnız Pro. Plan js/ae-plan.js'te, yürütme
+ *     host-ae.jsx'te.
  *   - "Suflo altyazılarını kaldır": yalnız Suflo'nun eklediği katmanlar (yorum işareti), tek geri al adımı.
  *
  * After Effects'te gerçek denemesi YAPILMADI (README). ES5 (CEF 74).
@@ -22,6 +24,7 @@ window.SufloAePanel = (function () {
   var AE_SEKMELERI = ["captions", "settings"];
   var kod = "";
   var hostSozu = null;
+  var sonHata = 0;   // son başarısız host-ae.jsx yüklemesinin zamanı (otomatik denemeleri seyreltir)
   var mesgul = false;
 
   function el(id) { return document.getElementById(id); }
@@ -33,10 +36,14 @@ window.SufloAePanel = (function () {
 
   /*
    * host-ae.jsx'i yükle (bir kez). Yol uzantı kökünden; ters bölü ExtendScript metninde kaçış sorunu çıkarmasın diye "/".
+   * otomatik: köprünün her KSAE_* çağrısından önceki denemesi (bridge.js call; 2,5 sn'lik bağlam yoklaması dahil). Kalıcı
+   * bir hatada betik her yoklamada yeniden evalFile edilmesin: son başarısızlıktan 10 sn geçmeden beklemeden false.
+   * Kullanıcı eylemi (ekle / kaldır) her zaman hemen yeniden dener.
    * Döner: Promise<bool> (KSAE_baglam tanımlandı mı).
    */
-  function hostYukle() {
+  function hostYukle(otomatik) {
     if (hostSozu) return hostSozu;
+    if (otomatik === true && sonHata && Date.now() - sonHata < 10000) return Promise.resolve(false);
     hostSozu = new Promise(function (resolve) {
       var kok = K.extensionPath ? String(K.extensionPath() || "") : "";
       if (!kok) { resolve(false); return; }
@@ -53,7 +60,8 @@ window.SufloAePanel = (function () {
         resolve(false);
       }
     }).then(function (ok) {
-      if (!ok) hostSozu = null;   // yüklenemediyse sonraki eylem yeniden dener
+      if (!ok) { hostSozu = null; sonHata = Date.now(); }   // yüklenemediyse sonraki eylem yeniden dener
+      else sonHata = 0;
       return ok;
     });
     return hostSozu;
@@ -86,14 +94,14 @@ window.SufloAePanel = (function () {
   function isKimligi() { return Date.now().toString(36); }
 
   /*
-   * Altyazıyı aktif kompozisyona metin katmanları olarak ekle. stilli: Altyazı Efektleri (Pro / deneme); değilse düz ve
-   * ücretsiz. Kapı, "Video katmanı ekle"ninkiyle aynı ("overlay"); deneme çıktısı filigranlı, hak yalnız başarıda düşer.
+   * Altyazıyı aktif kompozisyona metin katmanları olarak ekle. stilli: Altyazı Efektleri (yalnız Pro, deneme hakkı yok;
+   * modül başındaki not); değilse düz ve ücretsiz. Kapı "Video katmanı ekle"ninkiyle aynı özellik ("overlay"), denemesiz.
    */
   async function ekle(stilli) {
     if (mesgul) return;
     if (!window.KCaptions || !KCaptions.hasSegments()) { toast("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }
     var P = proVar();
-    if (stilli && P && !P.gate("overlay", { deneme: true, yeniden: function () { ekle(true); } })) return;
+    if (stilli && P && !P.gate("overlay", { yeniden: function () { ekle(true); } })) return;
     mesgul = true;
     dugmeler(true);
     try {
@@ -102,14 +110,12 @@ window.SufloAePanel = (function () {
       if (!b || !b.ok) throw new Error((b && b.error) || "After Effects'e bağlanılamadı.");
       if (!b.hasSeq) throw new Error(AP().HATA.comp);
       var v = KCaptions.aeVerisi(stilli);
-      var filigran = !!(stilli && P && P.filigranGerekli && P.filigranGerekli());
       var plan = AP().plan(v.cues, { mod: stilli ? "stilli" : "duz", ayar: v.ayar, cueKind: v.cueKind, guvenli: v.guvenli,
-        w: b.width, h: b.height, fps: b.fps, sure: b.seqDur, filigran: filigran, isId: isKimligi() });
+        w: b.width, h: b.height, fps: b.fps, sure: b.seqDur, filigran: false, isId: isKimligi() });
       if (!plan.katmanlar.length) throw new Error("Kompozisyonun süresine düşen altyazı yok.");
       var r = await K.call("KSAE_altyaziOlustur", plan, 600000);
       if (!r || !r.ok) throw new Error((r && r.error) || "Altyazı katmanları eklenemedi.");
-      if (stilli && P && P.denemeHarca) P.denemeHarca("overlay", KApp.toast);
-      toast(r.filigran ? r.adet + " altyazı katmanı eklendi (deneme: filigranlı)" : r.adet + " altyazı katmanı eklendi", "good", 7000);
+      toast(r.adet + " altyazı katmanı eklendi", "good", 7000);
       var notlar = plan.uyarilar.slice();
       if (r.eksikFont && r.eksikFont.length) notlar.push("After Effects'te kurulu olmayan font: " + r.eksikFont.join(", ") + ". Fontu kurup katmanlarda yeniden seçebilirsin.");
       if (r.italikYok) notlar.push("Bu After Effects sürümü italiği betikten açamıyor; yazı düz eklendi.");
