@@ -114,7 +114,7 @@ ok("örnek klip varsa ffmpeg arkaya bırakılır", SO.kurulumSecenekleri({ model
 /* ---- Pro'ya bağlı yapay zekâ özellikleri ve metinler ---- */
 ok("Pro'ya bağlı AI özellikleri: Çeviri/SRT paketi translate, Viral/B-roll highlights; diğerleri ücretsiz",
   SO.aiProOzelligi("Çeviri") === "translate" && SO.aiProOzelligi("Çok dilli SRT paketi") === "translate" && SO.aiProOzelligi("Viral anlar") === "highlights" &&
-  SO.aiProOzelligi("B-roll önerileri") === "highlights" && SO.aiProOzelligi("AI metin kontrolü") === "" && SO.aiProOzelligi("Kanca önerileri") === "" && SO.aiProOzelligi("") === "");
+  SO.aiProOzelligi("B-roll önerileri") === "broll" && SO.aiProOzelligi("AI metin kontrolü") === "" && SO.aiProOzelligi("Kanca önerileri") === "" && SO.aiProOzelligi("") === "");
 ok("ücretsiz kullanıcıya çeviri/viral 'anahtarla çalışır' denmez, Pro olduğu söylenir",
   [SO.aiMetni(false, false), SO.aiMetni(false, true)].every(function (m) { return /^(AI metin kontrolü|Yapay zekâ açık: AI metin)/.test(m) && /Çeviri, viral anlar ve B-roll[^.]*Pro'da/.test(m); }));
 ok("Pro kullanıcıya tüm liste", /^Çeviri, AI metin kontrolü, viral anlar, B-roll/.test(SO.aiMetni(true, false)) && /çeviri/.test(SO.aiMetni(true, true)));
@@ -288,7 +288,7 @@ ok("anahtarKaydet: yerel motor hazırsa 'local' kalır, değilse groq; Ayarlar a
   /if \(!K\.whisperLocal\(\)\) s\.provider = "groq"/.test(ksGovde) && /set-apikey/.test(ksGovde) && /set-provider/.test(ksGovde) && /ayarDegisti\("anahtar"\)/.test(ksGovde));
 
 /* ================= 7) AI düğmeleri: Pro kapısı anahtar denetiminden ÖNCE ================= */
-[["js/viral.js", "Viral anlar", "highlights"], ["js/broll-ui.js", "B-roll önerileri", "highlights"], ["js/captions.js", "Çeviri", "translate"]].forEach(function (x) {
+[["js/viral.js", "Viral anlar", "highlights"], ["js/broll-ui.js", "B-roll önerileri", "broll"], ["js/captions.js", "Çeviri", "translate"]].forEach(function (x) {
   var src = fs.readFileSync(path.join(KOK, x[0]), "utf8");
   var istek = src.indexOf('KOnboarding.anahtarIste("' + x[1] + '")');
   var kapi = src.lastIndexOf('Pro.gate("' + x[2] + '"', istek);

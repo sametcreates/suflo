@@ -11,6 +11,8 @@ window.KSahne = (function () {
   var clip = null;
   var sahneler = [];   // [{ t (sequence sn), skor }]
   var busy = false;
+  // Deneme: hak analizin ilk timeline çıktısında (marker ya da bölme) bir kez düşer (beat.js gibi)
+  var analizHakDustu = false;
 
   function el(id) { return document.getElementById(id); }
 
@@ -47,13 +49,15 @@ window.KSahne = (function () {
   }
 
   async function analyze() {
-    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return;
+    // Pro: kendi 'sahne' anahtarı (ücretsizde 3 deneme hakkı; tarama hak düşürmez, hak ilk timeline çıktısında)
+    if (typeof Pro !== "undefined" && !Pro.gate("sahne", { deneme: true, yeniden: analyze })) return;
     if (busy) return;
     var sc = await K.call("KS_getSelectedClips");
     if (!sc.ok || !sc.clips || !sc.clips.length) { status("Timeline'da bir video klibi seç.", "warn"); return; }
     clip = sc.clips[0];
     // Yeni analiz: eski sonuc basarisiz analizde de ekranda kalmasin
     sahneler = [];
+    analizHakDustu = false;
     el("sc-result").hidden = true;
     setBusy(true);
     status("Görüntü taranıyor… (" + Math.round(clip.dur) + " sn)");
@@ -86,7 +90,8 @@ window.KSahne = (function () {
   }
 
   async function uygula(bol) {
-    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return;
+    // Bu analizin hakkı ilk çıktısında düştüyse (ör. marker) bölme yeni hak ya da pencere istemez
+    if (typeof Pro !== "undefined" && !analizHakDustu && !Pro.gate("sahne", { deneme: true, yeniden: function () { uygula(bol); } })) return;
     if (!sahneler.length || !clip) return;
     // Bolme yalniz analiz edilen klibe: secim degistiyse baska klibi bu zamanlarda kesme
     if (bol) {
@@ -102,6 +107,8 @@ window.KSahne = (function () {
         ? await K.call("KS_splitSelectedAt", { times: times, markers: false }, 300000)
         : await K.call("KS_addMarkers", { times: times, name: "Sahne" }, 120000);
       if (!r.ok) throw new Error(r.error);
+      // deneme: yalnız başarıda, analiz başına bir kez
+      if (!analizHakDustu && typeof Pro !== "undefined" && Pro.denemeHarca && Pro.denemeHarca("sahne", KApp.toast) >= 0) analizHakDustu = true;
       KApp.toast(bol ? "✂ Klip " + r.cuts + " sahne değişiminde bölündü" : r.added + " sahne marker'ı atıldı", "good");
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");

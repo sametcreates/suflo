@@ -68,6 +68,7 @@ function loadBridge(opts) {
   var sahteRequire = function (m) {
     if (m === "dns" && opts.dns) return opts.dns;
     if (m === "http" && opts.http) return opts.http;
+    if (m === "https" && opts.https) return opts.https;
     if (m === "child_process" && opts.cp) return opts.cp;
     return require(m);
   };
@@ -638,6 +639,49 @@ async function engelSayfasi(K2, tbase, sahteDns, aramalar, caPem) {
   var rH = await K9.download("http://huggingface.invalid/m.bin", pathm.join(TMP, "yon-h.bin"), null, 0, undefined, { key: "model:x" });
   chk("adım 19 inceleme: yalnız son (yönlendirilen) ad engelliyse o söylenir",
     !rH.ok && rH.dnsEngeli === "146.112.61.104" && /Kurumsal ağ filtresi block\.opendns\.invalid adresini engelliyor/.test(rH.error), JSON.stringify(rH));
+
+  // (h) Pro denetimi: yalnız https -> https yönlendirme izlenir. Düşürme (https -> http) ya da başka şema
+  // reddedilir, hedefe hiç istek gitmez; hedefin adı yine DNS teşhisine girer (engel sayfası http'ye yönlendirir)
+  var yIstek = [];
+  function sahteModul(sema) {
+    var m = {
+      get: function (o, cb) {
+        var EE = require("events");
+        var rq = new EE();
+        rq.setTimeout = function () { return rq; };
+        rq.destroy = function () {};
+        rq.end = function () {};
+        yIstek.push(sema + "//" + o.hostname + o.path);
+        setTimeout(function () {
+          var rs = new EE();
+          rs.resume = function () {};
+          rs.headers = {};
+          var hedef = { "dusur.invalid": "http://duz.invalid/m.bin", "guvenli.invalid": "https://cdn.invalid/m.bin", "sema.invalid": "ftp://ftp.invalid/m.bin" }[o.hostname];
+          if (hedef) { rs.statusCode = 302; rs.headers.location = hedef; }
+          else rs.statusCode = 503;
+          cb(rs);
+        }, 1);
+        return rq;
+      }
+    };
+    m.request = m.get;
+    return m;
+  }
+  var hDns = { lookup: function (h, o, cb) { cb(null, [{ address: h === "duz.invalid" ? "146.112.61.104" : "1.2.3.4", family: 4 }]); } };
+  var K10 = loadBridge({ ag: true, http: sahteModul("http:"), https: sahteModul("https:"), dns: hDns });
+  K10.settings().noProxy = "*";
+  var rI = await K10.download("https://guvenli.invalid/m.bin", pathm.join(TMP, "yon-i.bin"), null, 0, undefined, { key: "motor:x" });
+  chk("Pro denetimi: https -> https yönlendirme izlenir",
+    !rI.ok && /HTTP 503/.test(rI.error) && yIstek.indexOf("https://cdn.invalid/m.bin") !== -1 && !rI.guvensizYonlendirme, JSON.stringify(rI) + " " + yIstek.join(","));
+  yIstek.length = 0;
+  var rJ = await K10.download("https://dusur.invalid/m.bin", pathm.join(TMP, "yon-j.bin"), null, 0, undefined, { key: "motor:x" });
+  chk("Pro denetimi: https -> http yönlendirme reddedilir, http hedefe istek gitmez; hedef ad DNS teşhisinde",
+    !rJ.ok && rJ.guvensizYonlendirme === true && /güvenli olmayan bir adrese/.test(rJ.error) && yIstek.join(",") === "https://dusur.invalid/m.bin" &&
+    rJ.dnsEngeli === "146.112.61.104", JSON.stringify(rJ) + " " + yIstek.join(","));
+  yIstek.length = 0;
+  var rK = await K10.download("https://sema.invalid/m.bin", pathm.join(TMP, "yon-k.bin"), null, 0, undefined, { key: "motor:x" });
+  chk("Pro denetimi: https -> ftp (başka şema) yönlendirme reddedilir",
+    !rK.ok && rK.guvensizYonlendirme === true && yIstek.join(",") === "https://sema.invalid/m.bin", JSON.stringify(rK) + " " + yIstek.join(","));
 }
 
 main().catch(function (e) { console.error("HARNESS HATA: " + e.stack); process.exit(2); });

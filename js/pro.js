@@ -83,12 +83,13 @@
 
   var FEATURE_LABELS = {
     overlay:   'Animasyonlu altyazı katmanı (Altyazı Efektleri)',
-    karaoke:   'Karaoke / kelime-kelime animasyon',
     cut:       'Otomatik kesim (sessizlik temizleme)',
+    sahne:     'Sahne algılama: görüntüde sahne değişimlerine marker at ya da böl',
     audioclean: 'Sesi iyilestir (gurultu azaltma + ses seviyesi)',
     textcut:   'Konusmadan kes (metinle kurgu + dolgu temizligi)',
     transitions: 'Kesim gecisleri (zoom, whip, itme ve daha fazlasi)',
     highlights: 'Viral anlar: uzun videodan Shorts/Reels klipleri',
+    broll:     'B-roll önerileri: ara görüntü anları ve stok sitelerinde aranacak kelimeler',
     shortsPaket: 'Tek Tık Shorts Paketi: anlardan bitmiş Shorts ve paylaşım metinleri',
     multicam:  'Podcast Modu: mikrofona göre otomatik kamera geçişi',
     zoom:      'Otomatik Zoom (konusmaya gore punch-in)',
@@ -101,13 +102,11 @@
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',
     assexport: 'Stilli ASS disa aktarma',
-    glossary:  'Terim sozlugu + gelismis bul/degistir',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
     captionStyles: '17 gerçek altyazı stili',
     presets:   'Panelden uygulanan 290 Motion ve efekt preseti',
     sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
     motionbg:  'Motion BG (hareketli zeminler + overlay videolari)',
-    emojiAssets: 'Emoji Assets (PNG / WEBP / GIF kutuphanesi)',
     propack:   'Suflo Pro icerik paketi (Motion presetleri + yazi animasyonlari + SFX)',
     pro:       'Suflo Pro'
   };
@@ -184,9 +183,11 @@
     return id;
   }
 
+  // Lemon Squeezy'de gorunen etkinlestirme adi. Gizlilik: bilgisayar adi (os.hostname: cogu zaman
+  // kullanicinin gercek adi) GONDERILMEZ; yalniz pro-machine.json'daki rastgele, kalici makine UUID'si.
+  // Yalniz YENI etkinlestirmeleri etkiler: var olanlar instance_id ile surer (dogrulama/birakma adi kullanmaz).
   function instanceName() {
-    var host = (os && os.hostname) ? os.hostname() : 'cep';
-    return host + ' / ' + machineId();
+    return 'Suflo / ' + machineId();
   }
 
   function fallbackUuid() {

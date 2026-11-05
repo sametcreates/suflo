@@ -716,6 +716,8 @@ window.K = (function () {
    * döner: bu "indi" sayılsaydı sayfa model adıyla kaydedilir, DNS ipucu hiç çıkmazdı.
    */
   var SAYFA_GELDI = "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.";
+  // https indirmesi düz http'ye (ya da başka bir şemaya) yönlendirildi: izlenmez (Pro denetimi)
+  var GUVENSIZ_YONLENDIRME = "Sunucu indirmeyi güvenli olmayan bir adrese (https dışı) yönlendirdi; güvenlik için izlenmedi.";
   function kucukGeldi(bayt, beklenenMB) {
     var b = Number(bayt) || 0;
     var boyut = b >= 1048576 ? Math.round(b / 1048576) + " MB" : Math.max(1, Math.ceil(b / 1024)) + " KB";
@@ -1598,6 +1600,16 @@ window.K = (function () {
           var next;
           try { next = new URL(res.headers.location, urlStr).href; }
           catch (eLoc) { next = u.protocol + "//" + u.host + res.headers.location; }
+          // Yalniz https -> https izlenir: indirilen motor / guncelleme / model dosyasi duz http'ye
+          // (ya da baska bir semaya) dusurulemez. Hedefin adi yine DNS teshisine girer (downloadTeshisli)
+          var nextProto = "";
+          try { nextProto = new URL(next).protocol; } catch (eP) {}
+          if (u.protocol !== "https:" || nextProto !== "https:") {
+            try { if (meta._izle) meta._izle.host = new URL(next).hostname; } catch (eH) {}
+            log("indirme: guvensiz yonlendirme reddedildi (" + u.protocol + " -> " + (nextProto || "?") + "): " + u.hostname);
+            resolve({ ok: false, error: GUVENSIZ_YONLENDIRME, kept: partSize(), guvensizYonlendirme: true });
+            return;
+          }
           download(next, destPath, onProgress, redirects + 1, resumeFrom, meta).then(resolve);
           return;
         }

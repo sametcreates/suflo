@@ -61,13 +61,36 @@ ok("3.4 araçları ve eylemleri kayıtta: Eğri sekmesi, Eğri uygula, Varışta
     "eylem:egri-geri-al", "eylem:kesim-kapsam", "eylem:kesim-katman", "eylem:altyazi-uyarla", "eylem:gecis-kaldir", "eylem:zoom-kaldir",
     "eylem:onayar-kaldir", "eylem:hiz-ozel", "eylem:model-ice-aktar", "eylem:kaynak-sina", "eylem:ayar-mcp"].every(function (id) { return !!kim[id]; }));
 // Pro rozeti: kenar çubuğuyla aynı (Eğri sekmesi PRO kilitli; uygulamak ve yaylanma 'curves'); ücretsizler rozetsiz
-ok("3.4 Pro kapıları: Eğri uygula ve Varışta yaylan 'curves', kesim seçenekleri 'cut', özel hız eğrisi 'speedramp', köprü 'mcp'; Eğri sekmesi PRO kilitli",
+ok("3.4 Pro kapıları: Eğri uygula ve Varışta yaylan 'curves', kesim seçenekleri 'cut', köprü 'mcp'; Eğri sekmesi PRO kilitli",
   kim["tab:egri"].pro === true && kim["eylem:egri-uygula"].pro === "curves" && kim["eylem:egri-yaylan"].pro === "curves" &&
-  kim["eylem:kesim-kapsam"].pro === "cut" && kim["eylem:kesim-katman"].pro === "cut" && kim["eylem:hiz-ozel"].pro === "speedramp" &&
+  kim["eylem:kesim-kapsam"].pro === "cut" && kim["eylem:kesim-katman"].pro === "cut" &&
   kim["eylem:ayar-mcp"].pro === "mcp", J([kim["tab:egri"].pro, kim["eylem:egri-uygula"].pro]));
+// Pro denetimi bulgusu: rozet aracın GERÇEK kapısıyla aynı olmalı. Sahne algılama kendi 'sahne' kapısında
+// (eskiden 'cut' rozeti); özel hız eğrisini çizmek / önizlemek ücretsiz (kapı yalnız "Rampayı uygula"da)
+ok("Pro denetimi: Sahneleri bul rozeti 'sahne', Özel hız eğrisi rozetsiz (çizmek ücretsiz)",
+  kim["eylem:sahne-bul"].pro === "sahne" && kim["eylem:hiz-ozel"].pro === "", J([kim["eylem:sahne-bul"].pro, kim["eylem:hiz-ozel"].pro]));
 ok("3.4 ücretsizler kapısız: model içe aktar, kaynak sınaması, eğri kodu / dosyası, geri alma ve kaldırma, kesimden sonra altyazı",
   ["model-ice-aktar", "kaynak-sina", "egri-kod", "egri-kod-kopyala", "egri-ice-aktar", "egri-disa-aktar", "egri-geri-al", "gecis-kaldir",
-    "zoom-kaldir", "onayar-kaldir", "altyazi-uyarla"].every(function (id) { return kim["eylem:" + id].pro === ""; }));
+    "zoom-kaldir", "onayar-kaldir", "altyazi-uyarla", "hiz-ozel"].every(function (id) { return kim["eylem:" + id].pro === ""; }));
+// Rozet = hedef düğmenin işleyicisindeki ilk Pro.gate anahtarı (kaynak taraması; eylem başına aracın dosyası ve işlevi)
+var ROZET_KAPI = [
+  ["sahne-bul", "js/sahneler.js", "async function analyze()"],
+  ["viral-bul", "js/viral.js", "async function bul()"],
+  ["rampa-uygula", "js/hiz-rampasi.js", "async function uygula(ek)"],
+  ["ritim-bul", "js/beat.js", "async function analyze()"],
+  ["konusmadan-kes", "js/konusma-kes.js", "async function analyze(zorla)"],
+  ["sessizlik-bul", "js/magiccut.js", "async function analyze(ev)"],
+  ["egri-uygula", "js/egri.js", "async function uygula()"]
+];
+ROZET_KAPI.forEach(function (r) {
+  var src = fs.readFileSync(path.join(KOK, r[1]), "utf8"), i = src.indexOf(r[2]);
+  var m = i === -1 ? null : /Pro\.gate\("([A-Za-z]+)"/.exec(src.slice(i, i + 3000));
+  ok("Pro denetimi: " + r[0] + " rozeti " + r[1] + " kapısıyla aynı", !!m && kim["eylem:" + r[0]].pro === m[1], J([kim["eylem:" + r[0]].pro, m && m[1]]));
+});
+// Özel eğri düzenleyicisinin çizimi / önizlemesi kapısız: hiz-rampasi.js'te Pro.gate yalnız uygula()'da
+var hizSrc = fs.readFileSync(path.join(KOK, "js", "hiz-rampasi.js"), "utf8");
+ok("Pro denetimi: hiz-rampasi.js'te tek Pro.gate (Rampayı uygula); özel eğri çizimi ücretsiz",
+  (hizSrc.match(/Pro\.gate\(/g) || []).length === 1 && hizSrc.indexOf("Pro.gate(") > hizSrc.indexOf("async function uygula(ek)"));
 ok("kayıt: aynı kimlik iki kez girmez (Ayarlar hem üst çubukta hem menüde)", AA.kayitKur([{ tab: "settings", ad: "Ayarlar" }, { tab: "settings", ad: "Ayarlar" }]).filter(function (o) { return o.tur === "arac"; }).length === 1);
 ok("temizAd: sondaki YENİ / NEW / PRO atılır", AA.temizAd("Geçişler  YENİ") === "Geçişler" && AA.temizAd("Transitions NEW PRO") === "Transitions" && AA.temizAd("Proje") === "Proje");
 

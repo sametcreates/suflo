@@ -1896,7 +1896,8 @@ window.KApp = (function () {
         // yorumladigi & ^ % gibi karakterler hic iceri girmesin.
         ad: (paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip").replace(/[^A-Za-z0-9._-]/g, "_"),
         // GitHub her release dosyasi icin "sha256:<hex>" ozeti yayinlar: indirilen
-        // dosya bununla dogrulanmadan otomatik kurulum yapilmaz
+        // dosya bununla dogrulanmadan otomatik kurulum yapilmaz. Ozet yoksa ("") panel
+        // hic indirmez; kullanici surum sayfasina yonlendirilir (guncellemeyiIndir)
         sha256: paket && /^sha256:[0-9a-f]{64}$/i.test(String(paket.digest || "")) ? String(paket.digest).slice(7).toLowerCase() : "",
         zip: !!zip,
         not: ilkSatir.slice(0, 90)
@@ -1995,9 +1996,20 @@ window.KApp = (function () {
     });
   }
 
+  // Doğrulama özeti olmayan sürüm: panel indirmez / kurmaz; sürüm sayfası elle indirmek için açılır
+  function ozetsizGuncelleme() {
+    var sayfa = "https://github.com/" + K.REPO + "/releases/latest";
+    el("update-not").textContent = "Bu sürümün dosyası doğrulama özeti (SHA-256) taşımıyor; güvenlik için otomatik kurulum yapılmadı. " +
+      "Sürüm sayfasından elle indir: github.com/" + K.REPO + "/releases/latest";
+    toast("Otomatik kurulum yapılmadı: dosya doğrulanamıyor — github.com/" + K.REPO + "/releases sayfasından elle indir", "warn");
+    K.log("[güncelleme] v" + guncelleme.surum + " dosyasında SHA-256 özeti yok — otomatik kurulum reddedildi");
+    try { K.cs.openURLInDefaultBrowser(sayfa); } catch (eAc) {}
+  }
+
   async function guncellemeyiIndir() {
     if (!guncelleme) return;
     var b = el("update-indir");
+    if (!guncelleme.sha256) { ozetsizGuncelleme(); return; }
     b.disabled = true;
     var eski = uiOzgun(b);   // özgün Türkçe: iş sürerken dil değişse de doğru dile döner
     b.textContent = "İniyor…";
@@ -2009,14 +2021,13 @@ window.KApp = (function () {
         b.textContent = "%" + Math.round(f * 100);
       }, 0, undefined, { key: "zxp:" + guncelleme.surum });
       if (!d.ok) throw new Error(d.error || "indirilemedi");
-      if (guncelleme.sha256) {
-        b.textContent = "Doğrulanıyor…";
-        var ozet = await dosyaOzeti(hedef);
-        if (ozet !== guncelleme.sha256) {
-          try { K.fs.unlinkSync(hedef); } catch (eSil) {}
-          K.log("[güncelleme] SHA-256 uyuşmadı: " + ozet + " != " + guncelleme.sha256);
-          throw new Error("indirilen dosya doğrulanamadı (bozuk ya da değiştirilmiş)");
-        }
+      // Özet zorunlu (ozetsizGuncelleme yukarıda durdurur): doğrulanmamış dosya açılmaz / kurulmaz
+      b.textContent = "Doğrulanıyor…";
+      var ozet = await dosyaOzeti(hedef);
+      if (!guncelleme.sha256 || ozet !== guncelleme.sha256) {
+        try { K.fs.unlinkSync(hedef); } catch (eSil) {}
+        K.log("[güncelleme] SHA-256 uyuşmadı: " + ozet + " != " + guncelleme.sha256);
+        throw new Error("indirilen dosya doğrulanamadı (bozuk ya da değiştirilmiş)");
       }
 
       // Önce tek tık kurulumu dene — başarırsa kullanıcıya yalnız yeniden başlatma kalır

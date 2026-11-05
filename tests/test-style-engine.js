@@ -488,9 +488,10 @@ var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status =
 if (!ffmpeg) {
   console.log("(ffmpeg yok - gercek stil renderlari atlandi)");
 } else {
-  var tmp = path.join(os.tmpdir(), "suflo-style-engine-test");
-  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
-  fs.mkdirSync(tmp, { recursive: true });
+  // Her koşuya kendi benzersiz klasörü: sabit /tmp/suflo-style-engine-test'te aynı anda iki koşu (iki oturum /
+  // paralel test) birbirinin klasörünü baştan siliyor, render "0 B" / "0 kare" ile düşüyordu (kararsız test)
+  var tmp = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-style-engine-"));
+  ok("render klasörü bu koşuya özel (mkdtemp; paralel koşular çakışmaz)", /suflo-style-engine-[A-Za-z0-9]{6}$/.test(tmp), tmp);
 
   Object.keys(compiled).forEach(function (id) {
     var font = engine.preset(id).style.fontFile;
