@@ -2105,6 +2105,9 @@
     ARALIKLAR: { golgeOpak: GOLGE_OPAK.slice(), golgeMesafe: GOLGE_MESAFE.slice(), golgeYumusak: GOLGE_YUMUSAK.slice(),
       kutuOpak: KUTU_OPAK.slice(), konum: KONUM_YUZDE.slice() },
     assColor: assColor,
+    // Stil kütüphanesi (parti 3): konuşmacı / vurgu ayrımının renk uzaklığı ve eşiği (testler hazır görünümleri bununla denetler)
+    renkUzakligi: renkUzakligi,
+    VURGU_YAKIN: VURGU_YAKIN,
     timecode: timecode
   };
 });

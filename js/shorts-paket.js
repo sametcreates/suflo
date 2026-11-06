@@ -135,13 +135,27 @@ window.KShortsPaket = (function () {
     var kayit = K.settings().shortsPaketSecim || {};
     var mogrt = !!(window.KCaptions && KCaptions.mogrtSecili && KCaptions.mogrtSecili());
     sel.innerHTML = "";
-    var secenekler = [{ id: "panel", ad: "Altyazı sekmesindeki efekt" }].concat(AE ? AE.GORUNUMLER.map(function (g) { return { id: g.id, ad: g.ad }; }) : []);
-    secenekler.forEach(function (x) {
+    function secenek(kap, id, ad) {
       var o = document.createElement("option");
-      o.value = x.id;
-      o.textContent = x.ad;
-      sel.appendChild(o);
-    });
+      o.value = id;
+      o.textContent = ad;
+      kap.appendChild(o);
+    }
+    secenek(sel, "panel", "Altyazı sekmesindeki efekt");
+    /*
+     * Stil kütüphanesi (parti 3): hazır görünümler kategori başına <optgroup> içinde (değerler görünüm kimliği, sayı
+     * 1 + GORUNUMLER aynı). Kategorisiz eski model (gruplar yok) düz liste.
+     */
+    var gruplar = AE && typeof AE.gruplar === "function" ? AE.gruplar() : null;
+    if (gruplar) {
+      gruplar.forEach(function (gr) {
+        var og = document.createElement("optgroup");
+        og.label = gr.ad;
+        if (og.setAttribute) og.setAttribute("label", gr.ad);
+        gr.gorunumler.forEach(function (x) { secenek(og, x.id, x.ad); });
+        sel.appendChild(og);
+      });
+    } else if (AE) AE.GORUNUMLER.forEach(function (g) { secenek(sel, g.id, g.ad); });
     var secilen = kayit.gorunum === "panel" || (AE && AE.gorunum(kayit.gorunum)) ? kayit.gorunum :
       (AE && AE.eskiGorunum(kayit.stilId)) || "panel";
     sel.value = secilen;

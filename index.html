@@ -406,7 +406,12 @@
         -->
         <section class="efekt" id="cap-efekt" aria-labelledby="cap-efekt-baslik">
           <div class="efekt-head"><b id="cap-efekt-baslik">Altyazı Efektleri</b><span>önizleme ücretsiz · After Effects gerekmez</span></div>
-          <div class="efekt-gorunumler" id="cap-efekt-gorunumler" role="group" aria-label="Hazır görünümler"></div>
+          <!-- Stil kütüphanesi (parti 3): kategori sekmeleri, çipler ve 300 ms ipucu (js/stil-galeri.js; captions.js gorunumleriCiz çağırır) -->
+          <div class="efekt-galeri" id="cap-efekt-galeri">
+            <div class="efekt-kategoriler" id="cap-efekt-kategoriler" role="tablist" aria-label="Görünüm kategorileri"></div>
+            <div class="efekt-gorunumler" id="cap-efekt-gorunumler" role="group" aria-label="Hazır görünümler"></div>
+            <div class="efekt-ipucu" id="cap-efekt-ipucu" role="tooltip" hidden></div>
+          </div>
 
           <!-- Canlı önizleme: Altyazı Efektleri gerçek motor çıktısıyla, Premiere şablonu kendi animasyonuyla oynar.
                3.3 adım 17: Altyazı Efektleri seçiliyken yazı sahnede sürüklenerek konumlanır (captions.js konumSurukle) -->
@@ -2921,6 +2926,8 @@
   <script src="js/stil-kodu.js"></script>
   <script src="js/style-engine.js"></script>
   <script src="js/altyazi-efekt.js"></script>
+  <!-- Stil kütüphanesi (parti 3): hazır görünüm galerisi (saf DOM yardımcısı; captions.js'ten önce) -->
+  <script src="js/stil-galeri.js"></script>
   <script src="js/caption-mogrt-json.js"></script>
   <script src="js/filigran.js"></script>
   <script src="js/overlay-render.js"></script>

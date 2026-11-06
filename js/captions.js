@@ -2039,33 +2039,33 @@ window.KCaptions = (function () {
     return true;
   }
 
-  // "Hazır görünümler": küçük çipler (yazı tipinde örnek + ad); rozet yok
+  /*
+   * "Hazır görünümler": küçük çipler (yazı tipinde örnek + ad); rozet yok. Stil kütüphanesi (parti 3): çipin örneği,
+   * kategori sekmeleri, süzgeç, klavye ve ipucu js/stil-galeri.js'te (yüklenmemişse yalın örnekli çipler, süzgeçsiz).
+   */
   function gorunumleriCiz() {
     var kap = el("cap-efekt-gorunumler");
     if (!kap || !AE) return;
+    var G = window.SufloStilGaleri || null;
+    var kit = G ? markaKiti() : null;
     kap.innerHTML = "";
     AE.GORUNUMLER.forEach(function (g) {
-      var a = g.ayar;
       var b = document.createElement("button");
       b.type = "button";
       b.className = "efekt-cip";
       b.setAttribute("data-gorunum", g.id);
+      if (g.kategori) b.setAttribute("data-kategori", g.kategori);
+      if (g.marka) b.setAttribute("data-marka", kit ? "kit" : "1");
       b.setAttribute("aria-pressed", "false");
-      var ornek = document.createElement("span");
-      ornek.className = "efekt-cip-ornek";
-      ornek.setAttribute("data-i18n-skip", "");
-      ornek.setAttribute("aria-hidden", "true");
-      ornek.style.fontFamily = '"' + a.font + '", sans-serif';
-      ornek.style.fontWeight = a.kalin ? "800" : "400";
-      ornek.style.color = a.renk;
-      ornek.style.setProperty("--efekt-kontur", a.konturRenk);
-      var harf = document.createElement("span");
-      harf.textContent = "A";
-      var vurgu = document.createElement("span");
-      vurgu.textContent = "a";
-      vurgu.style.color = a.vurgu ? a.vurguRenk : a.renk;
-      ornek.appendChild(harf);
-      ornek.appendChild(vurgu);
+      var ornek = G ? G.ornek(document, g, { kit: kit }) : document.createElement("span");
+      if (!G) {
+        ornek.className = "efekt-cip-ornek";
+        ornek.setAttribute("data-i18n-skip", "");
+        ornek.setAttribute("aria-hidden", "true");
+        ornek.style.fontFamily = '"' + g.ayar.font + '", sans-serif';
+        ornek.style.color = g.ayar.renk;
+        ornek.textContent = "Aa";
+      }
       var ad = document.createElement("b");
       ad.textContent = g.ad;
       b.appendChild(ornek);
@@ -2088,6 +2088,17 @@ window.KCaptions = (function () {
       kap.appendChild(u);
     }
     stilKartiIsaretle(EFEKT);
+    if (G) G.kur({ doc: document, kap: kap, sekmeler: el("cap-efekt-kategoriler"), ipucu: el("cap-efekt-ipucu"), kategoriler: AE.KATEGORILER,
+      gorunumler: AE.GORUNUMLER, depo: tarayiciDeposu(), ilgi: galeriTuslariniTut });
+  }
+  // İzleyicinin tarayıcı deposu (galerinin kategori sekmesi); erişilemezse null (seçim hatırlanmaz, galeri çalışır)
+  function tarayiciDeposu() {
+    try { return window.localStorage || null; } catch (e) { return null; }
+  }
+  // Galeri odaktayken ok / Home / End / Enter tuşları panelde kalır (Premiere'in oynatma kafası kımıldamaz)
+  function galeriTuslariniTut(tut) {
+    var AA = window.SufloAracAra, G = window.SufloStilGaleri;
+    if (AA && typeof AA.tusIlgisiAyarla === "function" && G) AA.tusIlgisiAyarla("galeri", tut ? G.tusIlgisi(!!(K && K.MAC)) : "");
   }
 
   // ★ Şablonum çipi: kayıtlı ayar gelir (Marka Kiti Şablonum'a karışmaz), seçim tercihe yazılır
@@ -3063,6 +3074,8 @@ window.KCaptions = (function () {
       }
     }
     inceAyarDurumu();
+    // Stil kütüphanesi: Marka görünümlerinin çipi kitin yazı tipi / renkleriyle (kit açılınca, kapanınca, değişince)
+    if (MK && window.SufloStilGaleri && MK.styleFieldsChanged(eski, yeni)) gorunumleriCiz();
   }
 
   /* ---------------- Stil ---------------- */

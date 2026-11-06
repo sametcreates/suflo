@@ -244,9 +244,11 @@ var kr = SE.compile({ styleId: "efekt", cues: tek.map(function (c, i) { return O
 ok("Podcast konuşmacı renkleri animasyonda da (koşu başında \\1c)", /\{\\1c&H000000FF\}/.test(kr.ass) && /\{\\1c&H0000FF00\}/.test(kr.ass) && kr.eventCount > 5);
 
 /* ---------------- 5) altyazi-efekt.js ---------------- */
-ok("AE.normalize: anim katalog kimliği ya da \"\"; bilinmeyen tabanda kalır; görünümler klasik", AE.normalize({ anim: "dalga" }).anim === "dalga" &&
+// Parti 3: ilk altı görünüm klasik kalır; kütüphanenin animasyonlu görünümleri yalnız katalog kimliği taşır
+ok("AE.normalize: anim katalog kimliği ya da \"\"; bilinmeyen tabanda kalır; ilk altı görünüm klasik, kütüphanedekiler katalogdan", AE.normalize({ anim: "dalga" }).anim === "dalga" &&
   AE.normalize({ anim: "uzay" }).anim === "" && AE.normalize({ anim: "uzay" }, { anim: "netles" }).anim === "netles" && AE.normalize({ anim: 3 }).anim === "" &&
-  AE.normalize({}).anim === "" && AE.GORUNUMLER.every(function (g) { return g.ayar.anim === ""; }) && AE.VARSAYILAN.anim === SE.preset("efekt").style.anim);
+  AE.normalize({}).anim === "" && AE.GORUNUMLER.slice(0, 6).every(function (g) { return g.ayar.anim === ""; }) &&
+  AE.GORUNUMLER.every(function (g) { return g.ayar.anim === "" || IDLER.indexOf(g.ayar.anim) !== -1; }) && AE.VARSAYILAN.anim === SE.preset("efekt").style.anim);
 ok("AE.overrides: anim yalnız seçiliyse (klasikte alan yok, paylaşım kodu uyarısız)", AE.overrides({ anim: "netles" }).anim === "netles" &&
   !("anim" in AE.overrides({})) && !("anim" in AE.overrides({ anim: "" })));
 ok("gorunumuBul: animasyon seçilince hazır görünüm çipi kalkar", AE.gorunumuBul(AE.gorunum("vurucu").ayar) === "vurucu" &&

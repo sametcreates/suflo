@@ -30,7 +30,10 @@ function ozet(ass) { return crypto.createHash("sha256").update(ass).digest("hex"
  */
 function klasikOzetleri(SE, AE, ek) {
   var out = {};
-  var ayarlar = AE.GORUNUMLER.map(function (g) { return { ad: g.id, ov: AE.overrides(g.ayar) }; });
+  // Anlık görüntü animasyon motoru v2'den önceki ilk altı görünümle üretildi; parti 3'ün kütüphane görünümleri (bazıları
+  // yazı animasyonlu) o motorda yoktu, kendi denetimleri tests/test-altyazi-efekt.js ve test-stil-kutuphanesi-libass.js'te
+  var ILK_ALTI = ["temiz", "vurucu", "canli", "zarif", "kutulu", "glitch"];
+  var ayarlar = ILK_ALTI.map(function (id) { return { ad: id, ov: AE.overrides(AE.gorunum(id).ayar) }; });
   var gl = AE.overrides(AE.gorunum("glitch").ayar);
   gl.golge = { renk: "#102030", opak: 70, mesafe: 6, yumusak: 4 }; gl.kutu = true; gl.kutuOpak = 60;
   ayarlar.push({ ad: "glitch+golge+kutu", ov: gl });

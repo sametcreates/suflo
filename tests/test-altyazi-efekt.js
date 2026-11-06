@@ -6,6 +6,9 @@ var kok = path.join(__dirname, "..");
 var AE = require(path.join(kok, "js", "altyazi-efekt.js"));
 var SE = require(path.join(kok, "js", "style-engine.js"));
 var SS = require(path.join(kok, "js", "style-share.js"));
+var SK = require(path.join(kok, "js", "stil-kodu.js"));
+var YA = require(path.join(kok, "js", "yazi-animasyonlari.js"));
+var FK = require(path.join(kok, "tools", "font-kontrol.js"));
 var gecen = 0, toplam = 0;
 function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
 function J(o) { return JSON.stringify(o); }
@@ -20,7 +23,9 @@ ok("temel stil 'efekt' motorda var ve kelime stili", AE.STIL === "efekt" && SE.h
 
 /* ---------------- hazır görünümler ---------------- */
 var ids = AE.GORUNUMLER.map(function (g) { return g.id; });
-ok("4-6 hazır görünüm, kimlikler tekil", ids.length >= 4 && ids.length <= 6 && ids.filter(function (x, i) { return ids.indexOf(x) === i; }).length === ids.length, ids.join(","));
+// Parti 3 (stil kütüphanesi): ilk altı görünüm aynı sırada başta, toplam ≥ 30 (ayrıntılı denetim dosyanın sonunda)
+ok("ilk altı görünüm aynı sırada başta (Temiz 0. dizin), toplam ≥ 30, kimlikler tekil", ids.slice(0, 6).join(",") === "temiz,vurucu,canli,zarif,kutulu,glitch" &&
+  ids.length >= 30 && ids.filter(function (x, i) { return ids.indexOf(x) === i; }).length === ids.length, ids.join(","));
 var efStil = SE.preset("efekt").style;
 ok("ilk görünüm (Temiz) stil motorunun efekt varsayılanıyla birebir (yazım ve noktalama: motorun metin kuralı)", Object.keys(AE.VARSAYILAN).filter(function (k) {
   return k !== "kase" && k !== "punct"; }).every(function (k) { return AE.VARSAYILAN[k] === efStil[k];
@@ -31,9 +36,12 @@ AE.GORUNUMLER.forEach(function (g) {
   var ov = AE.overrides(g.ayar);
   var r = SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1080, height: 1920, overrides: ov });
   var uy = [];
-  var temiz = SS.sanitizeOverrides(ov, uy);
+  // Yazı animasyonlu kütüphane görünümü (parti 3): anim SFL1 kodunun "ek"ine gider (js/stil-kodu.js), overrides'ta klasik çift
+  var temiz = SS.sanitizeOverrides(AE.overrides(AE.klasikAyar(g.ayar)), uy);
+  var kodYolu = SK.decode(SK.encode({ styleId: "efekt", overrides: ov }), function (id) { return SE.has(id); });
   ok("görünüm " + g.id + ": motor çizer, paylaşım koduna uyarısız girer, yazı tipi paketten", r.eventCount > 0 && r.style.font === g.ayar.font &&
-    r.style.giris === g.ayar.giris && r.style.aktif === g.ayar.aktif && uy.length === 0 && temiz.giris === g.ayar.giris && !!r.fontFiles[0], uy.join(",") + " " + r.fontFiles[0]);
+    r.style.giris === g.ayar.giris && r.style.aktif === g.ayar.aktif && uy.length === 0 && temiz.giris === g.ayar.giris && !!r.fontFiles[0] &&
+    kodYolu.ok && kodYolu.warnings.length === 0 && (kodYolu.recipe.overrides.anim || "") === g.ayar.anim, uy.join(",") + " " + r.fontFiles[0] + " " + J(kodYolu.warnings));
 });
 ok("gorunum(): kopya döner (değiştirmek listeyi bozmaz), bilinmeyen null", (function () {
   var g = AE.gorunum("vurucu"); g.ayar.renk = "#000000";
@@ -286,6 +294,145 @@ var kutuluAss = SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words"
 ok("Kutulu görünümü motorda kutuyla, Vurucu / Zarif gölgeyle çizilir", /Style: SufloKutu,/.test(kutuluAss) && /\\3a&H59&/.test(kutuluAss) &&
   /\\4a&H26&\\shad4\.9\}/.test(SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: AE.overrides(AE.gorunum("vurucu").ayar) }).ass) &&
   /\\shad2\.1\\blur5/.test(SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: AE.overrides(AE.gorunum("zarif").ayar) }).ass));
+
+/* ---------------- Parti 3: stil kütüphanesi (kategoriler, 24+ özgün görünüm, tipografi kuralları) ---------------- */
+var KAT = AE.KATEGORILER.map(function (k) { return k.id; });
+ok("KATEGORILER: altı kategori, Türkçe adlarıyla", J(AE.KATEGORILER) === J([{ id: "viral", ad: "Viral · Shorts" }, { id: "minimal", ad: "Minimal" },
+  { id: "podcast", ad: "Podcast" }, { id: "egitim", ad: "Eğitim" }, { id: "sinematik", ad: "Sinematik" }, { id: "marka", ad: "Marka" }]), J(AE.KATEGORILER));
+ok("ilk altının kategorisi: Temiz minimal, Vurucu / Canlı / Glitch viral, Zarif sinematik, Kutulu podcast",
+  J(AE.GORUNUMLER.slice(0, 6).map(function (g) { return g.kategori; })) === J(["minimal", "viral", "viral", "sinematik", "podcast", "viral"]));
+ok("her görünümün geçerli kategorisi ve tek satırlık Türkçe açıklaması var", AE.GORUNUMLER.every(function (g) {
+  return KAT.indexOf(g.kategori) !== -1 && typeof g.aciklama === "string" && g.aciklama.length >= 20 && g.aciklama.length <= 110 && !/\n/.test(g.aciklama) &&
+    typeof g.ad === "string" && g.ad.length > 0;
+}), AE.GORUNUMLER.filter(function (g) { return KAT.indexOf(g.kategori) === -1 || !g.aciklama; }).map(function (g) { return g.id; }).join(","));
+var katSay = {};
+AE.GORUNUMLER.forEach(function (g) { katSay[g.kategori] = (katSay[g.kategori] || 0) + 1; });
+ok("her kategoride ≥ 4 görünüm (Marka ≥ 3); toplam ≥ 30; kütüphaneye ≥ 24 yeni görünüm", KAT.every(function (k) { return katSay[k] >= (k === "marka" ? 3 : 4); }) &&
+  AE.GORUNUMLER.length >= 30 && AE.GORUNUMLER.length - 6 >= 24, J(katSay));
+ok("gruplar(): kategori sırasıyla, her görünüm tam bir grupta", J(AE.gruplar().map(function (k) { return k.id; })) === J(KAT) &&
+  AE.gruplar().reduce(function (t, k) { return t + k.gorunumler.length; }, 0) === AE.GORUNUMLER.length &&
+  AE.gruplar().every(function (k) { return k.gorunumler.every(function (x) { return AE.gorunum(x.id).kategori === k.id; }); }));
+ok("Marka görünümleri marka: true (yalnız onlar), Marka kategorisinde", AE.GORUNUMLER.every(function (g) { return (g.marka === true) === (g.kategori === "marka"); }) &&
+  AE.GORUNUMLER.filter(function (g) { return g.marka; }).length >= 3);
+ok("normalize meta alanları yok sayar (kategori / aciklama / marka ayara girmez, ayar aynı kalır)", AE.GORUNUMLER.every(function (g) {
+  var n = AE.normalize(Object.assign({ kategori: g.kategori, aciklama: g.aciklama, marka: true, id: g.id, ad: g.ad }, g.ayar));
+  return J(n) === J(g.ayar) && n.kategori === undefined && n.aciklama === undefined && n.marka === undefined && !("kategori" in AE.overrides(n));
+}));
+ok("her görünüm: normalize gidip gelir, gorunumuBul kendini bulur, görünür ayarlar tekil (iki görünüm aynı değil)", AE.GORUNUMLER.every(function (g) {
+  return J(AE.normalize(g.ayar)) === J(g.ayar) && AE.gorunumuBul(g.ayar) === g.id && AE.gorunumuBul(JSON.parse(J(g.ayar))) === g.id;
+}) && (function () {
+  // kase / punct gorunurAyar'a girmez: tekillik onlarsız da sağlanmalı
+  var g = {};
+  return AE.GORUNUMLER.every(function (x) { var a = Object.assign({}, x.ayar, { kase: "normal", punct: true }), k = J(AE.normalize(a)).replace(/"kase":"\w+","punct":\w+,/, "");
+    if (!x.ayar.kutu) k = k.replace(/"kutuRenk":"#\w+","kutuOpak":\d+,/, "");
+    if (g[k]) return false; g[k] = 1; return true; });
+})());
+ok("yazı animasyonlu görünümler: anim katalogda, giris / aktif katalogdaki klasik çift; ilk altı klasik", AE.GORUNUMLER.every(function (g, i) {
+  if (!g.ayar.anim) return true;
+  var k = YA.klasik(g.ayar.anim);
+  return i >= 6 && !!YA.bul(g.ayar.anim) && k.giris === g.ayar.giris && k.aktif === g.ayar.aktif;
+}) && AE.GORUNUMLER.slice(0, 6).every(function (g) { return g.ayar.anim === ""; }) && AE.GORUNUMLER.filter(function (g) { return g.ayar.anim; }).length >= 6);
+
+// WCAG 2.x göreli parlaklık ve kontrast oranı
+function parlaklik(hex) {
+  var c = [1, 3, 5].map(function (i) { var v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+function kontrast(a, b) { var x = parlaklik(a), y = parlaklik(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+ok("kontrast yardımcısı WCAG değerleri verir (siyah / beyaz 21, aynı renk 1, #777777 / beyaz ≈ 4,48)", Math.abs(kontrast("#000000", "#ffffff") - 21) < 1e-9 &&
+  kontrast("#123456", "#123456") === 1 && Math.abs(kontrast("#777777", "#ffffff") - 4.48) < 0.01);
+// Yazının okunduğu zemin: kutu varsa kutu, yoksa kontur, ikisi de yoksa gölge (gölge de yoksa null: kural dışı)
+function zemin(a) { return a.kutu ? a.kutuRenk : a.kontur > 0 ? a.konturRenk : a.golge ? a.golge.renk : null; }
+var kontrastlar = AE.GORUNUMLER.map(function (g) { var z = zemin(g.ayar); return [g.id, z ? kontrast(g.ayar.renk, z) : 0]; });
+ok("yazı ile kontur / kutu arasında kontrast ≥ 4,5 (kontur ve kutu yoksa gölge zorunlu, gölgeyle)", kontrastlar.every(function (k) { return k[1] >= 4.5; }),
+  kontrastlar.map(function (k) { return k[0] + " " + k[1].toFixed(1); }).join(", "));
+ok("konturu ve kutusu olmayan görünümde gölge var, yeterince koyu ve yumuşak (opaklık ≥ 50, mesafe + yumuşaklık ≥ 6)", AE.GORUNUMLER.every(function (g) {
+  var a = g.ayar;
+  return a.kontur > 0 || a.kutu || (a.golge && a.golge.opak >= 50 && a.golge.mesafe + a.golge.yumusak >= 6);
+}));
+ok("vurgu rengi de zeminde okunur (kontrast ≥ 3, vurgu açıksa)", AE.GORUNUMLER.every(function (g) { return !g.ayar.vurgu || kontrast(g.ayar.vurguRenk, zemin(g.ayar)) >= 3; }),
+  AE.GORUNUMLER.map(function (g) { return g.id + " " + kontrast(g.ayar.vurguRenk, zemin(g.ayar)).toFixed(1); }).join(", "));
+ok("vurgu rengi yazı renginden belirgin (stil motorunun renk uzaklığı ≥ VURGU_YAKIN)", typeof SE.renkUzakligi === "function" && SE.VURGU_YAKIN === 150 &&
+  AE.GORUNUMLER.every(function (g) { return SE.renkUzakligi(g.ayar.renk, g.ayar.vurguRenk) >= SE.VURGU_YAKIN; }),
+  AE.GORUNUMLER.map(function (g) { return g.id + " " + Math.round(SE.renkUzakligi(g.ayar.renk, g.ayar.vurguRenk)); }).join(", "));
+var BUYUK_HARFLI = ["Anton", "Bebas Neue", "Bungee", "Bangers"];
+ok("yalnız büyük harfli görüntü fontları (Anton, Bebas Neue, Bungee, Bangers) yalnız BÜYÜK HARF ile", AE.GORUNUMLER.every(function (g) {
+  return BUYUK_HARFLI.indexOf(g.ayar.font) === -1 || g.ayar.kase === "upper";
+}), AE.GORUNUMLER.filter(function (g) { return BUYUK_HARFLI.indexOf(g.ayar.font) !== -1; }).map(function (g) { return g.id + ":" + g.ayar.kase; }).join(","));
+ok("punto 56-130 (1080 tabanı)", AE.GORUNUMLER.every(function (g) { return g.ayar.boyut >= 56 && g.ayar.boyut <= 130; }));
+ok("satır / kelime kategoriye uygun: viral 1-2 satır ve ≤ 4 kelime; podcast ve eğitim 2 satır, 5-7 kelime", AE.GORUNUMLER.every(function (g) {
+  var a = g.ayar;
+  if (g.kategori === "viral") return a.satir >= 1 && a.satir <= 2 && a.kelime <= 4;
+  if (g.kategori === "podcast" || g.kategori === "egitim") return a.satir === 2 && a.kelime >= 5 && a.kelime <= 7;
+  return true;
+}), AE.GORUNUMLER.map(function (g) { return g.id + " " + g.ayar.satir + "/" + g.ayar.kelime; }).join(", "));
+// Font cmap'i (tools/font-kontrol.js): görünümün çizildiği yüz(ler) Türkçe harflerin tamamını içerir
+var yuzler = {};
+AE.GORUNUMLER.forEach(function (g) { [SS.fontFile(g.ayar.font), SS.fontFile(g.ayar.font, true)].forEach(function (f) { if (f) yuzler[f] = 1; }); });
+var cmap = Object.keys(yuzler).map(function (f) { var r = FK.denetle(fs.readFileSync(path.join(kok, "fonts", f))); return [f, r.hata ? ["hata"] : r.eksik]; });
+ok("her görünümün yazı tipi ğĞüÜşŞıİöÖçÇ harflerinin tamamını içerir (cmap)", cmap.length >= 10 && cmap.every(function (x) { return x[1].length === 0; }) &&
+  "ğĞüÜşŞıİöÖçÇ".split("").every(function (h) { return Object.prototype.hasOwnProperty.call(FK.TURKCE, h); }), J(cmap));
+ok("adlar ve renkler özgün: rakip / üretici adı yok", AE.GORUNUMLER.every(function (g) {
+  return !/mr\.?\s*beast|hormozi|capcut|clashi|submagic|veed|opus|tiktok|reels|instagram|youtube/i.test(g.id + " " + g.ad + " " + g.aciklama);
+}));
+
+// Her görünüm × kadraj: NaN yok, kartlar kadrajın içinde; 9:16 + "Platform arayüzünden kaçın" ile GUVENLI_ALAN dışında
+var KUTU_GEN = SS.widths(), KAD_CUE = ["Bugün", "*sizlere*", "çok", "önemli", "bir", "şey", "anlatacağım", "arkadaşlar", "dikkat", "edin"]
+  .map(function (w, i) { return { start: 0.2 + i * 0.45, end: 0.2 + i * 0.45 + 0.4, text: w }; });
+// ASS olaylarının tahmini kutuları (fontun ortalama genişlik katsayısı; \pos ya da \move'un iki ucu; \an hizası)
+function olayKutulari(ass) {
+  var fontu = {}, out = [];
+  ass.split("\n").forEach(function (l) { var m = /^Style: ([^,]+),([^,]+),/.exec(l); if (m) fontu[m[1]] = m[2]; });
+  ass.split("\n").forEach(function (l) {
+    if (!/^Dialogue:/.test(l)) return;
+    var p = l.split(","), metin = p.slice(9).join(",");
+    var an = Number((/\\an(\d)/.exec(metin) || [0, 2])[1]);
+    var pos = /\\pos\(([-\d.]+),([-\d.]+)\)/.exec(metin), mv = /\\move\(([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)/.exec(metin);
+    var noktalar = pos ? [[+pos[1], +pos[2]]] : mv ? [[+mv[1], +mv[2]], [+mv[3], +mv[4]]] : [];
+    var fsz = Number((/\\fs([\d.]+)/.exec(metin) || [0, 0])[1]), sx = Number((/\\fscx([\d.]+)/.exec(metin) || [0, 100])[1]);
+    var bord = Number((/\\[xy]?bord([\d.]+)/.exec(metin) || [0, 0])[1]);
+    var satirlar = metin.replace(/\{[^}]*\}/g, "").split("\\N");
+    var en = Math.max.apply(null, satirlar.map(function (x) { return x.length; }));
+    var bw = en * fsz * KUTU_GEN[fontu[p[3]]] * sx / 100 + 2 * bord, bh = satirlar.length * fsz * 1.2 + 2 * bord;
+    noktalar.forEach(function (n) {
+      var x0 = an % 3 === 1 ? n[0] : an % 3 === 2 ? n[0] - bw / 2 : n[0] - bw, y0 = an <= 3 ? n[1] - bh : an <= 6 ? n[1] - bh / 2 : n[1];
+      out.push({ x0: x0, y0: y0, x1: x0 + bw, y1: y0 + bh });
+    });
+  });
+  return out;
+}
+var GA = SE.GUVENLI_ALAN, kadrajHatasi = [];
+AE.GORUNUMLER.forEach(function (g) {
+  [[1920, 1080, false], [1080, 1920, false], [1080, 1920, true], [1080, 1080, false]].forEach(function (k) {
+    var w = k[0], h = k[1], ov = AE.overrides(g.ayar);
+    ov.guvenli = k[2];
+    var r = SE.compile({ styleId: "efekt", cues: KAD_CUE, cueKind: "words", width: w, height: h, overrides: ov });
+    var kutular = olayKutulari(r.ass), ad = g.id + "@" + w + "x" + h + (k[2] ? "g" : "");
+    if (!(r.eventCount > 0) || /NaN|undefined|Infinity/.test(r.ass) || !kutular.length) { kadrajHatasi.push(ad + " olay/NaN"); return; }
+    kutular.forEach(function (b) {
+      if ([b.x0, b.y0, b.x1, b.y1].some(function (v) { return !isFinite(v); }) || b.x0 < 0 || b.y0 < 0 || b.x1 > w || b.y1 > h) kadrajHatasi.push(ad + " kadraj dışı " + J(b));
+      if (k[2] && (b.y0 < GA[0].h * h || b.y1 > GA[2].y * h || (b.y1 > GA[1].y * h && b.y0 < (GA[1].y + GA[1].h) * h && b.x1 > GA[1].x * w))) kadrajHatasi.push(ad + " güvenli alanda " + J(b));
+    });
+  });
+});
+ok("her görünüm 16:9, 9:16 (güvenli açık / kapalı) ve 1:1'de NaN'sız derlenir, kartlar kadrajın içinde; 9:16 güvenlide platform arayüzünün dışında",
+  kadrajHatasi.length === 0, kadrajHatasi.slice(0, 4).join(" | "));
+// Yerel MOGRT sözleşmesi her görünümde geçerli
+ok("sablonStili her görünümde geçerli sözleşme (9 alan, RGB 0-255, paket PostScript adı, punto, textAnim 0-5, hlAnim 0-3)", AE.GORUNUMLER.every(function (g) {
+  var st = AE.sablonStili(g.ayar, { olcek: 1920 / 1080 });
+  function rgbMi(x) { return x instanceof Array && x.length === 3 && x.every(function (v) { return v >= 0 && v <= 255 && v === Math.round(v); }); }
+  return st.length === 9 && rgbMi(st[0]) && rgbMi(st[1]) && /^[A-Za-z0-9]+-(Regular|Bold)$/.test(st[2]) && st[3] === Math.round(g.ayar.boyut * 1920 / 1080) &&
+    (st[4].length === 1 ? g.ayar.kontur === 0 : st[4].length === 5) && (st[5].length === 1) === !g.ayar.golge && (st[6].length === 1) === !g.ayar.kutu &&
+    st[7] >= 0 && st[7] <= 5 && st[8] >= 0 && st[8] <= 3 && st[7] === SE.GIRISLER.indexOf(g.ayar.giris) && st[8] === SE.AKTIFLER.indexOf(g.ayar.aktif);
+}));
+// Eski panel: kütüphane görünümünün stil kodu, yazı animasyonunu bilmeyen çözücüde (SS.decode) klasik karşılığıyla açılır
+ok("yeni görünümün stil kodu eski panelde (SS.decode, 'ek' bilinmez) aklı başında klasik görünüm: efekt, aynı yazı tipi / renk, klasik giriş / vurgu", AE.GORUNUMLER.slice(6).every(function (g) {
+  var d = SS.decode(SK.encode({ styleId: "efekt", overrides: AE.overrides(g.ayar), text: { kase: g.ayar.kase, punct: g.ayar.punct } }), function (id) { return SE.has(id); });
+  var o = d.recipe && d.recipe.overrides;
+  return d.ok && d.recipe.styleId === "efekt" && o.font === g.ayar.font && o.renk === g.ayar.renk && o.vurguRenk === g.ayar.vurguRenk && o.anim === undefined &&
+    o.giris === AE.klasikAyar(g.ayar).giris && o.aktif === AE.klasikAyar(g.ayar).aktif && d.warnings.every(function (w) { return w === "ek"; }) &&
+    SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", overrides: o }).eventCount > 0;
+}));
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

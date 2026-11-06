@@ -3759,6 +3759,36 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   background: #11131b; font-size: 12px; line-height: 1.15; text-align: center; letter-spacing: .01em;
   text-shadow: 1px 0 0 var(--efekt-kontur, #000), -1px 0 0 var(--efekt-kontur, #000), 0 1px 0 var(--efekt-kontur, #000), 0 -1px 0 var(--efekt-kontur, #000);
 }
+/* Stil kütüphanesi (parti 3, js/stil-galeri.js): kategori sekmeleri, süzülen çipler, ipucu. Dar panelde (300 px) taşmaz:
+   sekmeler ve çipler satıra kırılır, ipucu galerinin genişliğinde */
+.efekt-galeri { position: relative; min-width: 0; }
+.efekt-kategoriler { display: flex; flex-wrap: wrap; margin: 0 -2px 3px; min-width: 0; }
+.efekt-kategori {
+  flex: 0 1 auto; min-width: 0; max-width: calc(100% - 4px); margin: 0 2px 4px; padding: 3px 9px; border: 1px solid transparent; border-radius: 999px;
+  background: transparent; color: var(--faint); font: inherit; font-size: 10px; font-weight: 650; letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+  transition: color .16s var(--ease), border-color .16s var(--ease), background .16s var(--ease);
+}
+.efekt-kategori:hover { color: var(--text); }
+.efekt-kategori.secili { color: var(--text); border-color: var(--line2); background: var(--bg3); }
+.efekt-kategori:focus-visible { outline: none; box-shadow: var(--glow-sm); border-color: var(--accent); }
+.efekt-gorunumler { min-width: 0; }
+.efekt-cip { max-width: calc(100% - 6px); min-width: 0; }
+.efekt-cip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.efekt-cip[hidden] { display: none; }
+.efekt-cip-ornek { flex: none; white-space: nowrap; }
+/* Kutulu görünüm: örneğin zemini kutunun rengi; kontursuz örnek yalın; Marka Kiti açıkken Marka çipinde kit halkası */
+.efekt-cip-ornek-kutu { background: var(--efekt-kutu, #11131b); }
+.efekt-cip-ornek-yalin { text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
+.efekt-cip-ornek-kit { box-shadow: 0 0 0 1px var(--accent); }
+.efekt-cip-anim { margin-left: 3px; font-style: normal; font-weight: 600; font-size: 9px; font-family: var(--mono, monospace); color: var(--faint); text-shadow: none; }
+.efekt-ipucu {
+  position: absolute; left: 0; right: 0; z-index: 5; padding: 6px 9px; border: 1px solid var(--line2); border-radius: 9px;
+  background: var(--bg2, #15171f); color: var(--dim); font-size: 10.5px; line-height: 1.35; box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  pointer-events: none; word-wrap: break-word;
+}
+.efekt-ipucu[hidden] { display: none; }
+.efekt-ipucu b { display: block; color: var(--text); font-size: 11px; font-weight: 650; margin-bottom: 2px; }
 /* Büyük canlı önizleme */
 .efekt .onizleme-sahne { max-height: 240px; }
 .efekt .onizleme-sahne.dikey { max-height: 380px; }
