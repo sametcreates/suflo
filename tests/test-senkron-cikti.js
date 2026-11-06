@@ -327,7 +327,7 @@ function ortam(o) {
     hostSonuc.clips[1].speed === 2 && hostSonuc.clips[1].reversed === true && hostSonuc.nested === 1 && !("speed" in hostSonuc.clips[2]), J(hostSonuc));
   ok("go(): sekans / In-Out kapsamında (iç içe sekanslı karışım) klip hızına bakılmaz, klip ve toplu klipte senkronHizEngeli; ffmpeg yoksa nedeni rapor eder",
     /senkronHizEngeli\(scope === "clip" \? clip : null, speedFactor\)/.test(goG) && /senkronHizEngeli\(bc, bf\)/.test(goG) &&
-    (goG.match(/else if \(senkronSonNeden === "ffmpeg"\) senkronAtlama = SUI\.ATLANDI\.ffmpeg;/g) || []).length === 2);
+    (goG.match(/(?:else )?if \(senkronSonNeden === "ffmpeg"\) senkronAtlama = SUI\.ATLANDI\.ffmpeg;/g) || []).length === 2);
   // senkronSesiAnaliz: ffmpeg yok → null + neden; ilerleme durum satırına
   var durumlar = [];
   var SSA = new Function("SZ", "SUI", "K", "status", "var aktifIptal = null; var senkronSonNeden = '';\n" + govde("async function senkronSesiAnaliz(") +

@@ -120,4 +120,42 @@ function uretHece(o) {
   return { pcm: pcm, kelimeler: kel };
 }
 
-module.exports = { uret: uret, uretHece: uretHece, boz: boz, kartla: kartla, int16: int16, rastgele: rastgele, SR: SR };
+/*
+ * Sürtünmeli ünsüzle başlayan "kelimeler" (s / f / h / th gibi): her kelime yüksek frekanslı gürültü patlamasıyla
+ * (60–120 ms, ünlüden fricDb dB alçak; farkı alınmış beyaz gürültü: enerjisi 2,5 kHz üstünde) başlar, ardından ötümlü
+ * harmonik ton (150–400 ms) gelir. Gerçek kelime başı = sürtünmenin başı. o: { tohum, kelime, fricDb (−26),
+ * yatakDb (verilirse düşük frekanslı müzik yatağı: 55–220 Hz tonlar + alçak geçiren gürültü; −20 ≈ konuşmadan 20 dB alçak) }
+ */
+function uretSurtunmeli(o) {
+  o = o || {};
+  var r = rastgele(o.tohum || 1), n = o.kelime || 40, t = 0.6, kel = [], par = [];
+  for (var i = 0; i < n; i++) {
+    var fr = 0.06 + r() * 0.06, v = 0.15 + r() * 0.25;
+    kel.push({ start: Math.round(t * 1000) / 1000, end: Math.round((t + fr + v) * 1000) / 1000, text: "s" + i });
+    par.push({ s: t, f: fr, v: v, f0: 100 + r() * 150 });
+    t += fr + v + 0.12 + r() * 0.4;
+  }
+  var pcm = new Float32Array(Math.round((t + 0.6) * SR));
+  for (var j = 0; j < pcm.length; j++) pcm[j] = 3e-4 * (r() * 2 - 1);
+  var VG = 0.25, FG = VG * Math.pow(10, (o.fricDb === undefined ? -26 : o.fricDb) / 20), onceki = 0;
+  par.forEach(function (p) {
+    var a = Math.round(p.s * SR), b = Math.round((p.s + p.f) * SR), c = Math.round((p.s + p.f + p.v) * SR), k;
+    for (k = a; k < b; k++) { var x = r() * 2 - 1, e = Math.min(1, (k - a) / 40, (b - k) / 40 + 0.3); pcm[k] += FG * 1.732 * (x - onceki) * 0.7 * e; onceki = x; }
+    for (k = b; k < c; k++) {
+      var e2 = Math.min(1, (k - b) / 80, (c - k) / 80), tt = k / SR, v = 0;
+      for (var h = 1; h <= 6; h++) v += Math.sin(2 * Math.PI * p.f0 * h * tt) / h;
+      pcm[k] += VG * e2 * v * 0.5;
+    }
+  });
+  if (o.yatakDb !== undefined) {
+    var mg = VG * Math.pow(10, o.yatakDb / 20), lp = 0;
+    for (var m = 0; m < pcm.length; m++) {
+      var tm = m / SR;
+      lp = 0.97 * lp + 0.03 * (r() * 2 - 1);
+      pcm[m] += mg * (Math.sin(2 * Math.PI * 55 * tm) + 0.7 * Math.sin(2 * Math.PI * 110 * tm) + 0.5 * Math.sin(2 * Math.PI * 165.5 * tm) + 0.4 * Math.sin(2 * Math.PI * 220 * tm) + 3 * lp) / 2;
+    }
+  }
+  return { pcm: pcm, kelimeler: kel };
+}
+
+module.exports = { uret: uret, uretHece: uretHece, uretSurtunmeli: uretSurtunmeli, boz: boz, kartla: kartla, int16: int16, rastgele: rastgele, SR: SR };

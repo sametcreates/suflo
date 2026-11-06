@@ -4778,7 +4778,7 @@ body.host-ae [data-yalniz-premiere], body.host-ae [data-ae-gizli] { display: non
 .dalga-tutamak:hover::after, .dalga-tutamak.surukleniyor::after { background: var(--accent-lite); }
 .dalga-tutamak:focus::after { left: 4px; width: 5px; background: var(--warn); box-shadow: 0 0 0 2px rgba(234, 200, 119, .35); }
 .dalga-bos { margin: 2px 0 4px; color: var(--dim); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
-.dalga-ipucu { margin: 4px 0 0; color: var(--faint); font-size: 9.5px; line-height: 1.4; overflow-wrap: anywhere; }
+.dalga-ipucu { margin: 4px 0 0; color: var(--dim); font-size: 10.5px; line-height: 1.4; overflow-wrap: anywhere; }
 .seg-senkron-uyari { padding: 0 5px; border: 1px solid rgba(234, 200, 119, .4); border-radius: 4px; background: rgba(234, 200, 119, .08);
   color: var(--warn); font-size: 10px; line-height: 1.5; cursor: pointer; }
 .seg-senkron-uyari:hover, .seg-senkron-uyari:focus { outline: none; border-color: var(--warn); box-shadow: 0 0 0 2px rgba(234, 200, 119, .25); }

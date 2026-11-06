@@ -155,21 +155,21 @@ ok("kaynakBul: belgenin t'yi kapsayan sesi (0,5 sn tolerans), başka belge yok",
 
 /* ---------------- 2) rapor metni ---------------- */
 var RM = U.raporMetni;
-ok("rapor satırı: N kelime sese oturtuldu · ortalama sapma X ms → Y ms · Z kelime emin değil",
-  RM({ duzeltilen: 42, ortalamaOnceMs: 183.4, ortalamaSonraMs: 11.6, eminDegil: [{ tur: "kelime" }, { tur: "kelime" }, { tur: "kart" }], kelimeli: true, kayma: { uygulandi: false } }).metin ===
-  "42 kelime sese oturtuldu · ortalama sapma 183 ms → 12 ms · 2 kelime emin değil");
-ok("kelimesiz belge: kart birimi; düzeltme yoksa 'Zamanlar sesle uyumlu ✓'", RM({ duzeltilen: 5, ortalamaOnceMs: 90, ortalamaSonraMs: 20, eminDegil: [], kelimeli: false }).metin === "5 kart sese oturtuldu · ortalama sapma 90 ms → 20 ms" &&
-  RM({ duzeltilen: 0, ortalamaOnceMs: 6, ortalamaSonraMs: 6, eminDegil: [], kelimeli: true }).metin === "Zamanlar sesle uyumlu ✓ · ortalama sapma 6 ms" &&
+ok("rapor satırı: N kelime sese oturtuldu · ortanca değişim X ms · Z kelime emin değil (önce → sonra 'iyileşme' çifti yok)",
+  RM({ duzeltilen: 42, degisimOrtancaMs: 183.4, ortalamaOnceMs: 183.4, ortalamaSonraMs: 11.6, eminDegil: [{ tur: "kelime" }, { tur: "kelime" }, { tur: "kart" }], kelimeli: true, kayma: { uygulandi: false } }).metin ===
+  "42 kelime sese oturtuldu · ortanca değişim 183 ms · 2 kelime emin değil");
+ok("kelimesiz belge: kart birimi; düzeltme yoksa 'Zamanlar sesle uyumlu ✓'", RM({ duzeltilen: 5, degisimOrtancaMs: 90, ortalamaOnceMs: 90, ortalamaSonraMs: 20, eminDegil: [], kelimeli: false }).metin === "5 kart sese oturtuldu · ortanca değişim 90 ms" &&
+  RM({ duzeltilen: 0, ortalamaOnceMs: 6, ortalamaSonraMs: 6, eminDegil: [], kelimeli: true }).metin === "Zamanlar sesle uyumlu ✓" &&
   RM({ duzeltilen: 0, ortalamaSonraMs: 6, eminDegil: [], kelimeli: true }).ton === "iyi");
 ok("toplam kayma ayrıntıda; atlanan seste neden ve uyarı tonu", RM(r.rapor).ayrinti === "Tüm altyazıda −" + Math.abs(Math.round(r.rapor.kayma.ms)) + " ms toplam kayma düzeltildi." &&
   RM({ atlandi: "dusukKontrast" }).metin === "Ses gürültülü ya da müzikli: zamanlara dokunulmadı" && RM({ atlandi: "dusukKontrast" }).ton === "uyari" &&
   RM({ atlandi: "iyilesmedi" }).ton === "iyi" && RM({ atlandi: "bilinmeyen" }).metin === U.ATLANDI.analizYok, RM(r.rapor).ayrinti);
 var I18N = require(path.join(KOK, "js", "i18n.js"));
 I18N.setDictionary(require(path.join(KOK, "i18n", "en.js")));
-var ceviriler = ["42 kelime sese oturtuldu · ortalama sapma 183 ms → 12 ms · 2 kelime emin değil", "Zamanlar sesle uyumlu ✓ · ortalama sapma 6 ms", RM(r.rapor).ayrinti,
+var ceviriler = ["42 kelime sese oturtuldu · ortanca değişim 183 ms · 2 kelime emin değil", "Zamanlar sesle uyumlu ✓", RM(r.rapor).ayrinti,
   "Ses dalgası · #7", "“selam” başı", "“selam” / “dünya” sınırı", "Kart girişi", "Geri alındı: sese yaslama"].concat(Object.keys(U.ATLANDI).map(function (k) { return U.ATLANDI[k]; }))
   .map(function (t) { return I18N.translate(t); });
-ok("İngilizce arayüz: rapor, şerit etiketleri, nedenler ve geri al etiketi çevrilir", ceviriler[0] === "42 words snapped to the audio · average offset 183 ms → 12 ms · 2 words uncertain" &&
+ok("İngilizce arayüz: rapor, şerit etiketleri, nedenler ve geri al etiketi çevrilir", ceviriler[0] === "42 words snapped to the audio · median change 183 ms · 2 words uncertain" &&
   ceviriler[3] === "Waveform · #7" && ceviriler[4] === "Start of “selam”" && ceviriler[7] === "Undone: snap to audio" &&
   ceviriler.every(function (t) { return !/[ıİşŞğĞçÇöÖüÜ]/.test(t.replace(/“[^”]*”/g, "")); }), J(ceviriler));
 
@@ -396,7 +396,7 @@ function ortamKur(o) {
   var h = ort(duz(d1.segments).map(function (w, i) { return Math.abs(w.start - gercek[i].start) * 1000; }));
   ok("Oluştur sonrası: belge sese oturur, tek geri al adımı 'sese yaslama', kaynak bu belgeye bağlı", h < 20 && d1.undo.length === 1 && d1.undo[0].etiket === "sese yaslama" &&
     d1.kaynak.length === 1 && d1.kaynak[0].belge === belge1, h.toFixed(1));
-  ok("rapor satırı görünür, metni raporMetni, ayrıntıda kayma, rapordaki Geri al görünür", !o.dom["cap-senkron-rapor"].hidden && /^\d+ kelime sese oturtuldu · ortalama sapma \d+ ms → \d+ ms/.test(o.dom["cap-senkron-rapor-metin"].textContent) &&
+  ok("rapor satırı görünür, metni raporMetni, ayrıntıda kayma, rapordaki Geri al görünür", !o.dom["cap-senkron-rapor"].hidden && /^\d+ kelime sese oturtuldu · ortanca değişim \d+ ms/.test(o.dom["cap-senkron-rapor-metin"].textContent) &&
     /toplam kayma/.test(o.dom["cap-senkron-rapor"].title) && o.dom["cap-senkron-geri"].hidden === false && o.dom["cap-senkron-rapor"].getAttribute("data-ton") !== null, o.dom["cap-senkron-rapor-metin"].textContent);
   C.senkronGeriAl();
   var d2 = C.durum();
@@ -480,7 +480,10 @@ function ortamKur(o) {
   var goG = govde("async function go(");
   var iTek = goG.indexOf("senkronSesiAnaliz(audioSrc"), iSon = goG.indexOf("senkronIsSonu(senkronSesler"), iEtiket = goG.indexOf("uygulaEtiketiniSifirla();  // yeni transkript");
   var iSonuc = goG.indexOf('el("cap-result").hidden = false;', iEtiket), iFinally = goG.indexOf("} finally {\n      tempFiles.forEach");
-  ok("go(): doğrulama yeni belge kurulduktan (bayraklar, geri al) sonra, editör açılmadan ve geçici ses silinmeden önce", iEtiket > 0 && iTek > iEtiket && iSon > iTek && iSonuc > iSon && iFinally > iSonuc);
+  // ses analizi (await) belge atanmadan ÖNCE (satır kurulduktan sonra); hizalama yeni belge kurulduktan (bayraklar, geri al) sonra
+  var iKur = goG.indexOf("kurulan = CT.segmentleriKur("), iAta = goG.indexOf("segments = kurulan.segments;");
+  ok("go(): ses analizi satırlar kurulup belge atanmadan önce; doğrulama yeni belge kurulduktan sonra, editör açılmadan ve geçici ses silinmeden önce",
+    iKur > 0 && iTek > iKur && iAta > iTek && iEtiket > iAta && iSon > iEtiket && iSonuc > iSon && iFinally > iSonuc);
   ok("go(): rehberin örneği hariç, ayara bağlı; hızı değişmiş klipte atlanır", /var senkronIste = !ornek && senkronDogrulaAcik\(\);/.test(goG) && /senkronHizEngeli\(bc, bf\)/.test(goG) &&
     /senkronHizEngeli\(scope === "clip" \? clip : null, speedFactor\)/.test(goG));
   var iTopluAnaliz = goG.indexOf("senkronSesiAnaliz(ba,"), iTopluSil = goG.indexOf("if (ba) { try { K.fs.unlinkSync(ba)");

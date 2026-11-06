@@ -8,7 +8,9 @@
  *   hizala(kartlar, analiz, opts) -> { kartlar, rapor }
  *       kartlar: [{ start, end, text, words?: [{ start, end, text, ... }] , ... }] (sn, sekans zamanı)
  *       Girdi DEĞİŞTİRİLMEZ; dönen kartlar ve kelimeler kopyadır, bilinmeyen alanlar korunur.
- *       rapor: { duzeltilen, ortalamaOnceMs, ortalamaSonraMs, eminDegil: [...], kayma: { ms, guven, uygulandi },
+ *       rapor: { duzeltilen, degisimOrtancaMs (değişenlerin başı ne kadar oynadı, ortanca), ortalamaOnceMs, ortalamaSonraMs
+ *                (en yakın konuşma başlangıcına uzaklık: yaslamanın kendi hedefi, iç ölçü; doğruluk değildir), eminDegil: [...],
+ *                kayma: { ms, guven, uygulandi, egim? (ppm: giderek büyüyen kayma doğrusu uygulandıysa) },
  *                kelimeGuven: [...], kartGuven: [...], kontrastDb, atlandi: null | neden, kelime, kart }
  *   kaymaBul(ogeler, analiz, opts)       -> { ms, guven, uygulanabilir }  (toplam gecikme)
  *   kelimeleriYasla(kelimeler, analiz, opts) -> { kelimeler, guven: [...], neden: [...] }
@@ -22,7 +24,9 @@
  *     iki kelime aynı başlangıcı paylaşamaz.
  *   - Toplam kayma: kelime / boşluk düzeninin konuşma etkinliğiyle ve başlangıçlarla ilintisi ±maxKaymaMs
  *     (800) içinde taranır, en iyi gecikme başlangıç farklarının ortancasıyla inceltilir. Tepe belirgin değilse
- *     (güven < 0,5) uygulanmaz.
+ *     (güven < 0,5) uygulanmaz. Kayma zamanla büyüyorsa (hız farkı: 23,976 / 24, yanlış etiketli örnekleme hızı) ~30 sn'lik
+ *     kayan pencerelerin kaymalarına doğru oturtulur (Theil–Sen) ve her sınır kendi zamanındaki kaymayla düzeltilir;
+ *     pencereler birbirini tutmuyorsa hiçbir şeye dokunulmaz (atlandi "kayma").
  *   - ASLA aşırı düzeltme yok: ses kontrastı düşükse (gürültü / müzik altında konuşma, kontrastMinDb 10)
  *     ya da konuşma neredeyse hiç yoksa zamanlar OLDUĞU GİBİ kalır, kartlar "emin değil" işaretlenir.
  *     Bir kelimenin yeni aralığı eskisinden belirgin daha az konuşma içeriyorsa o kelime geri alınır;
@@ -128,6 +132,20 @@
    *   + kelime başlarının ±20 ms'sindeki başlangıç gücü ortalaması (0..1)
    * En iyi gecikmenin ±100 ms dışındaki en iyi rakibe üstünlüğü güveni verir.
    */
+  // başlangıç gücü dizisi: her pencere için ±2 pencere içindeki en güçlü başlangıç (son analiz için saklanır: kayan
+  // pencerelerle kayma ararken her pencere yeniden kurmasın)
+  var ogSakla = { a: null, n: -1, sayi: -1, og: null };
+  function baslangicGucu(a) {
+    if (ogSakla.a === a && ogSakla.n === a.n && ogSakla.sayi === a.onsetler.length) return ogSakla.og;
+    var h = hopOf(a), n = a.n, og = new Float32Array(n);
+    a.onsetler.forEach(function (x) {
+      var k = Math.round(x.t / h);
+      for (var j = Math.max(0, k - 2); j <= Math.min(n - 1, k + 2); j++) if (x.g > og[j]) og[j] = x.g;
+    });
+    ogSakla = { a: a, n: n, sayi: a.onsetler.length, og: og };
+    return og;
+  }
+
   function kaymaBul(ogeler, a, opts) {
     var o = ayar(opts);
     var sonuc = { ms: 0, guven: 0, uygulanabilir: false, puan0: 0, puan: 0, uyum: null, baslangicUyum: null };
@@ -135,12 +153,7 @@
     var liste = (ogeler || []).filter(gecerli).map(function (w) { return { s: Number(w.start), e: Number(w.end) }; });
     if (!liste.length) return sonuc;
     var h = hopOf(a), n = a.n, i;
-    // başlangıç gücü dizisi: her pencere için ±2 pencere içindeki en güçlü başlangıç
-    var og = new Float32Array(n);
-    a.onsetler.forEach(function (x) {
-      var k = Math.round(x.t / h);
-      for (var j = Math.max(0, k - 2); j <= Math.min(n - 1, k + 2); j++) if (x.g > og[j]) og[j] = x.g;
-    });
+    var og = baslangicGucu(a);
     var bosluklar = [];
     for (i = 0; i + 1 < liste.length; i++) {
       var gs = liste[i].e, ge = liste[i + 1].s;
@@ -197,6 +210,62 @@
     // kelime içi konuşma − boşluktaki konuşma (süre ağırlıklı, en iyi gecikmede): transkript bu sese ait mi
     sonuc.uyum = Math.round(uyumlar[en] * 1000) / 1000;
     sonuc.uygulanabilir = liste.length >= 4 && sonuc.guven >= o.kaymaGuvenMin && Math.abs(sonuc.ms) >= o.minKaymaMs && puanlar[en] - p0 >= 0.05;
+    return sonuc;
+  }
+
+  /* ---------------- Giderek büyüyen kayma (hız farkı) ---------------- */
+
+  function ortanca(d) {
+    if (!d.length) return 0;
+    var x = d.slice().sort(function (p, q) { return p - q; });
+    var m = x.length >> 1;
+    return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2;
+  }
+
+  /*
+   * Transkriptin saati sesten biraz farklı hızda işliyorsa (23,976 / 24 dönüşümü, 48k diye etiketli 44,1k ses, değişken
+   * kare hızlı telefon kaydı) kayma zamanla doğrusal büyür: tek toplam kayma ve ±pencere yaslaması onu kapatamaz.
+   * ogeler (analiz ekseninde, başa göre sıralı) ~30 sn'lik, %50 örtüşen pencerelere bölünür (her biri en az 8 öğe);
+   * her pencerede kaymaBul. Güvenli pencerelerden (≥ 3) Theil–Sen doğrusu: kayma(t) = a + b·t (ms, t sn).
+   * Döner: { durum: "yok" | "dogru" | "tutarsiz", a, b, pencereler: [{ t, ms, guven }], artikMs, yayMs }
+   *   dogru     ortanca artık ≤ 40 ms ve öngörülen kayma aralığı > 60 ms: uygulanabilir
+   *   tutarsiz  pencereler birbirini tutmuyor (doğruya oturmuyor ya da az pencerede ms'ler pencereMs'ten çok açık)
+   */
+  var KAYAN_PENCERE = 30, KAYAN_ADIM = 15, KAYAN_MIN_OGE = 8, KAYAN_ARTIK_MS = 40, KAYAN_ARALIK_MS = 60;
+  function kayanKayma(ogeler, a, o) {
+    var sonuc = { durum: "yok", a: 0, b: 0, pencereler: [], artikMs: null, yayMs: 0 };
+    var liste = (ogeler || []).filter(gecerli).slice().sort(function (p, q) { return Number(p.start) - Number(q.start); });
+    if (liste.length < 2 * KAYAN_MIN_OGE) return sonuc;
+    var ilk = Number(liste[0].start), son = Number(liste[liste.length - 1].start);
+    var pen = [];
+    for (var b0 = ilk; b0 === ilk || b0 + KAYAN_PENCERE / 2 <= son; b0 += KAYAN_ADIM) {
+      var icinde = liste.filter(function (w) { var t = Number(w.start); return t >= b0 && t < b0 + KAYAN_PENCERE; });
+      if (icinde.length < KAYAN_MIN_OGE) continue;
+      var ky = kaymaBul(icinde, a, o);
+      if (!(ky.guven >= o.kaymaGuvenMin)) continue;
+      var tm = 0;
+      icinde.forEach(function (w) { tm += Number(w.start); });
+      pen.push({ t: tm / icinde.length, ms: ky.ms, guven: ky.guven });
+    }
+    sonuc.pencereler = pen;
+    if (!pen.length) return sonuc;
+    var msler = pen.map(function (p) { return p.ms; });
+    sonuc.yayMs = Math.max.apply(null, msler) - Math.min.apply(null, msler);
+    if (pen.length < 3) {
+      if (sonuc.yayMs > o.pencereMs) sonuc.durum = "tutarsiz";
+      return sonuc;
+    }
+    var egimler = [];
+    for (var i = 0; i < pen.length; i++) for (var j = i + 1; j < pen.length; j++) {
+      if (pen[j].t - pen[i].t > 1) egimler.push((pen[j].ms - pen[i].ms) / (pen[j].t - pen[i].t));
+    }
+    var b = ortanca(egimler);
+    var aa = ortanca(pen.map(function (p) { return p.ms - b * p.t; }));
+    var artik = ortanca(pen.map(function (p) { return Math.abs(p.ms - (aa + b * p.t)); }));
+    sonuc.a = aa; sonuc.b = b; sonuc.artikMs = Math.round(artik * 10) / 10;
+    var aralik = Math.abs(b) * (son - ilk);
+    if (artik <= KAYAN_ARTIK_MS && aralik > KAYAN_ARALIK_MS) sonuc.durum = "dogru";
+    else if (artik > KAYAN_ARTIK_MS && sonuc.yayMs > o.pencereMs) sonuc.durum = "tutarsiz";
     return sonuc;
   }
 
@@ -439,7 +508,7 @@
     var t0 = num(o.t0, a && isFinite(a.t0) ? a.t0 : 0);
     var girdi = kartlar || [];
     var rapor = {
-      duzeltilen: 0, ortalamaOnceMs: 0, ortalamaSonraMs: 0, eminDegil: [],
+      duzeltilen: 0, degisimOrtancaMs: 0, ortalamaOnceMs: 0, ortalamaSonraMs: 0, eminDegil: [],
       kayma: { ms: 0, guven: 0, uygulandi: false },
       kelimeGuven: [], kartGuven: [], kontrastDb: a && isFinite(a.kontrast) ? Math.round(a.kontrast * 10) / 10 : 0,
       atlandi: null, uyum: null, kelime: 0, kart: girdi.length
@@ -502,17 +571,46 @@
     // onlarda kart başlarının konuşma başlangıçlarına oturması ölçülür
     var uy = duz.length ? ky.uyum : ky.baslangicUyum;
     rapor.uyum = uy;
-    if (uy !== null && uy < (duz.length ? o.uyumMin : o.baslangicUyumMin)) {
+    var uyumsuz = uy !== null && uy < (duz.length ? o.uyumMin : o.baslangicUyumMin);
+    function hepsiniIsaretle(neden) {
+      girdi.forEach(function (c, ci) {
+        if (gecerli(c)) rapor.eminDegil.push({ tur: "kart", kart: ci, metin: String(c.text || ""), bas: ms(Number(c.start)), son: ms(Number(c.end)), guven: 0, neden: neden });
+      });
+    }
+    /*
+     * Giderek büyüyen kayma: tek toplam kayma uygulanamıyorsa (ya da kelime düzeni hiçbir sabit gecikmede oturmuyorsa)
+     * kayan pencerelerle doğrusal kayma aranır. Uygulanan toplam kayma varsa da doğru belirgin biçimde daha iyi
+     * açıklıyorsa (pencereler doğruya oturuyor, aralık > 60 ms) doğru kullanılır. Pencereler birbirini tutmuyorsa
+     * yaslama rastgele başlangıçlara çekmek olurdu: hiçbir şeye dokunulmaz, "kayma" nedeniyle işaretlenir.
+     */
+    var kayan = null;
+    if (o.kaymaUygula !== false && ogeler.filter(gecerli).length >= 4) kayan = kayanKayma(ogeler, a, o);
+    if (kayan && kayan.durum === "tutarsiz" && !ky.uygulanabilir && !uyumsuz) {
+      rapor.atlandi = "kayma";
+      rapor.kayma = { ms: ky.ms, guven: ky.guven, uygulandi: false, pencere: kayan.pencereler.length, yayMs: Math.round(kayan.yayMs) };
+      hepsiniIsaretle("kayma");
+      return { kartlar: aynen(), rapor: rapor };
+    }
+    var dogru = kayan && kayan.durum === "dogru" ? kayan : null;
+    if (uyumsuz && !dogru) {
       // kelimeler / boşluklar sesin konuşma düzenine hiçbir gecikmede oturmuyor: transkript bu sesin değil
       // (yanlış klip, başka dil kaydı, ağır müzik). Yaslamak rastgele başlangıçlara çekmek olurdu.
       rapor.atlandi = "uyumsuz";
-      girdi.forEach(function (c, ci) {
-        if (gecerli(c)) rapor.eminDegil.push({ tur: "kart", kart: ci, metin: String(c.text || ""), bas: ms(Number(c.start)), son: ms(Number(c.end)), guven: 0, neden: "uyumsuz" });
-      });
+      hepsiniIsaretle("uyumsuz");
       return { kartlar: aynen(), rapor: rapor };
     }
     var d = 0;
-    if (o.kaymaUygula !== false && ky.uygulanabilir) { d = ky.ms / 1000; rapor.kayma.uygulandi = true; }
+    if (dogru) {
+      // kayma(t) ms, t transkriptin (yerel eksen) zamanı; kartın ve kelimelerinin her sınırı kendi zamanındaki kaymayla
+      var ilkT = Infinity, sonT = -Infinity;
+      ogeler.forEach(function (w) { if (gecerli(w)) { ilkT = Math.min(ilkT, Number(w.start)); sonT = Math.max(sonT, Number(w.start)); } });
+      var k0 = dogru.a + dogru.b * ilkT, k1 = dogru.a + dogru.b * sonT;
+      rapor.kayma = { ms: Math.round(Math.abs(k1) > Math.abs(k0) ? k1 : k0), guven: Math.round(ortanca(dogru.pencereler.map(function (p) { return p.guven; })) * 1000) / 1000,
+        uygulandi: true, egim: Math.round(dogru.b * 1000), basMs: Math.round(k0), sonMs: Math.round(k1), pencere: dogru.pencereler.length };
+      var kd = function (t) { return t + (dogru.a + dogru.b * t) / 1000; };
+      var kaydirD = function (w) { if (gecerli(w)) { w.start = kd(Number(w.start)); w.end = Math.max(w.start, kd(Number(w.end))); } };
+      kartlarY.forEach(function (c) { kaydirD(c); (c.words || []).forEach(kaydirD); });
+    } else if (o.kaymaUygula !== false && ky.uygulanabilir) { d = ky.ms / 1000; rapor.kayma.uygulandi = true; }
     function kaydir(w) { if (gecerli(w)) { w.start = Number(w.start) + d; w.end = Number(w.end) + d; } }
     if (d) kartlarY.forEach(function (c) { kaydir(c); (c.words || []).forEach(kaydir); });
 
@@ -570,14 +668,17 @@
 
     var cikti = yeniKartlar.map(sekans);
     // düzeltilen sayısı (5 ms'den büyük değişim), güven ve "emin değil" listesi
-    var esik = 0.005;
+    var esik = 0.005, degisim = [];
     if (duz.length) {
       var k2 = 0;
       girdi.forEach(function (c, ci) {
         var gTop = 0, gSay = 0;
         (c.words || []).forEach(function (w, wi) {
           var yeni = cikti[ci].words[wi];
-          if (gecerli(w) && (Math.abs(Number(yeni.start) - Number(w.start)) > esik || Math.abs(Number(yeni.end) - Number(w.end)) > esik)) rapor.duzeltilen++;
+          if (gecerli(w) && (Math.abs(Number(yeni.start) - Number(w.start)) > esik || Math.abs(Number(yeni.end) - Number(w.end)) > esik)) {
+            rapor.duzeltilen++;
+            degisim.push(Math.abs(Number(yeni.start) - Number(w.start)) * 1000);
+          }
           var gv = sonucKelime.guven[k2], nd = sonucKelime.neden[k2];
           rapor.kelimeGuven[k2] = gv;
           if (gecerli(w)) { gTop += gv; gSay++; }
@@ -591,12 +692,18 @@
     } else {
       girdi.forEach(function (c, ci) {
         var yeni = cikti[ci];
-        if (gecerli(c) && (Math.abs(yeni.start - c.start) > esik || Math.abs(yeni.end - c.end) > esik)) rapor.duzeltilen++;
+        if (gecerli(c) && (Math.abs(yeni.start - c.start) > esik || Math.abs(yeni.end - c.end) > esik)) {
+          rapor.duzeltilen++;
+          degisim.push(Math.abs(Number(yeni.start) - Number(c.start)) * 1000);
+        }
         var gv = kartGuveni(yeni);
         rapor.kartGuven[ci] = gv;
         if (gecerli(c) && gv < o.guvenEsik) rapor.eminDegil.push({ tur: "kart", kart: ci, metin: String(c.text || ""), bas: yeni.start, son: yeni.end, guven: gv, neden: "onsetYok" });
       });
     }
+    // değişenlerin başlarının ne kadar oynadığı (ortanca, ms). ortalamaOnceMs / SonraMs yaslamanın kendi hedefine
+    // (en yakın başlangıç) uzaklıktır: yaslama onu her zaman küçültür, doğruluk ölçüsü olarak gösterilmez
+    rapor.degisimOrtancaMs = Math.round(ortanca(degisim));
     function kartGuveni(c) {
       if (!gecerli(c)) return 0;
       var s = Number(c.start) - t0, e = Number(c.end) - t0;
@@ -633,7 +740,7 @@
   function iki(n) { return (n < 10 ? "0" : "") + n; }
   /*
    * Gösterim: "SS:DD:SN:KK"; dropFrame (yalnız 29,97 / 59,94) "SS:DD:SN;KK" — atlanan kare NUMARALARIDIR,
-   * zaman değişmez (iç zaman her zaman gerçek saniye).
+   * zaman değişmez (iç zaman her zaman gerçek saniye). Zaman kodu 24 saatte başa döner (DF ve NDF).
    */
   function zamanKodu(t, fps, secenek) {
     var k = kareHizi(fps);
@@ -644,11 +751,13 @@
       var dus = Math.round(nom / 15);   // 30 → 2, 60 → 4
       var on = Math.round(k.deger * 600);
       var dk = nom * 60 - dus;
-      var dGun = Math.round(k.deger * 86400);
+      // drop-frame günü 24 saatlik ETİKET sayısıdır (29,97: 2 589 408, 59,94: 5 178 816), gerçek 86 400 sn'nin karesi değil
+      var dGun = (nom * 600 - 9 * dus) * 144;
       kare = kare % dGun;
       var dd = Math.floor(kare / on), mm = kare % on;
       kare += dus * 9 * dd + (mm > dus ? dus * Math.floor((mm - dus) / dk) : 0);
     }
+    else kare = kare % (nom * 86400);   // non-drop-frame de 24:00:00:00'da başa döner
     var kk = kare % nom, toplamSn = Math.floor(kare / nom);
     var sn = toplamSn % 60, dkk = Math.floor(toplamSn / 60) % 60, sa = Math.floor(toplamSn / 3600);
     return iki(sa) + ":" + iki(dkk) + ":" + iki(sn) + (df ? ";" : ":") + iki(kk);

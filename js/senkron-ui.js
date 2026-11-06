@@ -10,7 +10,7 @@
  *   hepsiniYasla(segs, kaynaklar, o)   -> { segments, rapor, islenen }  (her kaynağın aralığındaki kartlar o sesle
  *                                         hizalanır; girdi DEĞİŞMEZ; sorunlu kartlar s.senkronUyari ile işaretlenir)
  *   raporMetni(rapor)                  -> { metin, ayrinti, ton }  Türkçe tek satır: "N kelime sese oturtuldu ·
- *                                         ortalama sapma X ms → Y ms · Z kelime emin değil"
+ *                                         ortanca değişim X ms · Z kelime emin değil · K klip doğrulanamadı: neden"
  *   sinirlar(seg)                      -> [{ id, tur, t, k }]  kartın sürüklenebilir sınırları (kart giriş / çıkışı,
  *                                         kelime başı / sonu; bitişik iki kelimenin ortak sınırı tek tutamak)
  *   sinirTasi(segs, ci, id, t, o)      -> { seg, t } | null  sınırı taşınmış kart KOPYASI (komşular, sıra, en kısa süre)
@@ -76,8 +76,8 @@
   /* ---------------- Hizalama (kaynak kaynak) ---------------- */
 
   function bosRapor() {
-    return { duzeltilen: 0, ortalamaOnceMs: 0, ortalamaSonraMs: 0, eminDegil: [], kayma: { ms: 0, guven: 0, uygulandi: false },
-      atlandi: null, kelime: 0, kart: 0, kelimeli: false, uyariKart: 0, kaynak: 0 };
+    return { duzeltilen: 0, degisimOrtancaMs: 0, ortalamaOnceMs: 0, ortalamaSonraMs: 0, eminDegil: [], kayma: { ms: 0, guven: 0, uygulandi: false },
+      atlandi: null, kismiAtlandi: [], kaymaKaynak: 0, kelime: 0, kart: 0, kelimeli: false, uyariKart: 0, kaynak: 0 };
   }
 
   /*
@@ -122,7 +122,7 @@
       for (var j = 0; j < liste.length; j++) if (t >= liste[j].bas - 0.05 && t < liste[j].son) en = j;
       return en;
     });
-    var onceTop = 0, sonraTop = 0, olcuSay = 0, nedenler = [], enBuyukKayma = null, islenen = 0;
+    var onceTop = 0, sonraTop = 0, olcuSay = 0, nedenler = [], enBuyukKayma = null, islenen = 0, degisimler = [];
     liste.forEach(function (k, ki) {
       var idx = [];
       out.forEach(function (s, i) { if (secim[i] === ki) idx.push(i); });
@@ -144,6 +144,8 @@
         nedenler.push(null);
         r.kartlar.forEach(function (c, j) { out[idx[j]] = sinirdaKes(c, segs[idx[j]], k, num(o.fps, 0)); });
         rapor.duzeltilen += rr.duzeltilen || 0;
+        if (rr.duzeltilen > 0) degisimler.push({ v: num(rr.degisimOrtancaMs, 0), w: rr.duzeltilen });
+        if (rr.kayma && rr.kayma.uygulandi) rapor.kaymaKaynak++;
         var w = Math.max(1, rr.kelime || idx.length);
         onceTop += (rr.ortalamaOnceMs || 0) * w; sonraTop += (rr.ortalamaSonraMs || 0) * w; olcuSay += w;
         if (rr.kayma && rr.kayma.uygulandi && (!enBuyukKayma || Math.abs(rr.kayma.ms) > Math.abs(enBuyukKayma.ms))) enBuyukKayma = rr.kayma;
@@ -165,8 +167,20 @@
     });
     if (!rapor.kaynak) rapor.atlandi = liste.length ? "kartYok" : "analizYok";
     else if (nedenler.every(function (n) { return n; })) rapor.atlandi = nedenler[0];
+    // bazı kaynaklar doğrulanamadı (gürültü, uyumsuz, kayma…): rapor satırı söyler, ton uyarı olur ("iyilesmedi" sorun değil)
+    else rapor.kismiAtlandi = nedenler.filter(function (n) { return n && n !== "iyilesmedi"; });
+    // değişimin ortancası: kaynakların ortancalarının düzeltilen sayısıyla ağırlıklı ortancası
+    if (degisimler.length) {
+      degisimler.sort(function (x, y) { return x.v - y.v; });
+      var topW = 0, yarim = 0;
+      degisimler.forEach(function (x) { topW += x.w; });
+      for (var di = 0; di < degisimler.length; di++) { yarim += degisimler[di].w; if (yarim >= topW / 2) { rapor.degisimOrtancaMs = Math.round(degisimler[di].v); break; } }
+    }
     if (olcuSay) { rapor.ortalamaOnceMs = Math.round(onceTop / olcuSay); rapor.ortalamaSonraMs = Math.round(sonraTop / olcuSay); }
-    if (enBuyukKayma) rapor.kayma = { ms: enBuyukKayma.ms, guven: enBuyukKayma.guven, uygulandi: true };
+    if (enBuyukKayma) {
+      rapor.kayma = { ms: enBuyukKayma.ms, guven: enBuyukKayma.guven, uygulandi: true };
+      if (isFinite(enBuyukKayma.egim)) rapor.kayma.egim = enBuyukKayma.egim;
+    }
     out.forEach(function (s) { if (s.senkronUyari) rapor.uyariKart++; });
     return { segments: out, rapor: rapor, islenen: islenen };
   }
@@ -202,31 +216,56 @@
     dusukKontrast: "Ses gürültülü ya da müzikli: zamanlara dokunulmadı",
     konusmaYok: "Seste konuşma bulunamadı: zamanlara dokunulmadı",
     uyumsuz: "Altyazı bu sesle eşleşmedi: zamanlara dokunulmadı",
-    iyilesmedi: "Zamanlar zaten sesle uyumlu: düzeltme gerekmedi"
+    iyilesmedi: "Zamanlar zaten sesle uyumlu: düzeltme gerekmedi",
+    kayma: "Altyazı sesten giderek kayıyor ve düzenli değil: zamanlara dokunulmadı",
+    ortusenKlip: "Klipler zamanda üst üste biniyor: senkron doğrulama yapılmadı"
+  };
+  // kısmi atlamada (bazı klipler doğrulanamadı) rapor satırına eklenen kısa neden; captions.js'in toplu iş anahtarları da
+  var KISA = {
+    analizYok: "ses okunamadı",
+    ffmpeg: "ffmpeg bulunamadı",
+    kartYok: "altyazı sesin aralığında değil",
+    dusukKontrast: "ses gürültülü ya da müzikli",
+    konusmaYok: "seste konuşma yok",
+    uyumsuz: "altyazı sesle eşleşmedi",
+    kayma: "altyazı sesten giderek kayıyor",
+    hiz: "klibin hızı değiştirilmiş",
+    ters: "klip ters oynatılıyor"
   };
   function isaretli(n) { return (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(Math.round(n)); }
 
   // ton: "iyi" | "uyari" | "bilgi"
+  /*
+   * "N kelime sese oturtuldu · ortanca değişim Z ms · M kelime emin değil · K klip doğrulanamadı: neden". Önce → sonra
+   * "iyileşme" çifti gösterilmez: yaslamanın ölçebildiği tek uzaklık (en yakın konuşma başlangıcı) yaslamanın kendi hedefidir,
+   * zamanlar kötüleşse bile küçülürdü. r.ekAtlama: captions.js'in sese bakmadan atladığı toplu klipler (KISA anahtarları).
+   */
   function raporMetni(r) {
     r = r || bosRapor();
     var emin = 0;
     (r.eminDegil || []).forEach(function (e) { if (r.kelimeli ? e.tur === "kelime" : true) emin++; });
     var ayrinti = "";
-    if (r.kayma && r.kayma.uygulandi) ayrinti = "Tüm altyazıda " + isaretli(r.kayma.ms) + " ms toplam kayma düzeltildi.";
+    if (r.kayma && r.kayma.uygulandi) {
+      if (isFinite(r.kayma.egim) && r.kayma.egim) ayrinti = "Altyazı sesten giderek kayıyordu: " + isaretli(r.kayma.ms) + " ms'ye varan kayma düzeltildi.";
+      else if (r.kaynak > 1) ayrinti = (r.kaymaKaynak || 1) + " klipte en çok " + isaretli(r.kayma.ms) + " ms toplam kayma düzeltildi.";
+      else ayrinti = "Tüm altyazıda " + isaretli(r.kayma.ms) + " ms toplam kayma düzeltildi.";
+    }
+    var atlananlar = (r.kismiAtlandi || []).concat(r.ekAtlama || []);
     if (r.atlandi) {
       var m = ATLANDI[r.atlandi] || ATLANDI.analizYok;
-      return { metin: m, ayrinti: ayrinti, ton: r.atlandi === "iyilesmedi" ? "iyi" : "uyari" };
+      return { metin: m, ayrinti: ayrinti, ton: r.atlandi === "iyilesmedi" && !atlananlar.length ? "iyi" : "uyari" };
     }
     var parca = [];
     if (r.duzeltilen > 0) {
       parca.push(r.kelimeli ? r.duzeltilen + " kelime sese oturtuldu" : r.duzeltilen + " kart sese oturtuldu");
-      parca.push("ortalama sapma " + Math.round(r.ortalamaOnceMs) + " ms → " + Math.round(r.ortalamaSonraMs) + " ms");
-    } else {
-      parca.push("Zamanlar sesle uyumlu ✓");
-      parca.push("ortalama sapma " + Math.round(r.ortalamaSonraMs) + " ms");
-    }
+      parca.push("ortanca değişim " + Math.round(num(r.degisimOrtancaMs, 0)) + " ms");
+    } else parca.push("Zamanlar sesle uyumlu ✓");
     if (emin > 0) parca.push(r.kelimeli ? emin + " kelime emin değil" : emin + " kart emin değil");
-    return { metin: parca.join(" · "), ayrinti: ayrinti, ton: emin > 0 ? "uyari" : "iyi" };
+    if (atlananlar.length) {
+      var farkli = atlananlar.filter(function (n, i) { return atlananlar.indexOf(n) === i; });
+      parca.push(atlananlar.length + " klip doğrulanamadı: " + (farkli.length === 1 ? (KISA[farkli[0]] || KISA.analizYok) : "farklı nedenler"));
+    }
+    return { metin: parca.join(" · "), ayrinti: ayrinti, ton: emin > 0 || atlananlar.length ? "uyari" : "iyi" };
   }
 
   /* ---------------- Sınırlar ve elle ince ayar ---------------- */
@@ -404,7 +443,7 @@
 
   /*
    * o: {
-   *   belge, kimlikler?: { kok, tuval, tutamaklar, alan, baslik, bos, analiz, dinle, yasla, geri },
+   *   belge, kimlikler?: { kok, tuval, tutamaklar, alan, baslik, bos, analiz, dinle, yasla, geri, ipucu },
    *   segments() -> dizi, secili() -> index, kaynak(seg) -> kaynak | null, fps() -> sayı, ae() -> bool,
    *   degistir(ci, yeniSeg, { ilk, bitti, etiket }), dinle(ci), hepsiniYasla(), geriAl(), geriAlVar() -> bool,
    *   analizEt() (kaynak yokken: seçili klibin sesini analiz eder), analizSuruyor() -> bool,
@@ -419,13 +458,13 @@
     var kok = el("kok", "cap-dalga"), tuval = el("tuval", "cap-dalga-tuval"), tut = el("tutamaklar", "cap-dalga-tutamaklar");
     var alan = el("alan", "cap-dalga-alan"), baslik = el("baslik", "cap-dalga-baslik"), bos = el("bos", "cap-dalga-bos");
     var bDinle = el("dinle", "cap-dalga-dinle"), bYasla = el("yasla", "cap-dalga-yasla"), bGeri = el("geri", "cap-dalga-geri");
-    var bAnaliz = el("analiz", "cap-dalga-analiz");
+    var bAnaliz = el("analiz", "cap-dalga-analiz"), ipucu = el("ipucu", "cap-dalga-ipucu");
     if (!kok || !tuval || !tut) return { ciz: function () {}, gizle: function () {} };
     var analizMetni = bAnaliz ? bAnaliz.textContent : "";
     function iptalEdilebilir() { return !!(o.analizIptalVar && o.analizIptalVar() && o.analizSuruyor && o.analizSuruyor()); }
     var tutamaklar = {};     // id -> öğe (yeniden çizimde korunur: klavye odağı kaybolmasın)
     var durum = { ci: -1, bas: 0, son: 1, gen: 0, sinir: [] };
-    var surukle = null;      // { id, ci, pid }
+    var surukle = null;      // { id (null: üst üste binen tutamaklardan hangisi, ilk harekette seçilir), adaylar, x0, ci, pid, el, t }
     var tusOturum = null;    // { anahtar, zaman }
 
     function xZaman(x) { return durum.bas + (x / Math.max(1, durum.gen)) * (durum.son - durum.bas); }
@@ -438,17 +477,88 @@
       } catch (e) { return yedek; }
     }
 
+    // sınırın kartta şu anki zamanı (tutamağı birleşme yüzünden kalmasa da: sürüklenen "sN" ortak "oN" olmuş olabilir)
+    function sinirZamani(seg, id) {
+      if (!gecerli(seg)) return null;
+      if (id === "kb") return Number(seg.start);
+      if (id === "ks") return Number(seg.end);
+      var m = /^([bso])(\d+)$/.exec(String(id)), w = m && seg.words && seg.words[+m[2]];
+      if (!gecerli(w)) return null;
+      return m[1] === "b" ? Number(w.start) : Number(w.end);
+    }
+    // id'nin tutamağı yeniden çizimde kalktıysa (iki sınır birleşti / ayrıldı) aynı kelime kenarındaki tutamak; yoksa t'ye en yakın
+    function yerineGecen(id, t) {
+      var m = /^([bso])(\d+)$/.exec(String(id || ""));
+      if (m) {
+        var k = +m[2], es = m[1] === "o" ? ["s" + k, "b" + (k + 1)] : m[1] === "s" ? ["o" + k] : ["o" + (k - 1)];
+        for (var j = 0; j < es.length; j++) if (tutamaklar[es[j]]) return es[j];
+      }
+      var en = null, enD = Infinity;
+      durum.sinir.forEach(function (x) {
+        var dd = Math.abs(x.t - num(t, 0)) + (x.tur === "kartBas" || x.tur === "kartSon" ? 1e-3 : 0);
+        if (tutamaklar[x.id] && dd < enD) { enD = dd; en = x.id; }
+      });
+      return en;
+    }
+
     function tasi(id, t, bayrak) {
       var segs = o.segments(), ci = durum.ci;
       var r = sinirTasi(segs, ci, id, t);
       if (!r) return null;
       // sınırda (komşu kart / kelime) kımıldamayan tutamak geri al yığınına boş adım yazmasın
-      var simdiki = null;
-      sinirlar(segs[ci]).forEach(function (x) { if (x.id === id) simdiki = x.t; });
+      var simdiki = sinirZamani(segs[ci], id);
       if (simdiki !== null && Math.abs(simdiki - r.t) < 1e-9) return null;
+      // odaktaki tutamak birleşip kalkarsa (sN sonraki kelimenin başına değdi: ortak oN) odak aynı kenardaki tutamağa
+      // geçer; yoksa <body>'ye düşer ve sonraki ←/→ Premiere'in playhead'ini oynatırdı
+      var odakta = !!(B.activeElement && tutamaklar[id] && tutamaklar[id] === B.activeElement);
       o.degistir(ci, r.seg, bayrak || {});
       ciz();   // tutamaklar yeni zamanlarda (öğeler korunur: odak ve sürükleme sürer)
+      if (odakta && !tutamaklar[id]) {
+        var yeni = yerineGecen(id, r.t);
+        if (yeni && tutamaklar[yeni].focus) tutamaklar[yeni].focus();
+      }
       return r;
+    }
+
+    function isaretciX(e) {
+      var r = alan && alan.getBoundingClientRect ? alan.getBoundingClientRect() : { left: 0 };
+      return Number(e.clientX) - Number(r.left || 0);
+    }
+    /*
+     * Dar şeritte (320 px) komşu tutamaklar 1–2 px aralıkla üst üste biner, üstteki öğe tıklamayı alır: kart girişi ilk
+     * kelimenin başının, son kelimenin sonu kart çıkışının altında kalırdı. İşaretçinin ±6,5 px'inde birden çok sınır varsa
+     * ilk hareketin yönü seçer: dışa (girişte sola, çıkışta sağa) kart sınırı, içe kelime sınırı; başka kümede en yakını.
+     */
+    var KUME_PX = 6.5;
+    function kumedenSec(adaylar, dx, x0) {
+      var ids = adaylar.map(function (x) { return x.id; });
+      var kelime = adaylar.filter(function (x) { return x.tur !== "kartBas" && x.tur !== "kartSon"; });
+      function enYakin(l) {
+        var en = l[0];
+        l.forEach(function (x) { if (Math.abs(zamanX(x.t) - x0) < Math.abs(zamanX(en.t) - x0)) en = x; });
+        return en.id;
+      }
+      if (dx < 0 && ids.indexOf("kb") !== -1) return "kb";
+      if (dx > 0 && ids.indexOf("ks") !== -1) return "ks";
+      if (kelime.length && (ids.indexOf("kb") !== -1 || ids.indexOf("ks") !== -1)) return enYakin(kelime);
+      return enYakin(adaylar);
+    }
+    /*
+     * Sürüklemeyi bitirir (tutamağın kendi pointerup / pointercancel'i, belgenin herhangi bir yerinde bırakma ya da düğmesiz
+     * hareket). Sürüklenen tutamak birleşip kalksa da sürükleme durumu ve "surukleniyor" sınıfı temizlenir, son adım
+     * degistir(bitti) ile bildirilir (liste yenilenir, taslak yazılır); aksi hâlde düğmesiz gezinme sınırları oynatırdı.
+     */
+    function surukleBitir(e) {
+      if (!surukle || (e && e.pointerId !== undefined && surukle.pid !== e.pointerId)) return;
+      var oynadi = surukle.oynadi, ci = surukle.ci, el0 = surukle.el;
+      surukle = null;
+      Object.keys(tutamaklar).forEach(function (k) { if (tutamaklar[k].classList) tutamaklar[k].classList.remove("surukleniyor"); });
+      try { if (e && el0 && el0.releasePointerCapture) el0.releasePointerCapture(e.pointerId); } catch (e1) {}
+      if (oynadi) { var segs = o.segments(); if (segs[ci]) o.degistir(ci, segs[ci], { ilk: false, bitti: true, etiket: "dalga sürükleme" }); }
+    }
+    if (B.addEventListener) {
+      B.addEventListener("pointerup", surukleBitir, true);
+      B.addEventListener("pointercancel", surukleBitir, true);
     }
 
     function tutamakKur(s) {
@@ -458,6 +568,8 @@
         d.setAttribute("role", "slider");
         d.setAttribute("tabindex", "0");
         d.setAttribute("data-sinir", s.id);
+        // ekran okuyucu tuşları da duysun: "←/→ 10 ms, Shift ile 1 kare" ipucu
+        if (ipucu && ipucu.id) d.setAttribute("aria-describedby", ipucu.id);
         d.addEventListener("keydown", function (e) {
           var adim = tusAdimi(e, o.fps());
           var id = d.getAttribute("data-sinir");
@@ -484,32 +596,35 @@
         d.addEventListener("pointerdown", function (e) {
           if (e.button !== undefined && e.button !== 0) return;
           e.preventDefault();
-          surukle = { id: d.getAttribute("data-sinir"), ci: durum.ci, pid: e.pointerId, ilk: true, oynadi: false };
+          var x0 = isaretciX(e), id0 = d.getAttribute("data-sinir");
+          var kume = durum.sinir.filter(function (x) { return Math.abs(zamanX(x.t) - x0) <= KUME_PX; });
+          var tek = kume.length <= 1;
+          surukle = { id: tek ? id0 : null, adaylar: tek ? null : kume, x0: x0, ci: durum.ci, pid: e.pointerId, ilk: true, oynadi: false, el: d, t: null };
           try { if (d.setPointerCapture) d.setPointerCapture(e.pointerId); } catch (e0) {}
           if (d.focus) d.focus();
           d.classList.add("surukleniyor");
         });
         d.addEventListener("pointermove", function (e) {
           if (!surukle || surukle.pid !== e.pointerId || surukle.ci !== durum.ci) return;
-          var r = alan && alan.getBoundingClientRect ? alan.getBoundingClientRect() : { left: 0 };
-          var t = xZaman(Number(e.clientX) - Number(r.left || 0));
-          if (tasi(surukle.id, t, { ilk: surukle.ilk, bitti: false, etiket: "dalga sürükleme" })) { surukle.ilk = false; surukle.oynadi = true; }
+          // düğme bırakılmış (bırakma olayı kaçtı): sürükleme biter, düğmesiz gezinme sınır oynatmaz
+          if (e.buttons === 0) { surukleBitir(e); return; }
+          var x = isaretciX(e);
+          if (surukle.id === null) {
+            if (Math.abs(x - surukle.x0) < 1) return;
+            surukle.id = kumedenSec(surukle.adaylar, x - surukle.x0, surukle.x0);
+            var secilen = tutamaklar[surukle.id];
+            if (secilen && secilen !== d && secilen.focus) secilen.focus();
+          }
+          var r = tasi(surukle.id, xZaman(x), { ilk: surukle.ilk, bitti: false, etiket: "dalga sürükleme" });
+          if (r) { surukle.ilk = false; surukle.oynadi = true; surukle.t = r.t; }
         });
-        function birak(e) {
-          if (!surukle || (e && surukle.pid !== e.pointerId)) return;
-          var oynadi = surukle.oynadi, ci = surukle.ci;
-          surukle = null;
-          d.classList.remove("surukleniyor");
-          try { if (e && d.releasePointerCapture) d.releasePointerCapture(e.pointerId); } catch (e1) {}
-          if (oynadi) { var segs = o.segments(); if (segs[ci]) o.degistir(ci, segs[ci], { ilk: false, bitti: true, etiket: "dalga sürükleme" }); }
-        }
-        d.addEventListener("pointerup", birak);
-        d.addEventListener("pointercancel", birak);
+        d.addEventListener("pointerup", surukleBitir);
+        d.addEventListener("pointercancel", surukleBitir);
         tutamaklar[s.id] = d;
         tut.appendChild(d);
       }
       var seg = o.segments()[durum.ci];
-      d.className = "dalga-tutamak " + (s.tur === "kartBas" || s.tur === "kartSon" ? "kart" : "kelime") + (surukle && surukle.id === s.id ? " surukleniyor" : "");
+      d.className = "dalga-tutamak " + (s.tur === "kartBas" || s.tur === "kartSon" ? "kart" : "kelime") + (surukle && (surukle.id === s.id || (surukle.el === d && !tutamaklar[surukle.id])) ? " surukleniyor" : "");
       d.setAttribute("aria-label", sinirEtiketi(seg, s));
       d.setAttribute("aria-valuemin", String(Math.round(durum.bas * 1000)));
       d.setAttribute("aria-valuemax", String(Math.round(durum.son * 1000)));
@@ -618,7 +733,22 @@
       var kalan = {};
       durum.sinir.forEach(function (s) { kalan[s.id] = true; });
       tutamaklariTemizle(kalan);
-      durum.sinir.forEach(tutamakKur);
+      // tutamaklar zaman sırasında (Sekme sırası Home / End ile aynı): yalnız yeri yanlış (yeni eklenen) öğe taşınır,
+      // odaktaki / sürüklenen öğe yerinden sökülmez
+      durum.sinir.forEach(function (s, i) {
+        var d = tutamakKur(s), kids = tut.children || tut.childNodes, yer = kids ? kids[i] : null;
+        if (yer && yer !== d && tut.insertBefore) tut.insertBefore(d, yer);
+      });
+      // sürüklenen tutamak birleşip kalktıysa işaretçi yakalaması aynı kenardaki tutamağa geçer (sürükleme donmaz)
+      if (surukle && surukle.ci === ci && surukle.id !== null && surukle.el && !Object.keys(tutamaklar).some(function (k) { return tutamaklar[k] === surukle.el; })) {
+        var yeniId = yerineGecen(surukle.id, surukle.t !== null ? surukle.t : sinirZamani(seg, surukle.id)), yeniEl = yeniId ? tutamaklar[yeniId] : null;
+        surukle.el = yeniEl;
+        if (yeniEl) {
+          try { if (yeniEl.setPointerCapture) yeniEl.setPointerCapture(surukle.pid); } catch (e2) {}
+          yeniEl.classList.add("surukleniyor");
+          if (B.activeElement !== yeniEl && yeniEl.focus) yeniEl.focus();
+        }
+      }
       tuvalCiz(seg, kay);
     }
 
@@ -644,6 +774,7 @@
     zamanMetni: zamanMetni,
     sinirEtiketi: sinirEtiketi,
     serit: serit,
-    ATLANDI: ATLANDI
+    ATLANDI: ATLANDI,
+    KISA: KISA
   };
 });

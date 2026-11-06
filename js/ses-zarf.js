@@ -43,7 +43,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var SURUM = 1;            // analiz biçimi: önbellek anahtarına girer
+  var SURUM = 2;            // analiz biçimi: önbellek anahtarına girer (2: yüksek bant ile genişleyen konuşma kenarları)
   var SR = 16000;
   var HOP = 160;            // 10 ms
   var HOP_SN = HOP / SR;
@@ -52,6 +52,10 @@
   var TABAN_DB = -120;
   var BLOK = 250;           // taban bloğu: 2,5 sn
   var GAMMA = 1e7;          // log(1 + γ P): ~-70 dBFS altı bant gücü akıya katılmaz
+  var YB_ALT = 40, YB_UST = 120;   // yüksek bant: 2,5–7,5 kHz (256 noktalı FFT, 62,5 Hz / bin)
+  var YB_PAY = 10;          // yüksek bant kendi tabanının bu kadar dB üstündeyse ses var (sürtünmeli ünsüz)
+  var YB_MAX = 20;          // yüksek bantla kenar genişletme en çok 200 ms
+  var YB_OLCEK = 2 / (N * N * 0.375);   // |X|² toplamı → bant ortalama karesi (tek yan, Hann enerjisi)
   var ZAMAN_SUZGECI = "aresample=async=1:min_hard_comp=0.01:first_pts=0";
 
   function num(v, d) { v = Number(v); return isFinite(v) ? v : d; }
@@ -135,7 +139,7 @@
     var BS = _bant.length - 1;
     var oncekiBant = new Float64Array(BS), bant = new Float64Array(BS);
     var ilk = true;
-    var db = new Float32Array(4096), aki = new Float32Array(4096), n = 0;
+    var db = new Float32Array(4096), aki = new Float32Array(4096), yb = new Float32Array(4096), n = 0;
     var artikBayt = -1;     // Buffer akışında tek kalan bayt
     var ornek = 0;
     var bitti = null;
@@ -157,7 +161,12 @@
       }
       var tmp = oncekiBant; oncekiBant = bant; bant = tmp;
       ilk = false;
-      db = buyut(db, n + 1); aki = buyut(aki, n + 1);
+      var ybt = 0;
+      for (var kb = YB_ALT; kb <= YB_UST; kb++) ybt += guc[kb];
+      ybt *= YB_OLCEK;
+      db = buyut(db, n + 1); aki = buyut(aki, n + 1); yb = buyut(yb, n + 1);
+      var ybv = ybt > 0 ? 10 * Math.log(ybt) / Math.LN10 : TABAN_DB;
+      yb[n] = ybv < TABAN_DB ? TABAN_DB : (ybv > 0 ? 0 : ybv);
       var ort = kt / HOP;
       var v = ort > 0 ? 10 * Math.log(ort) / Math.LN10 : TABAN_DB;
       db[n] = v < TABAN_DB ? TABAN_DB : v;
@@ -219,7 +228,7 @@
           var v = ort > 0 ? 10 * Math.log(ort) / Math.LN10 : TABAN_DB;
           db[n - 1] = v < TABAN_DB ? TABAN_DB : v;
         }
-        bitti = ozetle(db.subarray(0, n), aki.subarray(0, n), o);
+        bitti = ozetle(db.subarray(0, n), aki.subarray(0, n), o, yb.subarray(0, n));
         bitti.ornek = ornek;
         return bitti;
       }
@@ -257,12 +266,42 @@
 
   function guc(dbv) { return Math.pow(10, dbv / 10); }
 
-  function ozetle(db, aki, o) {
+  /*
+   * Uyarlanır taban (dB dizisi için): 2,5 sn'lik bloklarda %10 yüzdelik, 5 komşu blokla ortanca, yakın bloklar
+   * arası doğrusal geçiş; 6 dB'den büyük sıçramada basamak. Döner: Float32Array(n).
+   */
+  function blokTaban(dizi, n) {
+    var bs = Math.max(1, Math.ceil(n / BLOK)), bt = [], b, i;
+    for (b = 0; b < bs; b++) {
+      var ba = b * BLOK, bb = Math.min(n, ba + BLOK);
+      bt.push(histYuzde(histogram(dizi, ba, bb), bb - ba, 0.10));
+    }
+    var bt2 = bt.map(function (v, k) {
+      var u = [];
+      for (var j = k - 2; j <= k + 2; j++) u.push(bt[kirp(j, 0, bs - 1)]);
+      u.sort(function (x, y) { return x - y; });
+      return u[2];
+    });
+    var out = new Float32Array(n);
+    for (i = 0; i < n; i++) {
+      var kb = (i + 0.5) / BLOK - 0.5, k0 = Math.floor(kb), f = kb - k0;
+      var v0 = bt2[kirp(k0, 0, bs - 1)], v1 = bt2[kirp(k0 + 1, 0, bs - 1)];
+      out[i] = Math.abs(v1 - v0) < 6 ? v0 + (v1 - v0) * f : bt2[kirp(Math.floor(i / BLOK), 0, bs - 1)];
+    }
+    return out;
+  }
+
+  /*
+   * yb (isteğe bağlı): pencere başına yüksek bant (2,5–7,5 kHz) düzeyi, dB. Varsa konuşma bölümünün kenarları, geniş
+   * bant eşiğinin altında kalan ama yüksek bantta tabanının YB_PAY dB üstünde süren kısma (en çok 200 ms, komşu bölüme
+   * geçmeden) genişler: müzik yatağı altında s / f / h / t / p / k ile başlayan kelimenin başı ünlüye değil ünsüze düşer.
+   */
+  function ozetle(db, aki, o, yb) {
     o = o || {};
     var n = db.length, i, b;
     var a = {
       surum: SURUM, sr: SR, hop: HOP_SN, n: n, sure: n * HOP_SN, t0: num(o.t0, 0),
-      db: db, aki: aki,
+      db: db, aki: aki, yb: yb && yb.length === n ? yb : null,
       taban: new Float32Array(n), esik: new Float32Array(n), esikK: new Float32Array(n),
       aktif: new Uint8Array(n), aktifTop: new Int32Array(n + 1),
       bolumler: [], onsetler: [], bitisler: [],
@@ -275,21 +314,10 @@
     a.kontrast = a.konusmaDb - a.tabanDb;
 
     // blok tabanları
-    var bs = Math.max(1, Math.ceil(n / BLOK)), bt = [];
-    for (b = 0; b < bs; b++) {
-      var ba = b * BLOK, bb = Math.min(n, ba + BLOK);
-      bt.push(histYuzde(histogram(db, ba, bb), bb - ba, 0.10));
-    }
-    var bt2 = bt.map(function (v, k) {
-      var u = [];
-      for (var j = k - 2; j <= k + 2; j++) u.push(bt[kirp(j, 0, bs - 1)]);
-      u.sort(function (x, y) { return x - y; });
-      return u[2];
-    });
+    var tabanD = blokTaban(db, n);
+    var ybT = a.yb ? blokTaban(a.yb, n) : null;
     for (i = 0; i < n; i++) {
-      var kb = (i + 0.5) / BLOK - 0.5, k0 = Math.floor(kb), f = kb - k0;
-      var v0 = bt2[kirp(k0, 0, bs - 1)], v1 = bt2[kirp(k0 + 1, 0, bs - 1)];
-      var tb = Math.abs(v1 - v0) < 6 ? v0 + (v1 - v0) * f : bt2[kirp(Math.floor(i / BLOK), 0, bs - 1)];
+      var tb = tabanD[i];
       var d = kirp(0.4 * (a.konusmaDb - tb), 6, 15);
       a.taban[i] = tb;
       a.esik[i] = tb + d;
@@ -312,11 +340,24 @@
       else bl.push([s[0], s[1]]);
     });
     bl = bl.filter(function (s) { return s[1] - s[0] >= 3; });
-    // aktif'i başlangıç eşiğinin altına inen kenar pencerelerine doğru genişlet (alt-pencere sınırı için)
-    bl.forEach(function (s) {
+    // aktif'i başlangıç eşiğinin altına inen kenar pencerelerine doğru genişlet (alt-pencere sınırı için); sonra yüksek
+    // bantta tabanının üstünde süren kenar (müzik / gürültü yatağının örttüğü sürtünmeli ünsüz) — komşu bölüme geçmez
+    var ybd = a.yb;
+    bl.forEach(function (s, si) {
       var x0 = s[0], x1 = s[1];
       while (x0 > 0 && db[x0 - 1] >= a.esikK[x0 - 1]) x0--;
       while (x1 < n && db[x1] >= a.esikK[x1]) x1++;
+      if (ybd) {
+        var alt = si > 0 ? bl[si - 1][1] : 0, ust = si + 1 < bl.length ? bl[si + 1][0] : n;
+        var g0 = x0, g1 = x1, lim0 = Math.max(alt, x0 - YB_MAX), lim1 = Math.min(ust, x1 + YB_MAX);
+        while (x0 > lim0 && ybd[x0 - 1] >= ybT[x0 - 1] + YB_PAY) x0--;
+        while (x1 < lim1 && ybd[x1] >= ybT[x1] + YB_PAY) x1++;
+        // tek pencerelik yüksek bant tıkırtıdır (sert kesilen sesin sıçraması; akı penceresi önceki karenin 96 örneğini
+        // de görür): en az iki pencere sürmeyen genişleme yok sayılır
+        if (g0 - x0 < 2) x0 = g0;
+        if (x1 - g1 < 2) x1 = g1;
+        s.ybBas = x0 < g0; s.ybSon = x1 > g1;
+      }
       s[0] = x0; s[1] = x1;
       for (var j = x0; j < x1; j++) a.aktif[j] = 1;
     });
@@ -326,7 +367,8 @@
     // bölümler ve kesin (g = 1) sınırlar
     var onset = [], bitis = [];
     bl.forEach(function (s) {
-      var tb = basSiniri(a, s[0]), ts = sonSiniri(a, s[1] - 1);
+      var tb = s.ybBas ? basSiniri(a, s[0], ybd, ybT) : basSiniri(a, s[0]);
+      var ts = s.ybSon ? sonSiniri(a, s[1] - 1, ybd, ybT) : sonSiniri(a, s[1] - 1);
       if (!(ts > tb)) { tb = s[0] * HOP_SN; ts = s[1] * HOP_SN; }
       a.bolumler.push({ bas: ms(tb), son: ms(ts) });
       onset.push({ t: ms(tb), g: 1, k: s[0] });
@@ -390,9 +432,10 @@
    * Konuşmanın başladığı pencere k: kısmen dolu olabilir. Taban üstü gücün bir sonraki (dolu) pencereye
    * oranı sesin k penceresinin ne kadarını kapladığını verir: başlangıç = (k + 1 − oran) × 10 ms.
    */
-  function basSiniri(a, k) {
-    var db = a.db, n = a.n;
-    var Pn = guc(a.taban[k]);
+  // dizi / taban: verilmezse geniş bant (a.db / a.taban); yüksek bantla genişlemiş kenarda yüksek bant
+  function basSiniri(a, k, dizi, taban) {
+    var db = dizi || a.db, n = a.n;
+    var Pn = guc((taban || a.taban)[k]);
     var Pk = guc(db[k]) - Pn;
     var Pd = k + 1 < n ? guc(db[k + 1]) - Pn : Pk;
     if (k + 2 < n) Pd = Math.max(Pd, Math.min(Pd * 1.5, guc(db[k + 2]) - Pn));
@@ -400,9 +443,9 @@
     return (k + 1 - oran) * HOP_SN;
   }
   // Konuşmanın son penceresi k: bitiş = (k + oran) × 10 ms (oran k'nın bir önceki dolu pencereye göre gücü)
-  function sonSiniri(a, k) {
-    var db = a.db;
-    var Pn = guc(a.taban[k]);
+  function sonSiniri(a, k, dizi, taban) {
+    var db = dizi || a.db;
+    var Pn = guc((taban || a.taban)[k]);
     var Pk = guc(db[k]) - Pn;
     var Pd = k > 0 ? guc(db[k - 1]) - Pn : Pk;
     if (k > 1) Pd = Math.max(Pd, Math.min(Pd * 1.5, guc(db[k - 2]) - Pn));
