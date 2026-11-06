@@ -97,6 +97,10 @@ window.KCaptions = (function () {
   var senkronSerit = null;
   var senkronAnalizde = false;
   var senkronRenderSaat = null;
+  // son analizin başarısızlık nedeni (ses-zarf.js: "ffmpeg" | "kopru" | "kod …" | "ses yok"); rapor ffmpeg yoksa bunu söyler
+  var senkronSonNeden = "";
+  // Caption Editor'daki "Seçili klibin sesini analiz et"in iptal jetonu (analiz sürerken düğme İptal olur)
+  var senkronAnalizIptal = null;
   var senkronDinleSaat = null;
   var lastCorrection = null;
 
@@ -3293,6 +3297,8 @@ window.KCaptions = (function () {
     // senkron doğrulama (Gelişmiş ayarlar, varsayılan açık); rehberin hazır örnek klibi hariç
     var senkronIste = !ornek && senkronDogrulaAcik();
     var senkronSesler = [], senkronAtlama = "";
+    // tek klibin transkripti önbelleğe yazıldıysa sese yaslanmış kelime zamanları da oraya eklenir (gövde v3)
+    var onbYazildi = false, onbMeta = null;
     // önceki belgenin raporu yeni iş sürerken görünmesin (iş başarısız olursa belge kalır; girdisi ve Ctrl+Z'si de)
     if (el("cap-senkron-rapor")) el("cap-senkron-rapor").hidden = true;
     busy = true;
@@ -3473,12 +3479,14 @@ window.KCaptions = (function () {
             // senkron doğrulama: klibin geçici sesi (finally siler) şimdi analiz edilir. Hızı değişmiş klipte ses ekseni
             // timeline'a doğrusal oturmaz: atlanır. İptal burada kalan klipleri de durdurur (toplu işin İptal'i gibi).
             if (senkronIste) {
-              if (Math.abs(bf - 1) < 0.002) {
+              var bEngel = senkronHizEngeli(bc, bf);
+              if (!bEngel) {
                 status(tag + "ses dalgası analiz ediliyor…");
-                var bKay = await senkronSesiAnaliz(ba, bc.clipStart, bc.dur, { media: bc.mediaPath, inPoint: bc.inPoint, dur: bc.dur });
+                var bKay = await senkronSesiAnaliz(ba, bc.clipStart, bc.dur, { media: bc.mediaPath, inPoint: bc.inPoint, dur: bc.dur }, tag + "ses dalgası analiz ediliyor…");
                 iptalDenetle();
                 if (bKay) senkronSesler.push(bKay);
-              } else senkronAtlama = SENKRON_HIZ;
+                else if (senkronSonNeden === "ffmpeg") senkronAtlama = SUI.ATLANDI.ffmpeg;
+              } else senkronAtlama = bEngel;
             }
           } catch (eB) {
             if (eB && eB.iptal) throw eB;   // İptal: kalan klipler işlenmez, yarım sonuç uygulanmaz
@@ -3514,7 +3522,7 @@ window.KCaptions = (function () {
          */
         // Çevrimdışı İngilizce transkript önbelleğe yazılmaz: anahtar kaynak dili taşır, Konuşmadan kes
         // İngilizce kelimeleri kaynak dil sanırdı
-        var onbMeta = (!ornek && !cevirEn && scope === "clip" && clip) ? onbellekMeta(clip, el("cap-lang").value || "auto", "altyazi") : null;
+        onbMeta = (!ornek && !cevirEn && scope === "clip" && clip) ? onbellekMeta(clip, el("cap-lang").value || "auto", "altyazi") : null;
         var rotaSecenek = motorSecenek || {};
         rotaSecenek.cevir = cevirEn;
         rotaSecenek.dtw = dtwIste;
@@ -3524,7 +3532,7 @@ window.KCaptions = (function () {
         var kelimeZamanli = karaoke || WW.kelimeVar(raw);
         if (onbMeta && rotaSecenek.motor) onbMeta.engine = rotaSecenek.motor;   // gerçekten yazan rota
         if (onbMeta && kelimeZamanli && rotaSecenek.motor && raw.length && transcriptCache()) {
-          transcriptCache().put(onbMeta, { segments: raw, lang: algilananDil || el("cap-lang").value || "" });
+          onbYazildi = transcriptCache().put(onbMeta, { segments: raw, lang: algilananDil || el("cap-lang").value || "" }) === true;
         }
 
         // satırlar ve ölçülmüş kelimeleri aynı eşlemeyle (klip başı + hız) sekans zamanına
@@ -3595,15 +3603,20 @@ window.KCaptions = (function () {
        */
       if (senkronIste) {
         if (!batchClips && audioSrc) {
-          if (Math.abs(speedFactor - 1) < 0.002) {
+          // sekans / In-Out kapsamında ses karışımdır (iç içe sekanslar dahil): klibin hızına bakılmaz
+          var tekEngel = senkronHizEngeli(scope === "clip" ? clip : null, speedFactor);
+          if (!tekEngel) {
             status("Ses dalgasıyla senkron doğrulanıyor…");
             var tekKay = await senkronSesiAnaliz(audioSrc, Number(seqOffset) || 0, durHint,
-              scope === "clip" && clip ? { media: clip.mediaPath, inPoint: clip.inPoint, dur: clip.dur } : null);
+              scope === "clip" && clip ? { media: clip.mediaPath, inPoint: clip.inPoint, dur: clip.dur } : null, "Ses dalgasıyla senkron doğrulanıyor…");
             if (tekKay) senkronSesler.push(tekKay);
+            else if (senkronSonNeden === "ffmpeg") senkronAtlama = SUI.ATLANDI.ffmpeg;
             status("");
-          } else senkronAtlama = SENKRON_HIZ;
+          } else senkronAtlama = tekEngel;
         }
+        var yaslamaOncesi = segments;
         senkronIsSonu(senkronSesler, senkronAtlama);
+        if (onbYazildi) senkronOnbellegeYaz(onbMeta, yaslamaOncesi, Number(seqOffset) || 0);
       }
       el("cap-result").hidden = false;
       el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
@@ -3643,6 +3656,21 @@ window.KCaptions = (function () {
   /* ---------------- Senkron doğrulama (ses dalgası) ---------------- */
 
   var SENKRON_HIZ = "Hızı değiştirilmiş klipte senkron doğrulama yapılmadı";
+  var SENKRON_TERS = "Ters oynatılan klipte senkron doğrulama yapılmadı";
+  var SENKRON_IC_SEKANS = "İç içe sekans klibinin sesi doğrudan okunamıyor: altyazıyı Sekans kapsamında oluştur, dışa aktarılan karışım sese yaslanır.";
+  /*
+   * Klibin ses ekseni timeline'a doğrusal (1:1) oturmuyorsa senkron doğrulama yapılmaz, nedeni döner ("" = engel yok):
+   * ters oynatma (host isSpeedReversed), Premiere'in bildirdiği hız (getSpeed) ya da timeline / kaynak süre oranı
+   * (zaman yeniden eşleme ve hız / süre değişikliği bunu bozar). Alanları olmayan eski host yanıtında yalnız oran.
+   */
+  function senkronHizEngeli(c, oran) {
+    if (c && c.reversed === true) return SENKRON_TERS;
+    var hz = c ? Number(c.speed) : NaN;
+    if (isFinite(hz) && hz > 0 && Math.abs(hz - 1) > 0.002) return SENKRON_HIZ;
+    var r = Number(oran);
+    if (isFinite(r) && r > 0 && Math.abs(r - 1) >= 0.002) return SENKRON_HIZ;
+    return "";
+  }
   function senkronDogrulaAcik() {
     try { return K.settings().senkronDogrula !== false; } catch (e) { return true; }
   }
@@ -3694,12 +3722,15 @@ window.KCaptions = (function () {
    * ffmpeg yok, okuma hatası ya da İptal → null. ozgun: { media, inPoint, dur } — analiz o klibin anahtarıyla da
    * önbelleğe girer, şeridin "analiz et"i aynı klipte ffmpeg'i yeniden çalıştırmaz.
    */
-  async function senkronSesiAnaliz(yol, t0, sure, ozgun) {
+  // durumMetni: uzun seste ilerleme ("… %42") durum satırına; verilmezse sessiz
+  async function senkronSesiAnaliz(yol, t0, sure, ozgun, durumMetni) {
+    senkronSonNeden = "";
     if (!SZ || !SUI || !yol) return null;
     try {
-      var r = await SZ.sesZarfiCikar({ K: K, media: yol, inPoint: 0, dur: Number(sure) || 0, iptal: aktifIptal, onbellek: false });
+      var ilerle = typeof durumMetni === "string" && durumMetni ? function (oran) { status(durumMetni + " %" + Math.round(oran * 100)); } : null;
+      var r = await SZ.sesZarfiCikar({ K: K, media: yol, inPoint: 0, dur: Number(sure) || 0, iptal: aktifIptal, onbellek: false, onIlerleme: ilerle });
       if (!r || r.iptal || !r.analiz) {
-        if (r && r.neden) K.log("[senkron] ses analizi yok: " + r.neden);
+        if (r && r.neden) { senkronSonNeden = String(r.neden); K.log("[senkron] ses analizi yok: " + r.neden); }
         return null;
       }
       if (ozgun && ozgun.media && SZ.anahtar && SZ.onbellek) {
@@ -3724,6 +3755,20 @@ window.KCaptions = (function () {
       return;
     }
     senkronUygula("sese yaslama");
+  }
+  /*
+   * Transkript önbelleği (gövde v3): motorun zamanı kalır, kelimelere sese yaslanmış zaman eklenir; Konuşmadan kes gibi
+   * önbellekten okuyan araçlar da kelimeleri sesin gerçek sınırından keser. Yaslama yapılmadıysa (aynı belge) yazılmaz.
+   * ofs: klibin timeline başı (kaynak zamanı = sekans zamanı − ofs; hızı değişmiş klipte doğrulama zaten yapılmaz).
+   */
+  function senkronOnbellegeYaz(meta, once, ofs) {
+    try {
+      var c = transcriptCache();
+      if (!c || !c.senkronYaz || !meta || !SUI || !SUI.eslesmeCikar || once === segments) return -1;
+      var n = c.senkronYaz(meta, SUI.eslesmeCikar(once, segments, ofs));
+      if (n > 0) K.log("[senkron] önbellek: " + n + " kelimenin sese yaslanmış zamanı yazıldı");
+      return n;
+    } catch (e) { return -1; }
   }
   /*
    * Belgenin bütün kartlarını sesine yaslar (tek geri al adımı). Değişiklik yoksa anlık görüntü alınmaz.
@@ -3791,15 +3836,21 @@ window.KCaptions = (function () {
   async function senkronSecilenKlibiAnaliz() {
     if (senkronAnalizde || busy || !SZ || !SUI) return null;
     senkronAnalizde = true;
+    var belge = senkronBelgeNo, yuzdeYazildi = false;
+    // uzun klip: şeritteki düğme analiz sürerken İptal olur (js/senkron-ui.js), durum satırı yüzdeyi gösterir
+    senkronAnalizIptal = K.iptalJetonu ? K.iptalJetonu() : null;
     if (senkronSerit) senkronSerit.ciz();
-    var belge = senkronBelgeNo;
     try {
       var sc = await K.call("KS_getSelectedClips");
       var c = sc && sc.ok && sc.clips && sc.clips[0];
+      if (!c && sc && sc.ok && Number(sc.nested) > 0) { KApp.toast(SENKRON_IC_SEKANS, "warn", 9000); return null; }
       if (!c || !c.mediaPath) { KApp.toast("Önce timeline'da altyazının ait olduğu klibi seç.", "warn"); return null; }
       var tl = Number(c.clipEnd) - Number(c.clipStart);
-      if (Number(c.dur) > 0 && tl > 0 && Math.abs(tl / Number(c.dur) - 1) > 0.002) { KApp.toast(SENKRON_HIZ + ".", "warn"); return null; }
-      var r = await SZ.sesZarfiCikar({ K: K, media: c.mediaPath, inPoint: Number(c.inPoint) || 0, dur: Number(c.dur) || 0 });
+      var engel = senkronHizEngeli(c, Number(c.dur) > 0 && tl > 0 ? tl / Number(c.dur) : 1);
+      if (engel) { KApp.toast(engel + ".", "warn"); return null; }
+      var r = await SZ.sesZarfiCikar({ K: K, media: c.mediaPath, inPoint: Number(c.inPoint) || 0, dur: Number(c.dur) || 0,
+        iptal: senkronAnalizIptal || undefined, onIlerleme: function (oran) { yuzdeYazildi = true; status("Ses dalgası analiz ediliyor… %" + Math.round(oran * 100)); } });
+      if (r && r.iptal) { KApp.toast("Ses dalgası analizi iptal edildi.", "warn"); return null; }
       if (!r || !r.analiz) {
         if (r && r.neden) K.log("[senkron] klip sesi okunamadı: " + r.neden);
         KApp.toast(r && r.neden === "ffmpeg" ? "Ses dalgası için ffmpeg gerekli: Ayarlar › ffmpeg." : "Klibin sesi okunamadı.", "bad");
@@ -3815,9 +3866,12 @@ window.KCaptions = (function () {
       return null;
     } finally {
       senkronAnalizde = false;
+      senkronAnalizIptal = null;
+      if (yuzdeYazildi) status("");
       if (senkronSerit) senkronSerit.ciz();
     }
   }
+  function senkronAnaliziIptalEt() { if (senkronAnalizIptal && senkronAnalizIptal.iptal) senkronAnalizIptal.iptal(); }
   // Şeritte sınır taşındı: ilk adımda anlık görüntü (tek Ctrl+Z bütün sürüklemeyi / tuş dizisini geri alır)
   function senkronSinirDegisti(ci, seg, b) {
     if (!segments[ci]) return;
@@ -3860,6 +3914,8 @@ window.KCaptions = (function () {
       geriAlVar: function () { return undoStack.length > 0; },
       analizEt: senkronSecilenKlibiAnaliz,
       analizSuruyor: function () { return senkronAnalizde || busy; },
+      analizIptal: senkronAnaliziIptalEt,
+      analizIptalVar: function () { return !!senkronAnalizIptal; },
       // tutamak odaktayken oklar / Home / End Premiere'e gitmesin (tüm ilgiler js/arac-ara.js'te birleşir)
       tusTut: function (tut) {
         var AA = window.SufloAracAra;
@@ -5342,7 +5398,15 @@ window.KCaptions = (function () {
       out.push(cue);
     });
     // "Emojileri bu katmanda atla": yalnız o render boyunca (overlayUygula), transkript değişmez
-    return emojisizCikti ? CT.emojisizCueler(out) : out;
+    if (emojisizCikti) out = CT.emojisizCueler(out);
+    // stilli katmanın klasik ASS yolu (buildAss): render boyunca zamanlar katmanın karesine oturur
+    return katmanKareHizi > 0 ? katmanCueleri(out, katmanKareHizi, 0) : out;
+  }
+  var katmanKareHizi = 0;
+  // libass karesine tam oturan kopya (js/overlay-render.js kareZamanlari); modül yoksa aynen
+  function katmanCueleri(cs, fps, ofs) {
+    var R = window.SufloOverlayRender;
+    return R && R.kareZamanlari ? R.kareZamanlari(cs, fps, ofs) : cs;
   }
 
   /*
@@ -6933,7 +6997,8 @@ window.KCaptions = (function () {
           styleId: st.aile,
           intensity: st.yogunluk,
           cueKind: motorCueTuru(),
-          cues: cueler({ vurgu: true, kelimeler: true }),
+          // kareye tam oturan zamanlar (senkron doğrulamanın karesi katmanda da aynı karede açılır; overlay-render.js)
+          cues: katmanCueleri(cueler({ vurgu: true, kelimeler: true }), fps, baslangic),
           offset: baslangic,
           width: g,
           height: y,
@@ -6945,8 +7010,12 @@ window.KCaptions = (function () {
       } else {
         // Eski kayitli ozel sablonlar yalnız geriye donuk uyumluluk icin kalir.
         var karaoke = segmentsMode === "k1";
-        ass = buildAssKaydirilmis(baslangic,
-          { karaoke: karaoke, animasyon: st.animasyon, genislik: g, yukseklik: y });
+        // buildAss cueler() okur: zamanlar o render boyunca katmanın karesine oturur (kaydırılmış eksende, ofs 0)
+        katmanKareHizi = fps;
+        try {
+          ass = buildAssKaydirilmis(baslangic,
+            { karaoke: karaoke, animasyon: st.animasyon, genislik: g, yukseklik: y });
+        } finally { katmanKareHizi = 0; }
       }
       emojisizCikti = false;
 

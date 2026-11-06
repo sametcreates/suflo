@@ -72,7 +72,7 @@ function ortam(o) {
     SufloStyleEngine: { compile: function () { return { id: "efekt", ass: "[Script Info]\nPlayResX: 1280\n[Events]\nDialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Merhaba\n", fontFiles: [] }; } }
   };
   var kod = [
-    "var EFEKT = 'efekt', segments = [{ start: 0, end: 1, text: 'Merhaba' }], secilenMogrt = null, emojiAtlaBirKez = false, emojisizCikti = false, scope = 'entire', FONTLAR = {};",
+    "var EFEKT = 'efekt', segments = [{ start: 0, end: 1, text: 'Merhaba' }], secilenMogrt = null, emojiAtlaBirKez = false, emojisizCikti = false, katmanKareHizi = 0, scope = 'entire', FONTLAR = {};",
     "function status(m, c) { kayit.durum.push([m, c || '']); } function uygulaEtiketiniSifirla() {} function emojiAtlaDugmesi() {} function emojiIceriyorMu() { return false; }",
     "function yerelCiktiSecili() { return false; } function mogrtStiliniUygula() {} function yerelAltyaziUygula() { return false; }",
     "function cueler() { return [{ start: 0, end: 1, text: 'Merhaba' }]; } function stil() { return { aile: 'efekt', yogunluk: 'balanced' }; }",
@@ -81,7 +81,7 @@ function ortam(o) {
     "function yildizIste() {} function uygulamaIpucunuGuncelle() { kayit.ipucu++; el('cap-apply-style').disabled = !!(katmanIptal || katmanHazirlaniyor); }",
     "var CT = { logoKatmanKalan: function () { return 0; }, katmanSuresi: function () { return 3; } };",
     cap.slice(cap.indexOf("  var katmanIptal = null;"), cap.indexOf("  function uygulaEtiketiniSifirla(")),
-    govde("async function overlayUygula("),
+    govde("async function overlayUygula("), govde("function katmanCueleri("),
     "return { overlayUygula: overlayUygula, iptalEt: katmanIptalEt, calisiyor: function () { return !!katmanIptal; } };"
   ].join("\n");
   var api = new Function("K", "KApp", "Pro", "window", "el", "kayit", "KOK", kod)(K,

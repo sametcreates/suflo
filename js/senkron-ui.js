@@ -171,10 +171,33 @@
     return { segments: out, rapor: rapor, islenen: islenen };
   }
 
+  /*
+   * Transkript önbelleği (js/transcript-cache.js senkronYaz) için kelime eşleşmesi: yaslamadan önceki ve sonraki belge
+   * (hepsiniYasla kartları ve kelimeleri birebir korur) → [{ start, end, rs, re }] (ofs çıkarılmış: klibin kaynak
+   * zamanı = sekans zamanı − klibin timeline başı). Kelimesiz kart kendisi bir kelime sayılır. Yapı tutmazsa (kart ya
+   * da kelime sayısı farklı) boş liste: önbelleğe yanlış eşleşme yazılmaz.
+   */
+  function eslesmeCikar(once, sonra, ofs) {
+    var o = num(ofs, 0), out = [];
+    if (!once || !sonra || once.length !== sonra.length) return [];
+    for (var i = 0; i < once.length; i++) {
+      var a = once[i], b = sonra[i];
+      if (!a || !b) return [];
+      var wa = a.words && a.words.length ? a.words : [a], wb = b.words && b.words.length ? b.words : [b];
+      if (wa.length !== wb.length) return [];
+      for (var j = 0; j < wa.length; j++) {
+        if (!gecerli(wa[j]) || !gecerli(wb[j])) continue;
+        out.push({ start: ms3(Number(wa[j].start) - o), end: ms3(Number(wa[j].end) - o), rs: ms3(Number(wb[j].start) - o), re: ms3(Number(wb[j].end) - o) });
+      }
+    }
+    return out;
+  }
+
   /* ---------------- Rapor metni ---------------- */
 
   var ATLANDI = {
     analizYok: "Senkron doğrulanamadı: ses okunamadı",
+    ffmpeg: "Senkron doğrulanamadı: ffmpeg bulunamadı (altyazı motorun zamanlarıyla)",
     kartYok: "Senkron doğrulanamadı: altyazı bu sesin aralığında değil",
     dusukKontrast: "Ses gürültülü ya da müzikli: zamanlara dokunulmadı",
     konusmaYok: "Seste konuşma bulunamadı: zamanlara dokunulmadı",
@@ -385,6 +408,7 @@
    *   segments() -> dizi, secili() -> index, kaynak(seg) -> kaynak | null, fps() -> sayı, ae() -> bool,
    *   degistir(ci, yeniSeg, { ilk, bitti, etiket }), dinle(ci), hepsiniYasla(), geriAl(), geriAlVar() -> bool,
    *   analizEt() (kaynak yokken: seçili klibin sesini analiz eder), analizSuruyor() -> bool,
+   *   analizIptal()?, analizIptalVar()? -> bool (uzun klipte analiz sürerken aynı düğme "İptal" olur),
    *   tusTut(bool) (tutamak odak alınca / bırakınca: tuş ilgisi)
    * }
    */
@@ -397,6 +421,8 @@
     var bDinle = el("dinle", "cap-dalga-dinle"), bYasla = el("yasla", "cap-dalga-yasla"), bGeri = el("geri", "cap-dalga-geri");
     var bAnaliz = el("analiz", "cap-dalga-analiz");
     if (!kok || !tuval || !tut) return { ciz: function () {}, gizle: function () {} };
+    var analizMetni = bAnaliz ? bAnaliz.textContent : "";
+    function iptalEdilebilir() { return !!(o.analizIptalVar && o.analizIptalVar() && o.analizSuruyor && o.analizSuruyor()); }
     var tutamaklar = {};     // id -> öğe (yeniden çizimde korunur: klavye odağı kaybolmasın)
     var durum = { ci: -1, bas: 0, son: 1, gen: 0, sinir: [] };
     var surukle = null;      // { id, ci, pid }
@@ -573,7 +599,12 @@
       if (baslik) baslik.textContent = "Ses dalgası · #" + (ci + 1);
       if (!kay) {
         if (bos) bos.hidden = false;
-        if (bAnaliz) bAnaliz.disabled = !!(o.analizSuruyor && o.analizSuruyor());
+        if (bAnaliz) {
+          // analiz sürerken (iptal edilebiliyorsa) düğme İptal olur: uzun klibin analizi beklenmek zorunda değil
+          var ip = iptalEdilebilir();
+          bAnaliz.disabled = !ip && !!(o.analizSuruyor && o.analizSuruyor());
+          bAnaliz.textContent = ip ? "İptal" : analizMetni;
+        }
         if (alan) alan.hidden = true;
         tutamaklariTemizle(null);
         return;
@@ -594,7 +625,7 @@
     if (bDinle) bDinle.addEventListener("click", function () { if (durum.ci >= 0) o.dinle(durum.ci); });
     if (bYasla) bYasla.addEventListener("click", function () { o.hepsiniYasla(); });
     if (bGeri) bGeri.addEventListener("click", function () { o.geriAl(); });
-    if (bAnaliz) bAnaliz.addEventListener("click", function () { o.analizEt(); });
+    if (bAnaliz) bAnaliz.addEventListener("click", function () { if (iptalEdilebilir()) o.analizIptal(); else o.analizEt(); });
     return { ciz: ciz, gizle: gizle, _durum: durum, _tutamaklar: tutamaklar };
   }
 
@@ -602,6 +633,7 @@
     kaynak: kaynak,
     kaynakBul: kaynakBul,
     hepsiniYasla: hepsiniYasla,
+    eslesmeCikar: eslesmeCikar,
     raporMetni: raporMetni,
     sinirlar: sinirlar,
     sinirTasi: sinirTasi,

@@ -155,7 +155,7 @@ function capOrtam(o) {
     window: { SufloAutoEmoji: AE, SufloKufurMaske: null, SufloStyleEngine: o.motor || null }
   };
   var kod = [
-    "var segments = SEG, emojiAtlaBirKez = false, emojisizCikti = false, secilenMogrt = null, scope = 'clip', segmentsMode = 'plain', katmanIptal = null, katmanHazirlaniyor = false;",
+    "var segments = SEG, emojiAtlaBirKez = false, emojisizCikti = false, katmanKareHizi = 0, secilenMogrt = null, scope = 'clip', segmentsMode = 'plain', katmanIptal = null, katmanHazirlaniyor = false;",
     "function uygulamaIpucunuGuncelle() {}", govde(cap, "function uygulaDurumu("),
     "var ceviriDili = '', algilananDil = 'tr';",
     "function ceviriVar() { return false; } function cevrimdisiEn() { return false; } function arayuzDili() { return 'tr'; }",
@@ -170,7 +170,7 @@ function capOrtam(o) {
     govde(cap, "function otomatikEmojiSecenekleri("), govde(cap, "function otomatikEmojiAyarlariniBagla("),
     govde(cap, "function otomatikEmoji("), govde(cap, "function dolgulariCikar("),
     govde(cap, "function emojiAtlaDugmesi("), govde(cap, "function emojileriAtlaVeUygula("), govde(cap, "function emojiIceriyorMu("),
-    govde(cap, "async function overlayUygula("), govde(cap, "function satirlariTopla("), govde(cap, "function cueler("),
+    govde(cap, "async function overlayUygula("), govde(cap, "function katmanCueleri("), govde(cap, "function satirlariTopla("), govde(cap, "function cueler("),
     govde(cap, "function kufurMaskesiAcik("), govde(cap, "function kufurMaskele("),
     "return { otomatikEmoji: otomatikEmoji, bagla: otomatikEmojiAyarlariniBagla, dolgulariCikar: dolgulariCikar, overlayUygula: overlayUygula,",
     "  emojileriAtlaVeUygula: emojileriAtlaVeUygula, seg: function () { return segments; }, durum: function () { return { atla: emojiAtlaBirKez, emojisiz: emojisizCikti }; } };"

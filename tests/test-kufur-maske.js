@@ -39,7 +39,7 @@ var src = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8
 function kes(imza) { var i = src.indexOf(imza); if (i === -1) throw new Error("yok: " + imza); return src.slice(i, src.indexOf("\n  }\n", i) + 4); }
 function ortam(ayar, seg) {
   return new Function("SEG", "CT", "CL", "AYAR", "KM", [
-    "var segments = SEG, emojisizCikti = false;",
+    "var segments = SEG, emojisizCikti = false, katmanKareHizi = 0;",
     "var K = { settings: function () { return AYAR; } }, window = { SufloKufurMaske: KM };",
     "function styleText(t) { return t; }",
     kes("function satirlariTopla("), kes("function cueler("), kes("function kufurMaskesiAcik("), kes("function kufurMaskele("),

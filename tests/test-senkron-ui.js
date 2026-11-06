@@ -481,7 +481,8 @@ function ortamKur(o) {
   var iTek = goG.indexOf("senkronSesiAnaliz(audioSrc"), iSon = goG.indexOf("senkronIsSonu(senkronSesler"), iEtiket = goG.indexOf("uygulaEtiketiniSifirla();  // yeni transkript");
   var iSonuc = goG.indexOf('el("cap-result").hidden = false;', iEtiket), iFinally = goG.indexOf("} finally {\n      tempFiles.forEach");
   ok("go(): doğrulama yeni belge kurulduktan (bayraklar, geri al) sonra, editör açılmadan ve geçici ses silinmeden önce", iEtiket > 0 && iTek > iEtiket && iSon > iTek && iSonuc > iSon && iFinally > iSonuc);
-  ok("go(): rehberin örneği hariç, ayara bağlı; hızı değişmiş klipte atlanır", /var senkronIste = !ornek && senkronDogrulaAcik\(\);/.test(goG) && (goG.match(/Math\.abs\((speedFactor|bf) - 1\) < 0\.002/g) || []).length === 2);
+  ok("go(): rehberin örneği hariç, ayara bağlı; hızı değişmiş klipte atlanır", /var senkronIste = !ornek && senkronDogrulaAcik\(\);/.test(goG) && /senkronHizEngeli\(bc, bf\)/.test(goG) &&
+    /senkronHizEngeli\(scope === "clip" \? clip : null, speedFactor\)/.test(goG));
   var iTopluAnaliz = goG.indexOf("senkronSesiAnaliz(ba,"), iTopluSil = goG.indexOf("if (ba) { try { K.fs.unlinkSync(ba)");
   ok("go(): toplu klipte her klibin sesi silinmeden analiz edilir", iTopluAnaliz > 0 && iTopluSil > iTopluAnaliz);
   ok("render(): uyarı işareti düğme (çevrilir, odaklanır), şerit her yenilemede çizilir; satır seçimi şeridi günceller",

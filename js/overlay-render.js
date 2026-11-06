@@ -93,6 +93,50 @@
     return f > 0 && f <= 1000 && isFinite(f) ? f : 25;
   }
 
+  /*
+   * Kareye tam oturan cue zamanları (senkron doğrulamanın kareye yuvarlanmış zamanları katmanda da aynı karede başlasın).
+   * ffmpeg'in altyazı süzgeci karenin zamanını ms'ye KESİP (floor) libass'e verir, ASS ise santisaniye taşır: 29,97 /
+   * 59,94 / 23,976 fps'te kare zamanı (1,0677 sn) santisaniyeye yuvarlanınca (1,07) olay karenin ARDINDAN başlıyor, cue
+   * bir kare geç açılıp bir kare geç kapanıyordu. Burada her zaman katman ızgarasının en yakın karesine oturur (ofs:
+   * katmanın timeline başı; 0 = katman zamanı) ve LIBASS_PAY kadar öne alınır: santisaniyeye yuvarlanan değer o karenin
+   * ms'sini geçmez, bir önceki karenin ms'sine de inmez (100 fps'e kadar; ffmpeg'in r=29.97 ızgarasıyla 1 saatte birkaç
+   * ms'lik farkı da karşılar). Kopya döner (kelimeler de); girdi değişmez. fps geçersizse cue'lar aynen (kopya).
+   */
+  var LIBASS_PAY = 0.0099;
+  function kareIzgarasi(fps) {
+    var f = Number(fps);
+    if (!(f > 0) || !isFinite(f) || f > 1000) return 0;
+    var n = Math.round(f);
+    if (Math.abs(f - n * 1000 / 1001) < 0.005 && Math.abs(f - n) > 0.005) return n * 1000 / 1001;
+    return f;
+  }
+  function kareZamani(t, f, ofs) {
+    var x = Number(t);
+    if (!isFinite(x)) return t;
+    var k = Math.round((x - ofs) * f + 1e-7);
+    return Math.max(0, Math.round((ofs + k / f - LIBASS_PAY) * 1e6) / 1e6);
+  }
+  function kareZamanlari(cues, fps, ofs) {
+    var f = kareIzgarasi(fps), o = Number(ofs) || 0;
+    return (cues || []).map(function (c) {
+      var y = {};
+      for (var a in c) if (Object.prototype.hasOwnProperty.call(c, a)) y[a] = c[a];
+      if (!f) return y;
+      y.start = kareZamani(c.start, f, o);
+      y.end = kareZamani(c.end, f, o);
+      if (c.words && c.words.length) {
+        y.words = c.words.map(function (w) {
+          var z = {};
+          for (var b in w) if (Object.prototype.hasOwnProperty.call(w, b)) z[b] = w[b];
+          z.start = kareZamani(w.start, f, o);
+          z.end = kareZamani(w.end, f, o);
+          return z;
+        });
+      }
+      return y;
+    });
+  }
+
   // Katmanın kare sayısı: round(sure·fps), en az 1 (çok kısa katman da bir kare)
   function kareSayisi(sure, fps) {
     var s = Number(sure);
@@ -793,7 +837,7 @@
 
   return {
     ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, buildArgs: buildArgs, previewArgs: previewArgs,
-    kareSayisi: kareSayisi, parcaPlani: parcaPlani, parcaKaynak: parcaKaynak, parcaArgs: parcaArgs, concatSatiri: concatSatiri,
+    kareSayisi: kareSayisi, kareZamanlari: kareZamanlari, LIBASS_PAY: LIBASS_PAY, parcaPlani: parcaPlani, parcaKaynak: parcaKaynak, parcaArgs: parcaArgs, concatSatiri: concatSatiri,
     PARCA_ESIK_SN: PARCA_ESIK_SN, ilerlemeCoz: ilerlemeCoz, ilerlemeOkuyucu: ilerlemeOkuyucu, ilerlemeMetni: ilerlemeMetni,
     hataSinifi: hataSinifi, hataMetni: hataMetni, sonSatir: sonSatir, yerelJeton: yerelJeton,
     logoHazirla: logoHazirla, filigranaGoreLogo: filigranaGoreLogo, render: render,

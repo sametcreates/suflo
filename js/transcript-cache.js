@@ -19,6 +19,11 @@
  *     ({ v: 1, words }) geçerli kalır: öğeleri kelimesiz satır sayılır. get() ikisinde de
  *     düz kelime listesi (words) ve satırları (segments) döner; satır ve kelime kelime
  *     altyazı aynı girdiyi ("altyazi") paylaşır.
+ *   - Gövde v3 (senkron doğrulama): v2 + kelimede sese yaslanmış zaman { rs, re } (kaynak saniyesi, ms) ve
+ *     senkron: { v: 1, ts, n }. Motorun zamanı (start / end) DEĞİŞMEZ: eski sürümler v3 gövdeyi v2 gibi
+ *     okur (fazla alanlara bakmaz). get() varsayılan olarak yaslanmış zamanı döner (yoksa motorunkini),
+ *     { ham: true } motorun zamanını; sonuçta senkron: true yaslanmış zaman kullanıldıysa.
+ *     senkronYaz(meta, eslesme) birebir anahtarlı girdiye yaslanmış zamanları ekler (put'tan sonra).
  *
  * Saf çekirdek: fs, path, crypto dışarıdan verilir (panel K.fs ve require('crypto')
  * bağlar). Yalnız Node 12 API'leri (klasör silme yerine dosya dosya unlink).
@@ -32,6 +37,8 @@
 
   var SURUM = 1;          // index.json biçimi (değişmedi: eski girdiler görünür kalır)
   var GOVDE_SURUM = 2;    // girdi gövdesi: 2 = satır + ölçülmüş kelime, 1 = düz liste
+  var SENKRON_SURUM = 3;  // 3 = v2 + kelimede sese yaslanmış zaman (rs / re); senkronYaz yazar
+  var ESLEME_TOL = 0.0025; // senkronYaz: kelime motorun zamanıyla (ms'ye yuvarlı) bu kadar içinde eşleşir
   var EPS = 0.002;
 
   function num(x) { var n = Number(x); return isFinite(n) ? n : 0; }
@@ -124,20 +131,27 @@
      * kapsayan girdide aralığa taşan uzun satırın içerideki kelimeleri kaybolmaz.
      * Döner: { segments, words } — words düz liste (satırın kelimesi yoksa satırın kendisi).
      */
-    function kes(d, inPoint, dur) {
-      var a = num(inPoint), b = a + num(dur);
+    // v3: yaslanmış zaman (rs / re) varsa ve ham istenmediyse o; yoksa motorun zamanı
+    function kelimeZamani(w, ham) {
+      if (!ham && isFinite(Number(w.rs)) && isFinite(Number(w.re)) && Number(w.re) >= Number(w.rs)) return { s: Number(w.rs), e: Number(w.re), y: true };
+      return { s: num(w.start), e: num(w.end), y: false };
+    }
+    function kes(d, inPoint, dur, ham) {
+      var a = num(inPoint), b = a + num(dur), yaslandi = false;
       function icinde(s, e) { var orta = (s + e) / 2; return orta >= a - EPS && orta <= b + EPS; }
       function kaydir(s, e) { return { start: Math.max(0, s - a), end: Math.max(0, Math.min(b, e) - a) }; }
       var segments = [], words = [];
       d.segments.forEach(function (g) {
         if (!g) return;
         var s = num(g.start), e = num(g.end);
-        var kel = [];
+        var kel = [], satirYas = false;
         if (dizi(g.words)) {
           g.words.forEach(function (w) {
             if (!w) return;
-            var ws = num(w.start), we = num(w.end);
+            var wz = kelimeZamani(w, ham);
+            var ws = wz.s, we = wz.e;
             if (!icinde(ws, we)) return;
+            if (wz.y) { yaslandi = true; satirYas = true; }
             var z = kaydir(ws, we);
             var y = { text: String(w.text || ""), start: z.start, end: z.end };
             var p = guven(w.p);
@@ -161,17 +175,20 @@
           var sg = { start: z3.start, end: z3.end, text: String(g.text || "") };
           if (guven(g.confidence) !== null) sg.confidence = Number(g.confidence);
           if (kel.length) sg.words = kel;
+          // yaslanmış kelimeli satır kelimelerini kapsar (motorun satır sınırı kelimeden önce / sonra kalmasın)
+          if (satirYas && kel.length) { sg.start = Math.min(sg.start, kel[0].start); sg.end = Math.max(sg.end, kel[kel.length - 1].end); }
           segments.push(sg);
         }
       });
       words.sort(function (x, y) { return x.start - y.start; });
-      return { segments: segments, words: words };
+      return { segments: segments, words: words, senkron: yaslandi };
     }
 
     /*
-     * get(meta, { prompts: ["dolgu", "altyazi"] })
+     * get(meta, { prompts: ["dolgu", "altyazi"], ham: false })
      * Doner: null | { words (düz kelime listesi, meta.inPoint'e göreli), segments (satırlar,
-     *        ölçülmüş kelimeleriyle), lang, prompt, covering }
+     *        ölçülmüş kelimeleriyle), lang, prompt, covering, senkron }
+     * ham: true → motorun zamanı (v3'ün sese yaslanmış zamanı yerine)
      * prompts verilmezse yalnız meta.prompt aranır. Sıra: her istem için önce
      * birebir anahtar, sonra kapsayan girdi.
      */
@@ -202,8 +219,8 @@
           if (!d) continue;
           bulunan.lastUsed = now();
           dizinYaz(ix);
-          var kesik = kes(d, m.inPoint, m.dur);
-          return { words: kesik.words, segments: kesik.segments, lang: d.lang || "", prompt: m.prompt, covering: kapsayan };
+          var kesik = kes(d, m.inPoint, m.dur, !!(opts && opts.ham));
+          return { words: kesik.words, segments: kesik.segments, lang: d.lang || "", prompt: m.prompt, covering: kapsayan, senkron: kesik.senkron };
         }
       } catch (e) {}
       return null;
@@ -247,6 +264,58 @@
       } catch (e) { return false; }
     }
 
+    /*
+     * senkronYaz(meta, eslesme): birebir anahtarlı girdinin kelimelerine sese yaslanmış zamanı ekler (gövde v3).
+     *   eslesme: [{ start, end, rs, re }] — meta.inPoint'e göreli kaynak saniyesi; start / end motorun zamanı
+     *   (put'a verilenle aynı), rs / re yaslanmış zaman. Kelimeler zaman sırasıyla eşleşir (motorun başlangıcı
+     *   ESLEME_TOL içinde); eşleşmeyen kelime ve kelimesiz satır olduğu gibi kalır, motorun zamanı hiç değişmez.
+     *   Boş eşleşme önceki yaslamayı siler (belge sese yaslanmadıysa önbellek eski düzeltmeyi taşımasın).
+     * Doner: eşleşen kelime sayısı (girdi yok / hata: -1). Asla fırlatmaz.
+     */
+    function senkronYaz(meta, eslesme) {
+      if (!hazir || !meta || !meta.mediaPath || !dizi(eslesme)) return -1;
+      try {
+        var anahtar = key(meta);
+        var ix = dizinOku(), giris = null;
+        for (var i = 0; i < ix.entries.length; i++) if (ix.entries[i].key === anahtar) { giris = ix.entries[i]; break; }
+        if (!giris) return -1;
+        var d = girdiOku(giris);
+        if (!d || !dizi(d.segments)) return -1;
+        var ip = num(meta.inPoint);
+        var es = eslesme.filter(function (x) {
+          return x && isFinite(Number(x.start)) && isFinite(Number(x.rs)) && isFinite(Number(x.re)) && Number(x.re) >= Number(x.rs);
+        }).map(function (x) { return { s: ip + Number(x.start), rs: ip + Number(x.rs), re: ip + Number(x.re) }; })
+          .sort(function (x, y) { return x.s - y.s; });
+        var kel = [], eskiVar = false;
+        d.segments.forEach(function (g) {
+          if (g && dizi(g.words)) g.words.forEach(function (w) {
+            if (!w) return;
+            if (w.rs !== undefined || w.re !== undefined) eskiVar = true;
+            delete w.rs; delete w.re; kel.push(w);
+          });
+        });
+        kel.sort(function (x, y) { return num(x.start) - num(y.start); });
+        var j = 0, n = 0;
+        kel.forEach(function (w) {
+          var ws = num(w.start);
+          while (j < es.length && es[j].s < ws - ESLEME_TOL) j++;
+          if (j < es.length && Math.abs(es[j].s - ws) <= ESLEME_TOL) {
+            w.rs = Math.round(Math.max(0, es[j].rs) * 1000) / 1000;
+            w.re = Math.round(Math.max(0, es[j].re) * 1000) / 1000;
+            n++; j++;
+          }
+        });
+        if (!n && !eskiVar) return 0;   // yazılacak yaslama yok, silinecek eskisi de: girdi olduğu gibi (v1 / v2 gövdesi korunur)
+        var govde = { v: n ? SENKRON_SURUM : GOVDE_SURUM, lang: String(d.lang || ""), segments: d.segments };
+        if (n) govde.senkron = { v: 1, ts: now(), n: n };
+        var metin = JSON.stringify(govde);
+        atomikYaz(path.join(dir, anahtar + ".json"), metin);
+        giris.bytes = Buffer_byteLength(metin);
+        dizinYaz(ix);
+        return n;
+      } catch (e) { return -1; }
+    }
+
     function Buffer_byteLength(s) {
       try { if (typeof Buffer !== "undefined") return Buffer.byteLength(s, "utf8"); } catch (e) {}
       return String(s).length * 2;
@@ -282,7 +351,7 @@
       return { entries: ix.entries.length, bytes: bytes };
     }
 
-    return { key: key, get: get, put: put, clear: clear, stats: stats, dir: dir };
+    return { key: key, get: get, put: put, senkronYaz: senkronYaz, clear: clear, stats: stats, dir: dir };
   }
 
   /*
@@ -299,5 +368,5 @@
     return { ara: ["altyazi", "dolgu"], yaz: "altyazi" };
   }
 
-  return { create: create, istemler: istemler };
+  return { create: create, istemler: istemler, GOVDE_SURUM: GOVDE_SURUM, SENKRON_SURUM: SENKRON_SURUM };
 });

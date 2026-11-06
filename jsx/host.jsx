@@ -200,14 +200,19 @@ function KS_getSelectedClips() {
     if (!seq) return KS_err("Aktif sequence yok.");
     var sel = seq.getSelection();
     var out = [];
+    // ic ice sekans ogesinin medya yolu bos: atlanir, sayisi doner (panel "Sekans kapsamini kullan" der)
+    var icSekans = 0;
     if (sel) {
       for (var i = 0; i < sel.length; i++) {
         var cl = sel[i];
         try {
           if (!cl.projectItem) continue;
           var mp = String(cl.projectItem.getMediaPath());
-          if (!mp) continue;
-          out.push({
+          if (!mp) {
+            if (KS_mcKlipBayrak(cl, "isSequence")) icSekans++;
+            continue;
+          }
+          var o = {
             name: String(cl.name),
             mediaPath: mp,
             clipStart: cl.start.seconds,
@@ -215,7 +220,11 @@ function KS_getSelectedClips() {
             inPoint: cl.inPoint.seconds,
             outPoint: cl.outPoint.seconds,
             dur: cl.outPoint.seconds - cl.inPoint.seconds
-          });
+          };
+          // senkron dogrulama: hiz (1 = %100) ve ters oynatma; okunamazsa alan yok (eski davranis: sure orani)
+          try { if (typeof cl.getSpeed === "function") { var hz = Math.abs(Number(cl.getSpeed())); if (hz > 0) o.speed = hz; } } catch (eS) {}
+          try { if (typeof cl.isSpeedReversed === "function") o.reversed = cl.isSpeedReversed() ? true : false; } catch (eR) {}
+          out.push(o);
         } catch (eC) {}
       }
     }
@@ -228,7 +237,7 @@ function KS_getSelectedClips() {
       ded.push(out[j]);
     }
     ded.sort(function (a, b) { return a.clipStart - b.clipStart; });
-    return KS_ok({ clips: ded });
+    return KS_ok({ clips: ded, nested: icSekans });
   } catch (e) { return KS_err(e); }
 }
 

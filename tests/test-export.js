@@ -33,7 +33,7 @@ var kod = [
   kes("function cueler("),
   kes("function kufurMaskesiAcik("),
   kes("function kufurMaskele("),
-  "var emojisizCikti = false;",
+  "var emojisizCikti = false, katmanKareHizi = 0;",
   kes("function buildSrt("),
   kes("function buildVtt("),
   kes("function assTc("),

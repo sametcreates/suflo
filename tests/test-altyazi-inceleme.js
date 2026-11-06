@@ -105,7 +105,7 @@ ok("2.000 kelime: her hazır görünüm, her animasyon ve her eski stil 1 sn'nin
 function onizlemeOrtami(n) {
   var segs = CL.kelimedenSatirlar(kelimeler(n), { maxChars: 42, maxLines: 1 }).map(function (c) { return { start: c.start, end: c.end, text: c.text, words: c.words }; });
   return new Function("CT", "CL", "WW", "window", "K",
-    "var segments = " + JSON.stringify(segs) + ", emojisizCikti = false, EFEKT = 'efekt';\n" +
+    "var segments = " + JSON.stringify(segs) + ", emojisizCikti = false, katmanKareHizi = 0, EFEKT = 'efekt';\n" +
     "function styleText(t) { return t; } function arayuzDili() { return 'tr'; }\n" +
     govde("function kufurMaskesiAcik(") + "\n" + govde("function kufurMaskele(") + "\n" + govde("function satirlariTopla(") + "\n" +
     govde("function cueler(") + "\n" + govde("function motorOnizlemeCueleri(") + "\nreturn { cueler: cueler, onizleme: motorOnizlemeCueleri, n: segments.length };")(

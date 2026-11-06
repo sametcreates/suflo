@@ -56,7 +56,7 @@ function kes(imza) {
 var M = new Function("SEG", "CT", "CL", [
   "var segments = SEG;",
   "function styleText(t) { return t; }",
-  "var K = { settings: function () { return {}; } }, window = {}, emojisizCikti = false;",
+  "var K = { settings: function () { return {}; } }, window = {}, emojisizCikti = false, katmanKareHizi = 0;",
   kes("function kufurMaskesiAcik("),
   kes("function kufurMaskele("),
   kes("function satirlariTopla("),
