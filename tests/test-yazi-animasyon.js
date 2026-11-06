@@ -293,6 +293,11 @@ ok("index.html: katalog ve stil kodu style-share.js'ten sonra, style-engine.js't
   sira("yazi-animasyonlari.js") < sira("style-engine.js") && sira("stil-kodu.js") > sira("yazi-animasyonlari.js") && sira("stil-kodu.js") < sira("captions.js"));
 var yaSrc = fs.readFileSync(path.join(KOK, "js", "yazi-animasyonlari.js"), "utf8") + fs.readFileSync(path.join(KOK, "js", "stil-kodu.js"), "utf8");
 ok("yeni modüller ES5 (let / const / => / class / şablon metni yok)", !/\b(let|const|class)\s|=>|`/.test(yaSrc));
+// Doğrulama: paket denetimi yeni modülleri zorunlu tutar (eksik paket animasyonları ve stil kodunun "ek"ini sessizce
+// klasiğe düşürürdü: seçici boş kalır, paylaşılan kodun animasyonu kaybolur)
+var vr = fs.readFileSync(path.join(KOK, "tools", "verify-release.ps1"), "utf8");
+ok("verify-release: js/yazi-animasyonlari.js ve js/stil-kodu.js paket için zorunlu",
+  /'\(\^\|\/\)js\/yazi-animasyonlari\\\.js\$'/.test(vr) && /'\(\^\|\/\)js\/stil-kodu\\\.js\$'/.test(vr));
 
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

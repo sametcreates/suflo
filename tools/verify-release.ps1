@@ -111,6 +111,9 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.3 Altyazi Efektleri: olusturucu modeli ve tek temel stil (efekt) motoru
             '(^|/)js/altyazi-efekt\.js$',
             '(^|/)js/style-engine\.js$',
+            # Animasyon motoru v2: yazi animasyonlari katalogu ve geriye uyumlu stil kodu (SFL1. + ek); eksikse sessizce klasige duser
+            '(^|/)js/yazi-animasyonlari\.js$',
+            '(^|/)js/stil-kodu\.js$',
             # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
             '(^|/)js/youtube-indir\.js$',
             '(^|/)js/youtube-indir-ui\.js$',
