@@ -28,7 +28,9 @@
  *     Bir kelimenin yeni aralığı eskisinden belirgin daha az konuşma içeriyorsa o kelime geri alınır;
  *     tüm hizalama genel uyumu kötüleştiriyorsa hiçbir şey değişmez.
  *   - Kart: giriş = ilk kelimenin başı − onPayMs (0..40, varsayılan 20), çıkış = son kelimenin sonu +
- *     kuyrukMs (150); sessizlikte asılı kalmaz, sonraki kartla çakışmaz, kelimeler kartın içinde kalır.
+ *     kuyrukMs (150), en az minKartMs (300); sessizlikte asılı kalmaz, sonraki kartla çakışmaz, kelimeler kartın içinde kalır.
+ *   - Bitişik kelimeler arasındaki sınırda enerji çukuru varsa sınır doğrulanmış sayılır: önceki kelimenin içindeki
+ *     hece / ünsüz başlangıcına çekilmez.
  *
  * Saf UMD modülü: DOM / Premiere / ffmpeg yok. ES5 (CEF 74 / Node 12). Testler: tests/test-senkron.js.
  */
@@ -222,7 +224,16 @@
       var c = [];
       var sesteMi = oran(a, S[j], S[j] + 0.05) > 0.5;
       // olduğu gibi kalmanın bedeli: başı sessizliğe düşüyorsa yaslamaya daha istekli
-      c.push({ t: S[j], cost: sesteMi ? 0 : 0.5, onset: null });
+      var kal = sesteMi ? 0 : 0.5;
+      // bitişik kelime sınırı sesle doğrulanıyorsa (tam orada, ±25 ms, enerji çukuru / düşüşü var) yerinde kalmak
+      // ödüllendirilir: bağlı konuşmada kelime sınırında başlangıç bulunmayabilir; en yakın başlangıç önceki
+      // kelimenin içindeki bir hece ya da patlamalı ünsüz (p / t / k kapanması) olur ve doğru kelimeyi ~100 ms kaydırırdı.
+      // Ödül tam değil (0,9 g): çukurun hemen ardındaki (~35 ms içi) güçlü başlangıç yine kazanır (kısa sessizlik sonrası)
+      if (sesteMi && j > 0 && S[j] - E[j - 1] <= 0.03) {
+        var yb = enYakin(a.bitisler, S[j]);
+        if (yb && yb.d <= 0.025) kal = -0.9 * yb.x.g;
+      }
+      c.push({ t: S[j], cost: kal, onset: null });
       aralikta(a.onsetler, S[j] - W, S[j] + W).forEach(function (x) {
         var d = (x.t - S[j]) / W;
         c.push({ t: x.t, cost: d * d - x.g, onset: x });
@@ -343,6 +354,8 @@
       if (ws.length) {
         gir = ilkK - onPay;
         cik = sonK + kuyruk;
+        // tek kısa kelimeli kart (ör. kelime kelime stil) göz kırpmasın: en az minKartMs ekranda (sonraki kart keser)
+        if (cik - gir < minK) cik = gir + minK;
       } else if (guvenli) {
         var y1 = null;
         aralikta(a.onsetler, gir - W, gir + W).forEach(function (x) {

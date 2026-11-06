@@ -1,7 +1,8 @@
 // Suflo testi: altyazı senkron doğrulama motoru — js/senkron.js (+ js/ses-zarf.js analizi)
 //  - +250 ms / −180 ms kaydırılmış transkript düzelir, ortalama kelime hatası < 20 ms, çakışma yok, sıra korunur
 //  - doğru transkript bozulmaz; gürültü / müzik / sessizlikte zamanlara dokunulmaz, işaretlenir
-//  - kart giriş / çıkışı (ön pay, kuyruk, asılı kalmama, çakışmazlık), kare yuvarlama (8 hız, drop-frame gösterim)
+//  - hece yapılı ses ve gerçek konuşma (ffmpeg flite varsa): doğru kelime kelime içi hece / ünsüz başlangıcına çekilmez
+//  - kart giriş / çıkışı (ön pay, kuyruk, en kısa kart süresi, asılı kalmama, çakışmazlık), kare yuvarlama (8 hız, drop-frame gösterim)
 //  - girdi değişmez, bilinmeyen alanlar korunur, sekans ekseni (t0), 1 saatlik başarım
 var fs = require("fs");
 var path = require("path");
@@ -81,6 +82,98 @@ ok("zaten doğru transkript (±12 ms): toplam kayma uygulanmaz, hata artmaz", !r
 var tam = S.hizala(G.kartla(g.kelimeler.map(function (w) { return { start: w.start, end: w.end, text: w.text }; }), 4), a, {});
 var hT = hatalar(duz(tam.kartlar), g.kelimeler);
 ok("birebir doğru transkript: kelimeler 10 ms'den fazla oynamaz", hT.bas < 5 && hT.son < 10, hT.bas.toFixed(2) + " / " + hT.son.toFixed(2));
+
+/* ---------------- 3b) hece yapılı ses: kelime içi başlangıçlara çekilmez ---------------- */
+// Kelimeler 1–3 heceli, heceler arası 0–40 ms kapanma (p / t / k gibi): kelime İÇİNDE başlangıç doğar. Bitişik iki
+// kelimenin sınırında başlangıç bulunmayıp enerji çukuru varsa doğru kelime önceki kelimenin hecesine (~100 ms
+// geriye) çekiliyordu (s1 doğrulaması: 20 tohumda 8 kelime, toplam 20 / 1200 kelime > 40 ms kaydı).
+var heceHedef = 0, heceKotu = 0, heceTop = 0, heceW0 = 0, heceW1 = 0, heceN = 0;
+for (var th = 1; th <= 10; th++) [0, 40].forEach(function (ara) {
+  var gh = G.uretHece({ tohum: th, kelime: 60, araMs: ara }), ah = Z.analizEt(gh.pcm);
+  var dh = G.boz(gh.kelimeler, 0, 0.012, th);
+  duz(S.hizala(G.kartla(dh, 4), ah, {}).kartlar).forEach(function (w, i) {
+    var gw = gh.kelimeler[i], e = Math.abs(w.start - gw.start);
+    heceTop++;
+    if (e > 0.04) heceKotu++;
+    var cukur = i > 0 && gh.kelimeler[i - 1].end === gw.start && (Z.enYakin(ah.bitisler, gw.start) || { d: 1 }).d <= 0.025;
+    if (cukur && e > 0.04) heceHedef++;
+  });
+  if (ara) {
+    // whisper benzeri hata (±30 ms + %12 kelimede 60–110 ms): yaslama yine işe yarar
+    var rw = G.rastgele(th * 11);
+    var bh = G.boz(gh.kelimeler, 0, 0, 1).map(function (w) {
+      var sap = (rw() < 0.12 ? (rw() < 0.5 ? -1 : 1) * (0.06 + rw() * 0.05) : (rw() * 2 - 1) * 0.05);
+      return { start: Math.round((w.start + sap) * 1000) / 1000, end: w.end, text: w.text };
+    });
+    for (var q3 = 0; q3 < bh.length; q3++) {
+      if (q3 && bh[q3].start < bh[q3 - 1].end) bh[q3].start = bh[q3 - 1].end;
+      if (bh[q3].end < bh[q3].start + 0.03) bh[q3].end = bh[q3].start + 0.03;
+    }
+    duz(S.hizala(G.kartla(bh, 4), ah, {}).kartlar).forEach(function (w, i) {
+      heceN++; heceW0 += Math.abs(bh[i].start - gh.kelimeler[i].start); heceW1 += Math.abs(w.start - gh.kelimeler[i].start);
+    });
+  }
+});
+ok("hece yapılı ses, doğru transkript: sınırı enerji çukuruyla doğrulanan bitişik kelime önceki kelimenin hecesine kaymaz", heceHedef === 0, heceHedef + " kelime");
+ok("hece yapılı ses, doğru transkript: > 40 ms oynayan kelime ≤ %1,2", heceKotu <= heceTop * 0.012, heceKotu + "/" + heceTop);
+ok("hece yapılı ses, whisper benzeri kelime hataları: ortalama baş hatası en az yarıya iner", heceW1 < heceW0 * 0.5, (heceW0 / heceN * 1000).toFixed(1) + " → " + (heceW1 / heceN * 1000).toFixed(1) + " ms");
+
+// bitişik yazılmış iki kelime arasında gerçekte kısa (25–40 ms) sessizlik var, transkript sınırı sessizliğin içinde:
+// çukur ödülü sessizlikten çıkışa (gerçek başa) yaslamayı engellememeli
+var bosHata = [];
+[[0.30, 0.03, 0.31], [0.30, 0.04, 0.315], [0.30, 0.025, 0.31], [0.25, 0.035, 0.265]].forEach(function (c) {
+  var pB = new Float32Array(3 * 16000), rB = G.rastgele(3), kB;
+  for (kB = 0; kB < pB.length; kB++) pB[kB] = 3e-4 * (rB() * 2 - 1);
+  var A = [1.0, 1.0 + c[0]], B = [A[1] + c[1], A[1] + c[1] + 0.3];
+  [[A, 180], [B, 140]].forEach(function (p) { for (var k = Math.round(p[0][0] * 16000); k < Math.round(p[0][1] * 16000); k++) pB[k] += 0.2 * Math.sin(2 * Math.PI * p[1] * k / 16000) + 0.1 * Math.sin(4 * Math.PI * p[1] * k / 16000); });
+  var sn = 1.0 + c[2];
+  var yB = S.kelimeleriYasla([{ start: 0.6, end: 0.8 }, { start: 1.0, end: sn }, { start: sn, end: B[1] }, { start: 2.2, end: 2.4 }], Z.analizEt(pB), {}).kelimeler;
+  bosHata.push(Math.round(Math.abs(yB[2].start - B[0]) * 1000));
+});
+ok("bitişik yazılmış kelimeler arasında kısa sessizlik: ikinci kelime sessizlikten çıkışa yaslanır (≤ 5 ms)", bosHata.every(function (d) { return d <= 5; }), J(bosHata));
+
+// gerçek konuşma (ffmpeg'in flite süzgeci varsa): kelimeler tek tek sentezlenir, bilinen yerlere (bitişik / kısa /
+// uzun ara) dizilir; patlamalı ünsüzler ve heceler gerçek konuşmadaki gibi kelime içi başlangıç üretir
+var cpF = require("child_process");
+var fliteVar = false;
+try { fliteVar = /\bflite\b/.test(String(cpF.spawnSync("ffmpeg", ["-hide_banner", "-filters"], { encoding: "utf8" }).stdout || "")); } catch (eF) {}
+if (!fliteVar) console.log("ATLA gerçek konuşma (flite) testleri: ffmpeg'de flite süzgeci yok");
+else {
+  var fKel = "today we are going to talk about the captions and how the timing works with speech because people notice when subtitles appear too early or too late especially in fast dialogue with plosive consonants like paper table kitten bucket doctor pocket".split(" ");
+  var fPcm = {};
+  fKel.forEach(function (w) {
+    if (fPcm[w]) return;
+    var rF = cpF.spawnSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "flite=text='" + w + "':voice=slt", "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1"], { maxBuffer: 1 << 26 });
+    var b = rF.stdout || Buffer.alloc(0), nF = b.length >> 1, x = new Float32Array(nF), pk = 0, iF;
+    for (iF = 0; iF < nF; iF++) { x[iF] = b.readInt16LE(2 * iF) / 32768; pk = Math.max(pk, Math.abs(x[iF])); }
+    var a0 = 0, e0 = nF - 1;
+    while (a0 < nF && Math.abs(x[a0]) < pk * 0.02) a0++;
+    while (e0 > a0 && Math.abs(x[e0]) < pk * 0.02) e0--;
+    fPcm[w] = x.subarray(a0, e0 + 1);
+  });
+  var fB = 0, fTop = 0, fEn = 0, fK0 = 0, fK1 = 0, fKay = 0;
+  for (var tf = 1; tf <= 6; tf++) {
+    var rf0 = G.rastgele(tf), tt0 = 0.5, gK = [], yer = [];
+    for (var rep = 0; rep < 2; rep++) fKel.forEach(function (w) {
+      var p = fPcm[w], d = p.length / 16000;
+      gK.push({ start: Math.round(tt0 * 1000) / 1000, end: Math.round((tt0 + d) * 1000) / 1000, text: w });
+      yer.push({ a: Math.round(tt0 * 16000), p: p, g: 0.5 + rf0() });
+      tt0 += d; var u = rf0();
+      if (u < 0.3) tt0 += 0; else if (u < 0.6) tt0 += 0.03 + rf0() * 0.07; else tt0 += 0.15 + rf0() * 0.5;
+    });
+    var pF = new Float32Array(Math.round((tt0 + 0.6) * 16000));
+    for (var jf = 0; jf < pF.length; jf++) pF[jf] = 5e-4 * (rf0() * 2 - 1);
+    yer.forEach(function (y) { for (var k = 0; k < y.p.length; k++) pF[y.a + k] += y.p[k] * y.g; });
+    var aF = Z.analizEt(pF);
+    var dF = G.boz(gK, 0, 0.012, tf);
+    duz(S.hizala(G.kartla(dF, 4), aF, {}).kartlar).forEach(function (w, i) { fTop++; var e = Math.abs(w.start - gK[i].start); if (e > 0.04) fB++; fEn = Math.max(fEn, e); });
+    var kF = G.boz(gK, 0.25, 0.04, tf), rKF = S.hizala(G.kartla(kF, 4), aF, {});
+    if (rKF.rapor.kayma.uygulandi) fKay++;
+    duz(rKF.kartlar).forEach(function (w, i) { fK0 += Math.abs(kF[i].start - gK[i].start); fK1 += Math.abs(w.start - gK[i].start); });
+  }
+  ok("gerçek konuşma (flite), doğru transkript: > 40 ms oynayan kelime ≤ %2, hiçbiri 80 ms'den fazla oynamaz", fB <= fTop * 0.02 && fEn <= 0.08, fB + "/" + fTop + ", en çok " + Math.round(fEn * 1000) + " ms");
+  ok("gerçek konuşma (flite), +250 ms kaymış transkript: kayma uygulanır, ortalama baş hatası < 15 ms", fKay === 6 && fK1 / fTop < 0.015, fKay + "/6, " + (fK0 / fTop * 1000).toFixed(1) + " → " + (fK1 / fTop * 1000).toFixed(1) + " ms");
+}
 
 /* ---------------- 4) aşırı düzeltme yok: gürültü / müzik / sessizlik ---------------- */
 function aynen(sonuc, girdi) { return J(sonuc.kartlar) === J(girdi); }
@@ -205,6 +298,16 @@ ok("hizala({ fps }): 8 hızda kart sınırları kare ızgarasında, ≥ 1 kare, 
 var rP = S.hizala(kartlar, a, { onPayMs: 0, kuyrukMs: 0 });
 ok("onPayMs 0 / kuyrukMs 0: kart = ilk kelime başı .. son kelime sonu", rP.kartlar.every(function (c) { return Math.abs(c.start - c.words[0].start) < 0.0015 && Math.abs(c.end - c.words[c.words.length - 1].end) < 0.0015; }));
 ok("onPayMs 40'ın üstü 40'a kırpılır", S.hizala(kartlar, a, { onPayMs: 500 }).kartlar.every(function (c, i) { return c.words[0].start - c.start <= 0.0405; }));
+// tek kısa kelimeli kart (kelime kelime stiller): kart en az minKartMs (300) ekranda kalır, sonraki kartla çakışmaz
+// (s1 doğrulaması: 60 ms'lik kelime 20 + 60 + 150 = 230 ms'lik kartta göz kırpıyordu)
+var tekW = g.kelimeler.filter(function (w, i) { return i + 1 < g.kelimeler.length && g.kelimeler[i + 1].start - w.end > 0.4; })[0];
+var tekK = [{ start: tekW.start, end: tekW.start + 0.06, text: "ve", words: [{ start: tekW.start, end: tekW.start + 0.06, text: "ve" }] }];
+var rTek = S.kartlariYasla(tekK, a, {});
+ok("tek kısa kelimeli kart en az 300 ms (minKartMs) ekranda", rTek[0].end - rTek[0].start >= 0.3 - 1e-9 && Math.abs(rTek[0].start - (tekW.start - 0.02)) < 1e-6, J(rTek[0]));
+var ikiK = [{ start: 1, end: 1.06, text: "a", words: [{ start: 1, end: 1.06, text: "a" }] }, { start: 1.15, end: 1.5, text: "b", words: [{ start: 1.15, end: 1.5, text: "b" }] }];
+var rIki = S.kartlariYasla(ikiK, a, { onPayMs: 0 });
+ok("en kısa kart süresi sonraki kartın girişini geçmez", Math.abs(rIki[0].end - 1.15) < 1e-6 && rIki[1].start >= rIki[0].end - 1e-9, J(rIki.map(function (c) { return [c.start, c.end]; })));
+ok("minKartMs ayarı: 500 → tek kelimeli kart 500 ms", Math.abs(S.kartlariYasla(tekK, a, { minKartMs: 500 })[0].end - (tekW.start - 0.02 + 0.5)) < 1e-6);
 var rW = S.kelimeleriYasla([{ start: 1, end: 1.01 }, { start: 1.005, end: 1.3 }], a, { minKelimeMs: 60 });
 ok("kelimeleriYasla: en kısa süre ve çakışmazlık doğrudan çağrıda da", cakismaYok(rW.kelimeler, 0.06) === "", J(rW.kelimeler));
 

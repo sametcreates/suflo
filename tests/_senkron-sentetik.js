@@ -82,4 +82,42 @@ function int16(pcm) {
   return y;
 }
 
-module.exports = { uret: uret, boz: boz, kartla: kartla, int16: int16, rastgele: rastgele, SR: SR };
+/*
+ * Hece yapılı "konuşma": her kelime 1–3 heceden (ayrı perde / seviye) oluşur; heceler arasında 0..araMs sessiz
+ * kapanma (patlamalı ünsüz gibi) olabilir. Kelime İÇİNDE de başlangıç / bitiş doğar: doğru zamanlı kelimeler
+ * bu iç başlangıçlara çekilmemeli. o: { tohum, kelime, araMs (40), bitisikOran (0.25) }
+ */
+function uretHece(o) {
+  o = o || {};
+  var r = rastgele(o.tohum || 1), n = o.kelime || 60, ara = (o.araMs !== undefined ? o.araMs : 40) / 1000;
+  var bo = o.bitisikOran !== undefined ? o.bitisikOran : 0.25;
+  var t = 0.5, kel = [], heceler = [];
+  for (var i = 0; i < n; i++) {
+    var ns = 1 + Math.floor(r() * 3), bas = t;
+    for (var s = 0; s < ns; s++) {
+      var d = 0.08 + r() * 0.15;
+      heceler.push({ s: t, e: t + d, f0: 100 + r() * 160, gen: 0.05 + r() * 0.35 });
+      t += d;
+      if (s + 1 < ns) t += r() * ara;
+    }
+    kel.push({ start: Math.round(bas * 1000) / 1000, end: Math.round(t * 1000) / 1000, text: "k" + i });
+    var u = r();
+    if (u < bo) t += 0; else if (u < 0.6) t += 0.04 + r() * 0.06; else t += 0.15 + r() * 0.5;
+  }
+  var pcm = new Float32Array(Math.round((t + 0.6) * SR));
+  for (var j = 0; j < pcm.length; j++) pcm[j] = 3e-4 * (r() * 2 - 1) * 1.732;
+  heceler.forEach(function (h) {
+    var a = Math.round(h.s * SR), b = Math.round(h.e * SR), ramp = 80;
+    for (var k = a; k < b; k++) {
+      var e = 1;
+      if (k - a < ramp) e = 0.5 - 0.5 * Math.cos(Math.PI * (k - a) / ramp);
+      if (b - k < ramp) e = 0.5 - 0.5 * Math.cos(Math.PI * (b - k) / ramp);
+      var tt = k / SR, v = 0;
+      for (var q = 1; q <= 6; q++) v += Math.sin(2 * Math.PI * h.f0 * q * tt) / q;
+      pcm[k] += h.gen * e * v * 0.5;
+    }
+  });
+  return { pcm: pcm, kelimeler: kel };
+}
+
+module.exports = { uret: uret, uretHece: uretHece, boz: boz, kartla: kartla, int16: int16, rastgele: rastgele, SR: SR };
