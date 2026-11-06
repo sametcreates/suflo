@@ -116,6 +116,8 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/stil-kodu\.js$',
             # Stil kutuphanesi (parti 3): hazir gorunum galerisi (kategori sekmeleri, cip ornekleri, klavye, ipucu)
             '(^|/)js/stil-galeri\.js$',
+            # Parti 4: uc adimli altyazi akisi (Olustur / Stil sec / Uygula; tek uygula dugmesi)
+            '(^|/)js/altyazi-akis\.js$',
             # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
             '(^|/)js/youtube-indir\.js$',
             '(^|/)js/youtube-indir-ui\.js$',

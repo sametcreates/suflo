@@ -518,9 +518,14 @@ window.KOnboarding = (function () {
   function sekansaUygulaVurgula() {
     var b = el("cap-apply");
     if (!b) return;
-    b.classList.add("onb-vurgu");
-    kaydir(b);
-    setTimeout(function () { b.classList.remove("onb-vurgu"); }, 9000);
+    // Parti 4: görünür denetim 3. adımın tek "Timeline'a uygula" düğmesi (#cap-apply'ye tıklar). Rehber ücretsiz
+    // düz altyazı izini anlatır: tür bu oturumluk "Düz" olur (kullanıcının kayıtlı seçimine yazılmaz)
+    var tek = el("cap-uygula-tek");
+    if (tek && window.SufloAltyaziAkis && SufloAltyaziAkis.turSec) SufloAltyaziAkis.turSec("duz", { gecici: true });
+    var vurgulananlar = tek ? [b, tek] : [b];
+    vurgulananlar.forEach(function (n) { n.classList.add("onb-vurgu"); });
+    kaydir(tek || b);
+    setTimeout(function () { vurgulananlar.forEach(function (n) { n.classList.remove("onb-vurgu"); }); }, 9000);
   }
 
   /*

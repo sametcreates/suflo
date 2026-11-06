@@ -1938,6 +1938,8 @@ window.KCaptions = (function () {
       if (hint) hint.textContent = "Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Animasyonlu ekleme için yukarıda bir görünüm seç ya da efekti ayarla.";
       if (styleBtn) { styleBtn.disabled = true; styleBtn.textContent = "Görünüm seçerek ekle"; }
     }
+    // üç adımlı akış (js/altyazi-akis.js): stil durumu ve tek düğmenin etiketi
+    if (typeof SufloAltyaziAkis !== "undefined" && SufloAltyaziAkis.guncelle) SufloAltyaziAkis.guncelle();
   }
 
   function mogrtStiliniSec(item) {
@@ -3800,6 +3802,7 @@ window.KCaptions = (function () {
     iptalAcilis = b ? Date.now() : 0;
     baslatAcilis = b ? 0 : Date.now();
     if (!b) refreshButton();
+    if (typeof SufloAltyaziAkis !== "undefined" && SufloAltyaziAkis.guncelle) SufloAltyaziAkis.guncelle({ uretiliyor: !!b });
   }
 
   /* ---------------- Segment düzenleme ---------------- */
@@ -6671,6 +6674,7 @@ window.KCaptions = (function () {
    * yildiz seridi acikken ya da Premiere mesgulken cikmaz, 30 gunde en cok bir kez).
    */
   function yildizIste() {
+    if (typeof SufloAltyaziAkis !== "undefined" && SufloAltyaziAkis.guncelle) SufloAltyaziAkis.guncelle({ uygulandi: true });   // başarılı uygulama: 3. adım "hazır ✓"
     var s = K.settings();
     s.basariliUygulama = (s.basariliUygulama || 0) + 1;
     K.saveSettings();
@@ -6874,6 +6878,25 @@ window.KCaptions = (function () {
   }
 
   /* ---------------- Başlat ---------------- */
+
+  /*
+   * Parti 4: üç adımlı akış (js/altyazi-akis.js). Bağlayıcı yalnız durumu okur; tek "Timeline'a uygula" düğmesi
+   * #cap-apply-style / #cap-apply'ye (AE'de #ae-ekle-stil / #ae-ekle) tıklar, uygulama yolları ve Pro kapıları aynen kalır.
+   * Bağlayıcının guncelle'si: stil değişince (uygulamaIpucunuGuncelle), iş başlayıp bitince (setBusy), başarılı uygulamada (yildizIste).
+   */
+  function akisBagla() {
+    var A = window.SufloAltyaziAkis;
+    if (!A || !A.bagla) return;
+    A.bagla({
+      belge: document,
+      depo: function () { return window.localStorage; },
+      durum: function () {
+        // üretim durumu setBusy'den gelir (guncelle({ uretiliyor })), "busy" değil: başka araçların transkripsiyonu sayılmaz
+        return { altyaziVar: segments.length > 0, stilSecili: !!secilenMotorStili && !secilenMogrt, mogrtSecili: !!secilenMogrt };
+      }
+    });
+    onSonuc(function (bilgi) { A.sonucGeldi(bilgi); });
+  }
 
   function init() {
     el("cap-go").addEventListener("click", go);
@@ -7099,6 +7122,7 @@ window.KCaptions = (function () {
     onizlemeCiz();
     stilKartiIsaretle(el("cap-preset").value);
     uygulamaIpucunuGuncelle();
+    akisBagla();
 
     if (el("cap-shorts-al")) el("cap-shorts-al").addEventListener("click", shortsAltyazisiAl);
     var sonSekans = null;
@@ -7391,9 +7415,9 @@ window.KCaptions = (function () {
       if (el("cap-preset")) el("cap-preset").value = id;
       applyPreset(id);
     }
-    var hedef = el("cap-efekt") || el("cap-stil-grid");
+    var hedef = el("cap-adim-stil") || el("cap-efekt") || el("cap-stil-grid");   // parti 4: 2. adım "Stil seç" (başından)
     if (hedef && hedef.scrollIntoView) {
-      try { hedef.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (eS) { hedef.scrollIntoView(); }
+      try { hedef.scrollIntoView({ behavior: "smooth", block: hedef.id === "cap-adim-stil" ? "start" : "center" }); } catch (eS) { hedef.scrollIntoView(); }
     }
     // Gercek stil motoru onizlemesi ffmpeg ister; yoksa sessizce atla (DOM onizlemesi kalir)
     K.findFfmpeg().then(function (ff) {

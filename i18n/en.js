@@ -4313,6 +4313,33 @@
     "Suflo altyazilari kaldirilamadi: {}": "Suflo captions couldn't be removed: {}"
   });
 
+  /* ================= Captions: three-step flow (batch 4; index.html #cap-adimlar, js/altyazi-akis.js) ================= */
+  add({
+    "Altyazı adımları": "Caption steps",
+    "Oluştur": "Create",
+    "Stil seç": "Pick style",
+    "bekliyor": "waiting",
+    "şu an": "now",
+    "hazır ✓": "ready ✓",
+    "Gelişmiş ayarlar": "Advanced settings",
+    "kelime sınırı · zamanlama · yazım · çeviri · ses": "word limit · timing · casing · translation · audio",
+    "Metni kontrol et": "Check the text",
+    "Diğer araçlar": "More tools",
+    "çeviri · bölümler · viral anlar · B-roll · bul & değiştir": "translation · chapters · viral moments · B-roll · find & replace",
+    "Özelleştir": "Customize",
+    "renk · yazı tipi · boyut · konum · stil kodu": "colour · font · size · position · style code",
+    "Premiere şablonları (17)": "Premiere templates (17)",
+    "MOGRT · animasyonlu": "MOGRT · animated",
+    "Önce altyazı oluştur. Timeline'a uygulama ve dosya olarak indirme altyazı hazır olunca açılır.":
+      "Create captions first. Applying to the timeline and downloading as a file unlock once captions are ready.",
+    "Ekleme biçimi": "How to add",
+    "Stilli · Altyazı Efektleri": "Styled · Caption Effects",
+    "Düz altyazı izi · ücretsiz": "Plain caption track · free",
+    "Timeline'a uygula": "Apply to timeline",
+    "Dosya olarak indir": "Download as a file",
+    "Önce 2. adımda bir stil seç": "Pick a style in step 2 first"
+  });
+
   var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE", "AFTER EFFECTS",
     "Suflo altyazi",   // After Effects: Suflo's layer comment marker (js/ae-plan.js ISARET; never shown in the panel)
     "PREMIERE READY", "SFX", "Emoji Assets", "PNG · WEBP · GIF", "Motion BG", "ffmpeg", "In → Out", "Creator Punch", "Clean Pill", "Bold Box",

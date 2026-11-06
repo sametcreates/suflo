@@ -4667,3 +4667,76 @@ body.host-ae [data-yalniz-premiere], body.host-ae [data-ae-gizli] { display: non
 .ae-not { margin: 10px 13px 0; padding: 9px 12px; border: 1px solid rgba(114, 124, 255, .35); border-radius: var(--r); background: rgba(114, 124, 255, .08); color: var(--dim); font-size: 11.5px; line-height: 1.5; }
 .ae-not b { display: block; color: var(--text); font-size: 12px; margin-bottom: 2px; }
 .ae-altyazi #ae-kaldir { margin: 0 0 10px; }
+
+/* ---------- Altyazı: üç adımlı akış (parti 4, js/altyazi-akis.js) ----------
+   300 px genişlikte yatay kaydırma yok (adım çubuğu üç eşit sütun, uzun metin satır kırar). Renkler var olan
+   belirteçlerden: şu an = --accent, hazır = --good, bekliyor = --faint / --line. Hareket azaltmada geçiş ve kaydırma yok. */
+.cap-adimlar {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+  margin: 0 0 12px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2);
+}
+.cap-adimlar-oge {
+  display: flex; align-items: center; gap: 5px; min-width: 0; padding: 6px 6px; border: 1px solid transparent; border-radius: 7px;
+  background: none; color: var(--dim); font: inherit; font-size: 11.5px; text-align: left; cursor: pointer;
+  transition: color .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
+}
+.cap-adimlar-oge b { font-weight: 620; min-width: 0; flex: 1 1 auto; line-height: 1.2; overflow-wrap: anywhere; }
+.cap-adimlar-oge:hover { color: var(--text); background: rgba(255, 255, 255, .03); }
+.cap-adimlar-oge:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--glow-sm); }
+.cap-adim-no {
+  flex: none; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  border: 1px solid var(--line2); color: var(--faint); font-size: 10px; font-weight: 750; line-height: 1;
+}
+.cap-adim-durum { flex: none; font-size: 9px; font-weight: 650; letter-spacing: .02em; color: var(--faint); white-space: nowrap; }
+.cap-adimlar-oge[data-durum="aktif"] { color: var(--text); border-color: var(--accent); background: rgba(114, 124, 255, .1); }
+.cap-adimlar-oge[data-durum="aktif"] .cap-adim-no { border-color: var(--accent); background: var(--accent); color: #fff; }
+.cap-adimlar-oge[data-durum="aktif"] .cap-adim-durum { color: var(--accent-lite, var(--accent)); }
+.cap-adimlar-oge[data-durum="tamam"] .cap-adim-no { border-color: var(--good); color: var(--good); }
+.cap-adimlar-oge[data-durum="tamam"] .cap-adim-durum { color: var(--good); }
+/* Dar panelde durum yazısı alt satıra iner (yatay kaydırma olmasın) */
+@media (max-width: 340px) {
+  .cap-adimlar-oge { flex-wrap: wrap; row-gap: 1px; }
+  .cap-adimlar-oge .cap-adim-durum { flex-basis: 100%; padding-left: 22px; }
+}
+
+.cap-adim { margin: 0 0 14px; min-width: 0; scroll-margin-top: 8px; }
+.cap-adim + .cap-adim { padding-top: 12px; border-top: 1px solid var(--line); }
+.cap-adim-bas {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 10px; color: var(--text);
+  font-size: 13px; font-weight: 680; letter-spacing: -.01em;
+}
+.cap-adim-bas:focus { outline: none; }
+.cap-adim-bas:focus-visible { outline: 1px dashed var(--accent); outline-offset: 3px; }
+.cap-adim[data-durum="aktif"] > .cap-adim-bas .cap-adim-no { border-color: var(--accent); background: var(--accent); color: #fff; }
+.cap-adim[data-durum="tamam"] > .cap-adim-bas .cap-adim-no { border-color: var(--good); color: var(--good); }
+.cap-adim-ara { margin: 0 0 6px; color: var(--faint); font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+
+/* Katlanır bölümler: Gelişmiş ayarlar, Diğer araçlar, Özelleştir, Premiere şablonları */
+.cap-gelismis, .cap-diger-araclar, .cap-ozellestir, .cap-mogrt-sar { min-width: 0; }
+.cap-gelismis summary .ia-not, .cap-diger-araclar summary .ia-not, .cap-ozellestir summary .ia-not, .cap-mogrt-sar summary .ia-not {
+  color: var(--faint); font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.cap-ozellestir > summary, .cap-mogrt-sar > summary { font-size: 12px; color: var(--text); font-weight: 600; }
+.cap-mogrt-sar[hidden], .cap-gelismis[hidden], .cap-diger-araclar[hidden] { display: none !important; }
+
+/* 3. adım: tür seçimi, tek düğme, ikincil "Dosya olarak indir" satırı */
+.cap-uygula-govde[hidden], .cap-uygula-ek[hidden], .cap-uygula-asil[hidden] { display: none !important; }
+.cap-uygula-bos[hidden] { display: none; }
+.cap-uygula-bos { margin: 0 0 8px; }
+.cap-uygula-tur { margin-bottom: 8px; }
+.cap-uygula-tur button { min-width: 0; font-size: 11.5px; line-height: 1.25; white-space: normal; }
+.cap-uygula-tur button:disabled { opacity: .45; cursor: not-allowed; }
+.cap-uygula-tur button:focus-visible { outline: none; box-shadow: var(--glow-sm); }
+.cap-uygula-tek { width: 100%; white-space: normal; }
+.cap-uygula-tek em:empty { display: none; }
+.cap-uygula-indir {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; padding: 7px 9px;
+  border: 1px solid var(--line); border-radius: var(--r, 10px); min-width: 0;
+}
+.cap-uygula-indir-bas { flex: 1 1 auto; color: var(--dim); font-size: 11px; min-width: 0; }
+.cap-uygula-indir .mini-select { max-width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cap-adimlar-oge, .cap-adim-no { transition: none; }
+  .cap-adim { scroll-margin-top: 0; }
+}
