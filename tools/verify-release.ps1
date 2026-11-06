@@ -143,6 +143,9 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.4 adim 8: kesimden sonra altyazi (saf esleme modulu + kesim kartlarindaki eylem satiri)
             '(^|/)js/kesim-esle\.js$',
             '(^|/)js/kesim-altyazi\.js$',
+            # Senkron dogrulama: ses zarfi / konusma baslangiclari ve kelime-kart hizalama motoru (saf moduller)
+            '(^|/)js/ses-zarf\.js$',
+            '(^|/)js/senkron\.js$',
             # 3.4 Yumusatma motoru (Rebound MIT uyarlamasi) ve anahtar kare kayitlari: Egri, Gecis, Zoom, Hareket bunlara dayanir
             '(^|/)js/ease-curve\.js$',
             '(^|/)js/key-records\.js$',
