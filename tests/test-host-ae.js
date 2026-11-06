@@ -23,7 +23,7 @@ function kopya(v) { return v && typeof v === "object" ? JSON.parse(JSON.stringif
 
 /* ---------------- sahte After Effects ---------------- */
 
-var HOLD = 6614, LINEAR = 6612;
+var HOLD = 6614, LINEAR = 6612, BEZIER = 6613;
 
 /*
  * Özellik ağacı: her property() çağrısı yeni bir sarmalayıcı verir; bir gruba addProperty yapılınca grubun altındaki
@@ -38,6 +38,8 @@ function Dugum(ad, tur, ek) {
   this.adi = ad;
 }
 Dugum.prototype.altAgac = function (f) { f(this); this.cocuklar.forEach(function (c) { c.altAgac(f); }); };
+// Bir grubun altındaki eski sarmalayıcılar geçersizleşir (addProperty / remove sonrası AE davranışı)
+Dugum.prototype.gecersizKil = function () { this.cocuklar.forEach(function (c) { c.altAgac(function (x) { x.verilen.forEach(function (v) { v.gecersiz = true; }); x.verilen = []; }); }); };
 Dugum.prototype.sar = function (ctx) {
   var d = this, w = { gecersiz: false };
   d.verilen.push(w);
@@ -51,10 +53,34 @@ Dugum.prototype.sar = function (ctx) {
     bak();
     if (!d.ekle) throw new Error("addProperty desteklenmiyor: " + d.ad);
     // AE: grubun altındaki eski nesneler geçersizleşir
-    d.cocuklar.forEach(function (c) { c.altAgac(function (x) { x.verilen.forEach(function (v) { v.gecersiz = true; }); x.verilen = []; }); });
+    d.gecersizKil();
     var yeni = d.ekle(mn);
+    yeni.ust = d;
     d.cocuklar.push(yeni);
     return yeni.sar(ctx);
+  };
+  w.remove = function () {
+    bak();
+    var u = d.ust;
+    if (!u) throw new Error("kök silinemez");
+    u.gecersizKil();
+    u.cocuklar.splice(u.cocuklar.indexOf(d), 1);
+    ctx.silinen.push(d.ad);
+  };
+  Object.defineProperty(w, "expression", { get: function () { bak(); return d.ifade || ""; }, set: function (v) {
+    bak();
+    if (ctx.ifadeYok) throw new Error("ifade desteklenmiyor");
+    d.ifade = String(v);
+  } });
+  Object.defineProperty(w, "canSetExpression", { get: function () { bak(); return d.tur !== "grup"; } });
+  w.removeKey = function (k) { bak(); d.anahtarlar.splice(k - 1, 1); };
+  // Zamansal yumuşatma: boyut sayısı özelliğe bağlı (Position 1, Scale 3); yanlış boyut fırlatır
+  w.setTemporalEaseAtKey = function (k, gir, cik) {
+    bak();
+    var beklenen = d.easeBoyut || 1;
+    if (gir.length !== beklenen || cik.length !== beklenen) throw new Error("ease boyutu " + beklenen + " olmalı");
+    if (!gir.every(function (e) { return e instanceof ctx.KeyframeEase; })) throw new Error("KeyframeEase değil");
+    d.anahtarlar[k - 1].ease = gir.map(function (e) { return e.influence; });
   };
   Object.defineProperty(w, "numProperties", { get: function () { bak(); return d.cocuklar.length; } });
   Object.defineProperty(w, "name", { get: function () { bak(); return d.adi; }, set: function (v) { bak(); d.adi = String(v); } });
@@ -66,15 +92,25 @@ Dugum.prototype.sar = function (ctx) {
     if (d.tur === "metin") {
       var td = v.kopya();
       // Kurulu olmayan font: AE başka fontla değiştirir (geri okunan ad farklı)
-      if (ctx.eksikFontlar.indexOf(td.font) !== -1) td.font = "ArialMT";
+      ctx.fontDenemeleri.push(td.font);
+      if (ctx.eksikFontlar.indexOf(td.font) !== -1) td.font = "MyriadPro-Regular";
       d.deger = td;
     } else d.deger = kopya(v);
   };
   w.setValueAtTime = function (t, v) {
     bak();
+    if (d.gerek && !d.gerek()) throw new Error("özellik bu katmanda yok: " + d.ad);
     d.anahtarlar = d.anahtarlar.filter(function (a) { return Math.abs(a.t - t) > 1e-9; });
     d.anahtarlar.push({ t: t, v: kopya(v), ic: LINEAR, dis: LINEAR });
     d.anahtarlar.sort(function (a, b) { return a.t - b.t; });
+  };
+  // Toplu anahtar (AE setValuesAtTimes); o.topluYok: eski / kısıtlı sürüm benzetimi (fırlatır, host tek tek yazar)
+  w.setValuesAtTimes = function (ts, vs) {
+    bak();
+    if (ctx.topluYok) throw new Error("setValuesAtTimes yok");
+    if (ts.length !== vs.length) throw new Error("uzunluk");
+    ctx.toplu++;
+    for (var i = 0; i < ts.length; i++) w.setValueAtTime(ts[i], vs[i]);
   };
   w.setInterpolationTypeAtKey = function (k, i, o) { bak(); d.anahtarlar[k - 1].ic = i; d.anahtarlar[k - 1].dis = o; };
   return w;
@@ -92,24 +128,45 @@ TextDocument.prototype.kopya = function () {
   return t;
 };
 
-function yaprak(ad, deger) { return new Dugum(ad, "yaprak", { deger: deger }); }
-function grup(ad, cocuklar, ekle) { var g = new Dugum(ad, "grup", { ekle: ekle }); g.cocuklar = cocuklar || []; return g; }
+function yaprak(ad, deger, ek) { var d = new Dugum(ad, "yaprak", { deger: deger }); for (var k in ek || {}) d[k] = ek[k]; return d; }
+function grup(ad, cocuklar, ekle) {
+  var g = new Dugum(ad, "grup", { ekle: ekle });
+  g.cocuklar = cocuklar || [];
+  g.cocuklar.forEach(function (c) { c.ust = g; });
+  return g;
+}
 
 function secici() {
   return grup("ADBE Text Selector", [
-    yaprak("ADBE Text Index Start", 0), yaprak("ADBE Text Index End", 0),
-    grup("ADBE Text Range Advanced", [yaprak("ADBE Text Range Units", 1), yaprak("ADBE Text Range Type2", 1)])
+    yaprak("ADBE Text Percent Start", 0), yaprak("ADBE Text Percent End", 100), yaprak("ADBE Text Percent Offset", 0),
+    yaprak("ADBE Text Index Start", 0), yaprak("ADBE Text Index End", 0), yaprak("ADBE Text Index Offset", 0),
+    grup("ADBE Text Range Advanced", [yaprak("ADBE Text Range Units", 1), yaprak("ADBE Text Range Type2", 1), yaprak("ADBE Text Selector Mode", 1),
+      yaprak("ADBE Text Selector Max Amount", 100), yaprak("ADBE Text Range Shape", 1), yaprak("ADBE Text Selector Smoothness", 100)])
   ]);
 }
-function animator() {
-  return grup("ADBE Text Animator", [
-    grup("ADBE Text Animator Properties", [], function (mn) {
-      if (mn === "ADBE Text Fill Color") return yaprak(mn, [1, 0, 0]);
-      if (mn === "ADBE Text Scale 3D") return yaprak(mn, [100, 100, 100]);
-      throw new Error("bilinmeyen animatör özelliği " + mn);
-    }),
+// Animatör özellikleri (AE varsayılanlarıyla); desteklenmeyen (eski sürüm benzetimi) addProperty'de fırlatır
+var ANIM_OZ = { "ADBE Text Opacity": 100, "ADBE Text Position 3D": [0, 0, 0], "ADBE Text Scale 3D": [100, 100, 100], "ADBE Text Rotation": 0,
+  "ADBE Text Blur": [0, 0], "ADBE Text Tracking Amount": 0, "ADBE Text Fill Color": [1, 0, 0], "ADBE Text Stroke Color": [1, 0, 0] };
+function animator(ctx) {
+  var ozler = grup("ADBE Text Animator Properties", [], function (mn) {
+    if (!Object.prototype.hasOwnProperty.call(ANIM_OZ, mn) || ctx.desteklenmeyen.indexOf(mn) !== -1) throw new Error("bilinmeyen animatör özelliği " + mn);
+    // Tracking Amount eklemek Tracking Type'ı da ekler (AE)
+    if (mn === "ADBE Text Tracking Amount") { var tt = yaprak("ADBE Text Track Type", 1); tt.ust = ozler; ozler.cocuklar.push(tt); }
+    return yaprak(mn, ANIM_OZ[mn]);
+  });
+  return grup("ADBE Text Animator", [ozler,
     grup("ADBE Text Selectors", [], function (mn) { if (mn !== "ADBE Text Selector") throw new Error(mn); return secici(); })
   ]);
+}
+function maskeAtom() { return grup("ADBE Mask Atom", [yaprak("ADBE Mask Shape", null), yaprak("ADBE Mask Opacity", 100)]); }
+// Şekil katmanı içeriği: grup → Contents (dikdörtgen, dolgu)
+function vektorGrubu() {
+  return grup("ADBE Vector Group", [grup("ADBE Vectors Group", [], function (mn) {
+    if (mn === "ADBE Vector Shape - Rect") return grup(mn, [yaprak("ADBE Vector Rect Size", [100, 100]), yaprak("ADBE Vector Rect Position", [0, 0]),
+      yaprak("ADBE Vector Rect Roundness", 0)]);
+    if (mn === "ADBE Vector Graphic - Fill") return grup(mn, [yaprak("ADBE Vector Fill Color", [1, 0, 0, 1]), yaprak("ADBE Vector Fill Opacity", 100)]);
+    throw new Error("bilinmeyen vektör " + mn);
+  })]);
 }
 function golgeEfekti() {
   return grup("ADBE Drop Shadow", ["0001", "0002", "0003", "0004", "0005"].map(function (n) { return yaprak("ADBE Drop Shadow-" + n, 0); }));
@@ -118,7 +175,11 @@ function golgeEfekti() {
 function kur(o) {
   o = o || {};
   var durum = { undoAc: 0, undoKapa: 0, undoAdlari: [], rectSayac: 0 };
-  var ctx = { eksikFontlar: o.eksikFontlar || [] };
+  function KeyframeEase(hiz, etki) { this.speed = hiz; this.influence = etki; }
+  function Shape() { this.vertices = []; this.closed = false; }
+  var ctx = { eksikFontlar: o.eksikFontlar || [], desteklenmeyen: o.desteklenmeyen || [], silinen: [], ifadeYok: !!o.ifadeYok, KeyframeEase: KeyframeEase,
+    topluYok: !!o.topluYok, toplu: 0,
+    fontDenemeleri: [] };
 
   function Katman(ad, ek) {
     ek = ek || {};
@@ -128,7 +189,17 @@ function kur(o) {
     this.hasAudio = ek.hasAudio !== false; this.source = ek.source || null;
     this.kok = {};
     this.metin = !!ek.metin;
+    this.parent = null;
+    this._uc = false;
   }
+  Object.defineProperty(Katman.prototype, "threeDLayer", { get: function () { return this._uc; }, set: function (v) {
+    if (o.ucBoyutYok) throw new Error("3B desteklenmiyor");
+    this._uc = !!v; } });
+  Katman.prototype.moveAfter = function (ly) {
+    var i = comp._katmanlar.indexOf(this);
+    comp._katmanlar.splice(i, 1);
+    comp._katmanlar.splice(comp._katmanlar.indexOf(ly) + 1, 0, this);
+  };
   Object.defineProperty(Katman.prototype, "inPoint", { get: function () { return this._in; }, set: function (v) {
     if (this.locked) throw new Error("kilitli katman");
     if (v >= this._out) throw new Error("inPoint outPoint'ten büyük olamaz"); this._in = v; } });
@@ -162,14 +233,30 @@ function kur(o) {
       var tdD = new Dugum("ADBE Text Document", "metin"); tdD.deger = new TextDocument(String(t));
       if (o.italikYok) tdD.deger._italikYok = true;
       ly.kok["ADBE Text Properties"] = grup("ADBE Text Properties", [tdD, grup("ADBE Text Animators", [], function (mn) {
-        if (mn !== "ADBE Text Animator") throw new Error(mn); return animator(); })]);
-      ly.kok["ADBE Transform Group"] = grup("ADBE Transform Group", [yaprak("ADBE Anchor Point", [0, 0]), yaprak("ADBE Position", [960, 540]),
-        yaprak("ADBE Scale", [100, 100]), yaprak("ADBE Opacity", 100)]);
+        if (mn !== "ADBE Text Animator") throw new Error(mn); return animator(ctx); }),
+        grup("ADBE Text More Options", [yaprak("ADBE Text Anchor Point Option", 1), yaprak("ADBE Text Anchor Point Align", [0, 0])])]);
+      ly.kok["ADBE Transform Group"] = donusumGrubu(ly);
       ly.kok["ADBE Effect Parade"] = grup("ADBE Effect Parade", [], function (mn) { if (mn !== "ADBE Drop Shadow") throw new Error(mn); return golgeEfekti(); });
+      ly.kok["ADBE Mask Parade"] = grup("ADBE Mask Parade", [], function (mn) { if (mn !== "ADBE Mask Atom") throw new Error(mn); return maskeAtom(); });
+      comp._katmanlar.unshift(ly);
+      return ly;
+    },
+    addShape: function () {
+      if (o.sekilYok) throw new Error("şekil katmanı eklenemedi");
+      var ly = new Katman("Şekil Katmanı 1", { outPoint: comp.duration });
+      ly.sekil = true;
+      ly.kok["ADBE Root Vectors Group"] = grup("ADBE Root Vectors Group", [], function (mn) { if (mn !== "ADBE Vector Group") throw new Error(mn); return vektorGrubu(); });
+      ly.kok["ADBE Transform Group"] = donusumGrubu(ly);
       comp._katmanlar.unshift(ly);
       return ly;
     }
   };
+  // Transform: X Rotation yalnız 3B katmanda anahtar alır; Scale 3 boyutlu yumuşatma ister
+  function donusumGrubu(ly) {
+    return grup("ADBE Transform Group", [yaprak("ADBE Anchor Point", [0, 0]), yaprak("ADBE Position", [960, 540]),
+      yaprak("ADBE Scale", [100, 100], { easeBoyut: 3 }), yaprak("ADBE Rotate X", 0, { gerek: function () { return ly._uc; } }),
+      yaprak("ADBE Rotate Z", 0), yaprak("ADBE Opacity", 100)]);
+  }
   var kullanici = [];
   function katmanEkle(ad, ek) { var ly = new Katman(ad, ek); comp._katmanlar.push(ly); kullanici.push(ly); return ly; }
 
@@ -182,7 +269,7 @@ function kur(o) {
     },
     CompItem: CompItem, FootageItem: FootageItem,
     ParagraphJustification: { CENTER_JUSTIFY: 7415, LEFT_JUSTIFY: 7413 },
-    KeyframeInterpolationType: { HOLD: HOLD, LINEAR: LINEAR },
+    KeyframeInterpolationType: { HOLD: HOLD, LINEAR: LINEAR, BEZIER: BEZIER }, KeyframeEase: KeyframeEase, Shape: Shape,
     Math: Math, Number: Number, String: String, Error: Error, isFinite: isFinite,
     decodeURIComponent: decodeURIComponent, encodeURIComponent: encodeURIComponent,
     File: function (p) { this.fsName = p; }, Folder: function () {}, $: { sleep: function () {} }
@@ -193,7 +280,7 @@ function kur(o) {
   catch (e) { hostHata = e; }
   vm.runInContext(fs.readFileSync(path.join(ROOT, "jsx", "host-ae.jsx"), "utf8"), sandbox, { filename: "jsx/host-ae.jsx" });
   return {
-    sb: sandbox, comp: comp, durum: durum, hostHata: hostHata, katmanEkle: katmanEkle, kullanici: kullanici, FootageItem: FootageItem, CompItem: CompItem,
+    sb: sandbox, comp: comp, durum: durum, ctx: ctx, hostHata: hostHata, katmanEkle: katmanEkle, kullanici: kullanici, FootageItem: FootageItem, CompItem: CompItem,
     call: function (ad, arg) { return JSON.parse(arg === undefined ? sandbox[ad]() : sandbox[ad](encodeURIComponent(JSON.stringify(arg)))); }
   };
 }
@@ -306,6 +393,11 @@ var h5 = kur({ eksikFontlar: ["Anton-Regular"], italikYok: true });
 var it = P.plan(cues, { mod: "stilli", ayar: (function () { var a = AE.gorunum("vurucu").ayar; a.italik = true; return a; })(), w: 1920, h: 1080, fps: 25, isId: "f" });
 var r5 = h5.call("KSAE_altyaziOlustur", it);
 ok("kurulu olmayan font bildirilir (bir kez), italik yazılamazsa bildirilir", r5.ok && js(r5.eksikFont) === '["Anton-Regular"]' && r5.italikYok === true, js(r5));
+var h5m = h5.comp._katmanlar.filter(function (l) { return l.metin; });
+ok("eksik font: katmanlar yedek fonta (Arial Bold) geçer; eksik font iş başına bir kez denenir, sonraki katman doğrudan yedekle",
+  h5m.length === it.katmanlar.length && h5m.every(function (l) { return metinDegeri(l).font === "Arial-BoldMT"; }) &&
+  h5.ctx.fontDenemeleri.filter(function (f) { return f === "Anton-Regular"; }).length === 1 && it.katmanlar[0].yazi.yedekFont === "Arial-BoldMT",
+  js(h5.ctx.fontDenemeleri));
 
 /* ---------------- hata: yarım iş bırakılmaz ---------------- */
 var h6 = kur({ rectHata: 2 });
@@ -318,8 +410,9 @@ var h7 = kur({ compYok: true });
 ok("kompozisyon yokken ekleme / kaldırma: Türkçe hata, geri al grubu açılmaz", !h7.call("KSAE_altyaziOlustur", duz).ok &&
   /Aktif kompozisyon yok/.test(h7.call("KSAE_altyaziKaldir", {}).error) && h7.durum.undoAc === 0);
 var h8 = kur();
-ok("plan sürümü uyuşmuyorsa / boşsa yürütülmez", /surum/.test(h8.call("KSAE_altyaziOlustur", { surum: 2, katmanlar: [{}] }).error) &&
-  /Eklenecek altyazi yok/.test(h8.call("KSAE_altyaziOlustur", { surum: 1, katmanlar: [] }).error) && h8.comp._katmanlar.length === 0 && h8.durum.undoAc === 0);
+ok("plan sürümü uyuşmuyorsa (eski v1 plan da) / boşsa yürütülmez", /surum/.test(h8.call("KSAE_altyaziOlustur", { surum: 1, katmanlar: [{}] }).error) &&
+  /surum/.test(h8.call("KSAE_altyaziOlustur", { surum: 3, katmanlar: [{}] }).error) &&
+  /Eklenecek altyazi yok/.test(h8.call("KSAE_altyaziOlustur", { surum: P.SURUM, katmanlar: [] }).error) && h8.comp._katmanlar.length === 0 && h8.durum.undoAc === 0);
 
 /* ---------------- kaldırma ---------------- */
 var h9 = kur();
@@ -343,6 +436,197 @@ ok("tümünü kaldır: yorumu 'Suflo altyazi' ile başlayan ama ayraçsız kulla
   js(h9.comp._katmanlar.map(function (l) { return l.comment; })));
 ok("kaldırma her çağrıda tek geri al grubu", h9.durum.undoAc === 4 && h9.durum.undoKapa === 4 && /kaldir/.test(h9.durum.undoAdlari[3]));
 ok("Suflo katmanı yoksa 0 silinir (hata değil)", h9.call("KSAE_altyaziKaldir", {}).removed === 0);
+
+
+/* ---------------- Parti 7: yazı animasyonları (metin animatörleri), kutu, maske ---------------- */
+var YA = require(path.join(ROOT, "js", "yazi-animasyonlari.js"));
+var aCues = [{ start: 1, end: 3.4, text: "Merhaba *dünya* bu bir deneme cümlesi", words: [
+  { start: 1, end: 1.4, text: "Merhaba" }, { start: 1.45, end: 1.8, text: "dünya" }, { start: 1.8, end: 1.95, text: "bu" },
+  { start: 2, end: 2.2, text: "bir" }, { start: 2.2, end: 2.6, text: "deneme" }, { start: 2.6, end: 3.4, text: "cümlesi" }] },
+  { start: 3.6, end: 6, text: "ikinci kart burada sakin" }];
+function animAyar(id, ek) {
+  var a = AE.gorunum("kutulu").ayar;   // kutu açık
+  a.anim = id; a.golge = { renk: "#000000", opak: 60, mesafe: 3, yumusak: 4 };
+  for (var k in ek || {}) a[k] = ek[k];
+  return a;
+}
+function animPlani(id, ek, kad) {
+  kad = kad || {};
+  return P.plan(aCues, { mod: "stilli", ayar: animAyar(id, ek), cueKind: "lines", w: kad.w || 1920, h: kad.h || 1080, fps: 25, sure: 60, isId: "a-" + id });
+}
+function anahtarDegerleri(d) { return d.anahtarlar.map(function (a) { return [a.t, a.v]; }); }
+function metinKatmanlari(h) { return h.comp._katmanlar.filter(function (l) { return l.metin; }); }
+function kutuKatmanlari(h) { return h.comp._katmanlar.filter(function (l) { return l.sekil; }); }
+// Planın animatörü ↔ katmandaki animatör: ad, taban, birim, şekil, sabit / anahtarlı Start-End-Offset, Amount, özellikler
+var TABAN = { karakter: 2, kelime: 3, satir: 4 }, SEKIL = { kare: 1 }, OZ = { opaklik: "ADBE Text Opacity", konum: "ADBE Text Position 3D",
+  olcek: "ADBE Text Scale 3D", donme: "ADBE Text Rotation", bulaniklik: "ADBE Text Blur", izleme: "ADBE Text Tracking Amount", dolguRengi: "ADBE Text Fill Color" };
+function animatorUyar(an, pa) {
+  var hata = [];
+  function bak(k, m) { if (!k) hata.push(m); }
+  bak(an.adi === pa.ad, "ad " + an.adi);
+  var se = sec(an), adv = alt(se, "ADBE Text Range Advanced"), s = pa.secici, ind = s.birim === "indeks";
+  bak(alt(adv, "ADBE Text Range Units").deger === (ind ? 2 : 1), "birim");
+  if (TABAN[pa.tabani]) bak(alt(adv, "ADBE Text Range Type2").deger === TABAN[pa.tabani], "taban");
+  if (s.sekil) bak(alt(adv, "ADBE Text Range Shape").deger === SEKIL[s.sekil], "şekil");
+  [["baslangic", "Start"], ["son", "End"], ["ofset", "Offset"]].forEach(function (p) {
+    var d = alt(se, (ind ? "ADBE Text Index " : "ADBE Text Percent ") + p[1]);
+    if (typeof s[p[0]] === "number") bak(d.anahtarlar.length ? true : d.deger === s[p[0]], p[0] + " sabit");
+    var an2 = s[p[0] + "Anahtarlari"];
+    if (an2) {
+      bak(js(anahtarDegerleri(d)) === js(an2), p[0] + " anahtarları " + js(anahtarDegerleri(d)).slice(0, 80));
+      var tut = s.tut === true || (s.tut instanceof Array && s.tut.indexOf(p[0]) !== -1);
+      bak(d.anahtarlar.every(function (a) { return (a.ic === HOLD) === tut; }), p[0] + " Hold");
+    }
+  });
+  if (s.miktarAnahtarlari) bak(js(anahtarDegerleri(alt(adv, "ADBE Text Selector Max Amount"))) === js(s.miktarAnahtarlari), "miktar");
+  var oz = alt(an, "ADBE Text Animator Properties");
+  Object.keys(pa.ozellikler).forEach(function (k) {
+    var d = alt(oz, OZ[k]);
+    bak(d && js(d.deger) === js(pa.ozellikler[k]), "özellik " + k);
+    if (pa.anahtarlar && pa.anahtarlar[k]) bak(d && js(anahtarDegerleri(d)) === js(pa.anahtarlar[k]), "özellik anahtarı " + k);
+  });
+  return hata;
+}
+
+var ozet = {}, hepsiHata = [];
+YA.kimlikler().forEach(function (id) {
+  var hh = kur();
+  var pl = animPlani(id);
+  var rr = hh.call("KSAE_altyaziOlustur", pl);
+  var mk = metinKatmanlari(hh), kk = kutuKatmanlari(hh), hata = [];
+  if (!rr.ok) hata.push(rr.error);
+  if (rr.atlanan && rr.atlanan.length) hata.push("atlanan " + js(rr.atlanan));
+  if (hh.durum.undoAc !== 1 || hh.durum.undoKapa !== 1) hata.push("geri al grubu");
+  if (mk.length !== pl.katmanlar.length || kk.length !== pl.katmanlar.length || rr.kutu !== pl.katmanlar.length) hata.push("katman sayısı");
+  pl.katmanlar.forEach(function (pk) {
+    var ly = mk.filter(function (l) { return l.name === pk.ad; })[0];
+    if (!ly) { hata.push("katman yok " + pk.ad); return; }
+    var anlar = animatorler(ly);
+    // Sıra: *vurgu* sabitleri, etkin kelime, yazı animasyonu
+    var beklenen = pk.sabitVurgu.length + (pk.aktif ? 1 : 0) + pk.animatorler.length;
+    if (anlar.length !== beklenen) hata.push("animatör sayısı " + anlar.length + " ≠ " + beklenen);
+    pk.animatorler.forEach(function (pa, j) {
+      var an = anlar[pk.sabitVurgu.length + (pk.aktif ? 1 : 0) + j];
+      hata = hata.concat(an ? animatorUyar(an, pa).map(function (x) { return pa.ad + ": " + x; }) : [pa.ad + " yok"]);
+    });
+    var DON = { opaklik: "ADBE Opacity", olcek: "ADBE Scale", konum: "ADBE Position", donme: "ADBE Rotate Z", xDonme: "ADBE Rotate X" };
+    pk.katmanAnahtarlari.forEach(function (ka) {
+      var d = donusum(ly, DON[ka.ozellik]);
+      if (js(anahtarDegerleri(d)) !== js(ka.anahtarlar)) hata.push("katman anahtarı " + ka.ozellik);
+      if (ka.yumusatma && !d.anahtarlar.every(function (a) { return a.ic === BEZIER && a.ease && a.ease.length === (DON[ka.ozellik] === "ADBE Scale" ? 3 : 1) && a.ease[0] === ka.yumusatma; })) hata.push("yumuşatma " + ka.ozellik);
+    });
+    var mo = ly.kok["ADBE Text Properties"].cocuklar[2];
+    if (pk.gruplama === "kelime" && (alt(mo, "ADBE Text Anchor Point Option").deger !== 2 || js(alt(mo, "ADBE Text Anchor Point Align").deger) !== "[0,-50]")) hata.push("gruplama");
+    if (!pk.gruplama && alt(mo, "ADBE Text Anchor Point Option").deger !== 1) hata.push("gereksiz gruplama");
+    if (ly._uc !== pk.ucBoyut) hata.push("3B");
+    var maskeler = ly.kok["ADBE Mask Parade"].cocuklar;
+    if (pk.maske ? !(maskeler.length === 1 && maskeler[0].adi === pk.maske.ad && maskeler[0].cocuklar[0].ifade === pk.maske.ifade &&
+      maskeler[0].cocuklar[0].deger && maskeler[0].cocuklar[0].deger.closed === true && maskeler[0].cocuklar[0].deger.vertices.length === 4) : maskeler.length) hata.push("maske");
+    // Kutu: metnin hemen altında, ona bağlı, aynı in / out, işaretli; ifadeler plandan; dolgu rengi RGBA, opaklık
+    var kl = hh.comp._katmanlar[hh.comp._katmanlar.indexOf(ly) + 1];
+    if (!kl || !kl.sekil || kl.parent !== ly || kl.comment !== P.yorum(pl.isId, "kutu") || kl.label !== P.ETIKET || kl.inPoint !== ly.inPoint || kl.outPoint !== ly.outPoint) { hata.push("kutu katmanı"); return; }
+    var vg = kl.kok["ADBE Root Vectors Group"].cocuklar[0].cocuklar[0], rect = alt(vg, "ADBE Vector Shape - Rect"), dol = alt(vg, "ADBE Vector Graphic - Fill");
+    var tg = kl.kok["ADBE Transform Group"];
+    if (alt(rect, "ADBE Vector Rect Size").ifade !== pk.kutu.ifade.boyut || js(alt(rect, "ADBE Vector Rect Position").deger) !== "[0,0]" ||
+      js(alt(dol, "ADBE Vector Fill Color").deger) !== js(pk.kutu.renk.concat([1])) || alt(dol, "ADBE Vector Fill Opacity").deger !== pk.kutu.opak ||
+      alt(tg, "ADBE Position").ifade !== pk.kutu.ifade.konum || alt(tg, "ADBE Scale").ifade !== pk.kutu.ifade.olcek ||
+      alt(tg, "ADBE Rotate Z").ifade !== pk.kutu.ifade.donme || js(alt(tg, "ADBE Anchor Point").deger) !== "[0,0]") hata.push("kutu içeriği / ifadeleri");
+  });
+  ozet[id] = pl.katmanlar[0].animatorler.length + pl.katmanlar[0].katmanAnahtarlari.length;
+  if (hata.length) hepsiHata.push(id + ": " + hata.slice(0, 3).join(" | "));
+});
+ok("her katalog animasyonu: host planı hatasız yürütür (animatör ağacı, seçici birim / taban / şekil, Start / End / Offset / Amount anahtarları ve Hold, özellik değerleri ve anahtarları, katman anahtarları ve yumuşatma, gruplama, 3B, maske, kutu katmanı), atlanan yok, tek geri al grubu",
+  hepsiHata.length === 0, hepsiHata.join(" || "));
+ok("'yok' animasyonlar animatörsüz (klasik çift), diğerleri yerel", YA.ANIMASYONLAR.every(function (a) { return (a.ae === "yok") === (ozet[a.id] === 0); }), js(ozet));
+
+// Daktilo: harf harf Opacity 0, Characters Excluding Spaces, Index, Hold Start anahtarları
+var hd = kur(), pd = animPlani("daktilo");
+hd.call("KSAE_altyaziOlustur", pd);
+var dly = metinKatmanlari(hd).filter(function (l) { return l.name === pd.katmanlar[0].ad; })[0];
+var dan = animatorler(dly).filter(function (a) { return a.adi === "Suflo daktilo"; })[0];
+var dsel = sec(dan), dSt = alt(dsel, "ADBE Text Index Start").anahtarlar;
+ok("daktilo: Opacity 0 animatörü, Based On karakter (boşluksuz), Units Index, End = harf sayısı, Start her harfte +1 (Hold)",
+  alt(alt(dan, "ADBE Text Animator Properties"), "ADBE Text Opacity").deger === 0 && alt(alt(dsel, "ADBE Text Range Advanced"), "ADBE Text Range Type2").deger === 2 &&
+  alt(dsel, "ADBE Text Index End").deger === pd.katmanlar[0].metin.replace(/\s/g, "").length && dSt[dSt.length - 1].v === alt(dsel, "ADBE Text Index End").deger &&
+  dSt.every(function (a, i) { return a.ic === HOLD && (!i || (a.t > dSt[i - 1].t && a.v > dSt[i - 1].v)); }), js(anahtarDegerleri({ anahtarlar: dSt })).slice(0, 200));
+
+// Ölçek darbesi: Scale 122 etkin kelimede; Amount 0 → 100 → 0 kelimenin adımında
+var ho = kur(), po = animPlani("olcek-darbe");
+ho.call("KSAE_altyaziOlustur", po);
+var oan = animatorler(metinKatmanlari(ho).filter(function (l) { return l.name === po.katmanlar[0].ad; })[0]).filter(function (a) { return a.adi === "Suflo ölçek darbesi"; })[0];
+var oam = alt(alt(sec(oan), "ADBE Text Range Advanced"), "ADBE Text Selector Max Amount").anahtarlar;
+ok("ölçek darbesi: Scale [122,122,100], kelime gruplaması, Amount her kelimede 0 → 100 → 0 (doğrusal)",
+  js(alt(alt(oan, "ADBE Text Animator Properties"), "ADBE Text Scale 3D").deger) === "[122,122,100]" && oam.length >= 9 &&
+  oam.every(function (a) { return a.ic === LINEAR && (a.v === 0 || a.v === 100); }) && oam.filter(function (a) { return a.v === 100; }).length === po.katmanlar[0].kelimeSayisi);
+
+// Yandan kay: Position anahtarları yumuşatmalı (1 boyut), opaklık doğrusal; kutu kartla kayar (ifade o anki zamanla)
+var hy = kur(), py = animPlani("yandan-kay");
+hy.call("KSAE_altyaziOlustur", py);
+var yly = metinKatmanlari(hy)[metinKatmanlari(hy).length - 1];
+ok("yandan kay: konum soldan (−%8 genişlik) gelir, Bezier + yumuşatma; kutu konum ifadesi o anki zamanla (kartla kayar)",
+  donusum(yly, "ADBE Position").anahtarlar[0].v[0] === py.katmanlar[0].konum[0] - Math.round(1920 * 0.08) &&
+  donusum(yly, "ADBE Position").anahtarlar.every(function (a) { return a.ic === BEZIER && js(a.ease) === "[50]"; }) &&
+  donusum(yly, "ADBE Opacity").anahtarlar.every(function (a) { return a.ic === LINEAR; }) &&
+  /parent\.toComp\(\[[^\]]+\], time\)/.test(py.katmanlar[0].kutu.ifade.konum) && /, T\)\)$/.test(animPlani("netles").katmanlar[0].kutu.ifade.konum));
+
+// Kapak çevir: 3B katman, X Rotation 70 → 0
+var hk2 = kur(), pk2 = animPlani("kapak-cevir");
+hk2.call("KSAE_altyaziOlustur", pk2);
+var kly = metinKatmanlari(hk2)[0];
+ok("kapak çevir: katman 3B, X Rotation 70 → 12 → 0, opaklık 0 → 100", kly._uc === true &&
+  js(donusum(kly, "ADBE Rotate X").anahtarlar.map(function (a) { return a.v; })) === "[70,12,0]" && donusum(kly, "ADBE Opacity").anahtarlar[0].v === 0);
+
+/* ---------------- bozulmadan geri çekilme: desteklenmeyen özellik iş durdurmaz ---------------- */
+var hb = kur({ desteklenmeyen: ["ADBE Text Blur"] }), pb = animPlani("netles");
+var rb = hb.call("KSAE_altyaziOlustur", pb);
+var bly = metinKatmanlari(hb);
+ok("desteklenmeyen animatör özelliği (Text Blur): iş biter, animatör yarım kalmaz (silinir), atlanan bir kez; opaklık girişi ve kutu yerinde",
+  rb.ok && js(rb.atlanan) === '["Suflo netleş"]' && bly.length === pb.katmanlar.length &&
+  bly.every(function (l) { return !animatorler(l).some(function (a) { return a.adi === "Suflo netleş"; }) && donusum(l, "ADBE Opacity").anahtarlar.length === 2; }) &&
+  kutuKatmanlari(hb).length === pb.katmanlar.length && hb.durum.undoAc === 1 && hb.durum.undoKapa === 1, js(rb));
+var h3b = kur({ ucBoyutYok: true }), p3b = animPlani("kapak-cevir");
+var r3b = h3b.call("KSAE_altyaziOlustur", p3b);
+ok("3B açılamazsa: X Rotation anahtarları geri alınır (0'da durağan), opaklık girişi kalır, iki parça bildirilir",
+  r3b.ok && js(r3b.atlanan) === '["3B katman","X donmesi"]' && metinKatmanlari(h3b).every(function (l) {
+    return donusum(l, "ADBE Rotate X").anahtarlar.length === 0 && donusum(l, "ADBE Rotate X").deger === 0 && donusum(l, "ADBE Opacity").anahtarlar.length === 2;
+  }), js(r3b));
+var hs = kur({ sekilYok: true }), rs = hs.call("KSAE_altyaziOlustur", animPlani("renk-gecis"));
+ok("şekil katmanı eklenemezse: metin katmanları eklenir, kutu atlanır ve bildirilir", rs.ok && rs.kutu === 0 && js(rs.atlanan) === '["Arka plan kutusu"]' &&
+  kutuKatmanlari(hs).length === 0 && metinKatmanlari(hs).length === rs.adet, js(rs));
+var hi = kur({ ifadeYok: true }), ri = hi.call("KSAE_altyaziOlustur", animPlani("perde"));
+ok("ifade yazılamazsa: perde maskesi ve kutu silinir (yazı gizli kalmaz), ikisi bildirilir", ri.ok && js(ri.atlanan) === '["Suflo perde","Arka plan kutusu"]' &&
+  kutuKatmanlari(hi).length === 0 && metinKatmanlari(hi).every(function (l) { return l.kok["ADBE Mask Parade"].cocuklar.length === 0; }), js(ri));
+
+/* ---------------- kaldırma: metin + kutu katmanları ---------------- */
+var hr = kur();
+var kullaniciSekil = hr.katmanEkle("Kendi şeklim", { comment: "logo" });
+hr.call("KSAE_altyaziOlustur", animPlani("dalga"));
+var oncekiSayi = hr.comp._katmanlar.length;
+var rr2 = hr.call("KSAE_altyaziKaldir", {});
+ok("kaldır: metin ve kutu katmanlarının hepsi gider, kullanıcı katmanı kalır, tek geri al grubu", rr2.ok && rr2.removed === oncekiSayi - 1 &&
+  hr.comp._katmanlar.length === 1 && hr.comp._katmanlar[0] === kullaniciSekil && hr.durum.undoAc === 2 && hr.durum.undoKapa === 2, js(rr2));
+
+/* ---------------- uzun transkript ---------------- */
+var uzunCues = [];
+for (var u = 0; u < 400; u++) {
+  var t0 = u * 2.5;
+  uzunCues.push({ start: t0, end: t0 + 2.2, text: "kelime bir iki üç dört", words: ["kelime", "bir", "iki", "üç", "dört"].map(function (w, j) {
+    return { start: t0 + j * 0.44, end: t0 + j * 0.44 + 0.4, text: w };
+  }) });
+}
+var hu = kur(), bas0 = Date.now();
+hu.comp.duration = 1200;
+var pu = P.plan(uzunCues, { mod: "stilli", ayar: animAyar("daktilo"), cueKind: "lines", w: 1920, h: 1080, fps: 25, sure: 1200, isId: "uzun" });
+var ru = hu.call("KSAE_altyaziOlustur", pu);
+var sureU = Date.now() - bas0;
+ok("uzun transkript (400 kart, daktilo + kutu): hepsi eklenir, atlanan yok, makul sürede; anahtarlar toplu yazılır (setValuesAtTimes)",
+  ru.ok && ru.adet === pu.katmanlar.length && pu.katmanlar.length >= 400 && ru.kutu === ru.adet && !ru.atlanan.length && sureU < 20000 && hu.ctx.toplu >= ru.adet,
+  ru.adet + " katman, " + sureU + " ms, toplu " + hu.ctx.toplu);
+var htk = kur({ topluYok: true }), ptk = animPlani("daktilo"), rtk = htk.call("KSAE_altyaziOlustur", ptk);
+var tkSt = sec(animatorler(metinKatmanlari(htk).filter(function (l) { return l.name === ptk.katmanlar[0].ad; })[0]).filter(function (a) { return a.adi === "Suflo daktilo"; })[0]);
+ok("setValuesAtTimes yoksa anahtarlar tek tek yazılır (aynı sonuç, Hold)", rtk.ok && !rtk.atlanan.length && htk.ctx.toplu === 0 &&
+  js(anahtarDegerleri(alt(tkSt, "ADBE Text Index Start"))) === js(ptk.katmanlar[0].animatorler[0].secici.baslangicAnahtarlari) &&
+  alt(tkSt, "ADBE Text Index Start").anahtarlar.every(function (a) { return a.ic === HOLD; }));
 
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

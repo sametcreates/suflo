@@ -438,10 +438,14 @@ ok("panel: yerel çıktı bildirimine animasyon notu gider", /CMJ\.bildirimEkler
 
 /* ---------------- 7) After Effects planı ---------------- */
 var apo = { mod: "stilli", w: 1920, h: 1080, fps: 30, cueKind: "words" };
-var apA = AP.plan(O.METINLER.bes, Object.assign({}, apo, { ayar: Object.assign({}, AE.gorunum("temiz").ayar, { anim: "yukari-suzul" }) }));
-var apK = AP.plan(O.METINLER.bes, Object.assign({}, apo, { ayar: Object.assign({}, AE.gorunum("temiz").ayar, { giris: "yukari" }) }));
-ok("AE planı: yazı animasyonu klasik çiftle (Yukarı kay) ve UYARI ile", apA.uyarilar.indexOf(AP.UYARI.anim) !== -1 &&
-  J(apA.katmanlar.map(function (k) { return k.giris; })) === J(apK.katmanlar.map(function (k) { return k.giris; })) && apK.uyarilar.indexOf(AP.UYARI.anim) === -1);
+// Parti 7: AE karşılığı olmayan animasyon (ae "yok") klasik çiftle ve adlı UYARI ile; karşılığı olan yerel animatörlerle
+var apA = AP.plan(O.METINLER.bes, Object.assign({}, apo, { ayar: Object.assign({}, AE.gorunum("temiz").ayar, { anim: "vurgu-kutusu" }) }));
+var apK = AP.plan(O.METINLER.bes, Object.assign({}, apo, { ayar: Object.assign({}, AE.gorunum("temiz").ayar, { giris: "yok", aktif: "yok" }) }));
+var apY = AP.plan(O.METINLER.bes, Object.assign({}, apo, { ayar: Object.assign({}, AE.gorunum("temiz").ayar, { anim: "yukari-suzul" }) }));
+ok("AE planı: karşılığı olmayan animasyon klasik çiftle (katmanlar aynı) ve adlı UYARI ile; Yukarı süzül yerel animatörlerle",
+  apA.uyarilar[0] === AP.UYARI.animYok.replace("{}", "Vurgu kutusu") && J(apA.katmanlar) === J(apK.katmanlar) && apK.uyarilar.length === 0 &&
+  YA.bul("vurgu-kutusu").ae === "yok" && apY.katmanlar.every(function (k) { return k.giris.length === 0 && k.animatorler.length === 2; }) &&
+  apY.uyarilar[0].indexOf("«Yukarı süzül»") === 0);
 
 /* ---------------- 8) Shorts paketi ---------------- */
 var spA = SPP.stilAyarlari("efekt", null, true, Object.assign({}, AE.gorunum("temiz").ayar, { anim: "netles" }), true);

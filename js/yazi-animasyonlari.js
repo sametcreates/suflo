@@ -12,7 +12,8 @@
  *   aciklama  bir cümle
  *   klasik    { giris, aktif }: en yakın klasik çift. Premiere yerel çıktı (MOGRT sözleşmesi yalnız textAnim 0-5 /
  *             hlAnim 0-3 bilir), After Effects planı, eski paneller ve suflo.app/stil bununla gösterir
- *   ae        "tam" | "yakin" | "yok": After Effects çıktısındaki karşılığı (şimdilik geçici; AE'de klasik çift çizilir)
+ *   ae        "tam" | "yakin" | "yok": After Effects çıktısındaki karşılığı (js/ae-plan.js aeDestegi ile aynı; test
+ *             denetler): tam yerel metin animatörü / katman anahtarı, yakin yerel ama farkı uyarıda, yok klasik çift + uyarı
  *   sure      hareketin Dengeli şiddetteki süresi (ms); stil motoru bunu şiddete böler (Yumuşak uzun, Sert kısa).
  *             daktilo'da kelime başına üst sınır (harfler kelimenin söylenişine yayılır)
  *   renkler   (isteğe bağlı) animasyonun kullandığı ek renk alanları: "vurguKutuRenk" (vurgu kutusunun rengi; boşsa
@@ -39,29 +40,29 @@
 
   var ANIMASYONLAR = [
     { id: "kelime-pop", ad: "Kelime pop", kategori: "kelime", aciklama: "Her kelime söylendiği anda küçükten büyüyüp yerine oturur; önceki kelimeler kalır.",
-      klasik: { giris: "pop", aktif: "yok" }, ae: "yok", sure: 220 },
+      klasik: { giris: "pop", aktif: "yok" }, ae: "yakin", sure: 220 },
     { id: "yukari-suzul", ad: "Yukarı süzül", kategori: "kelime", aciklama: "Her kelime söylendiği anda biraz aşağıdan belirerek yukarı süzülür.",
-      klasik: { giris: "yukari", aktif: "yok" }, ae: "yok", sure: 320 },
+      klasik: { giris: "yukari", aktif: "yok" }, ae: "yakin", sure: 320 },
     { id: "dalga", ad: "Dalga", kategori: "kelime", aciklama: "Kart açılırken kelimeler sırayla dalgalanarak gelir ve durulur.",
-      klasik: { giris: "yukari", aktif: "yok" }, ae: "yok", sure: 420 },
+      klasik: { giris: "yukari", aktif: "yok" }, ae: "yakin", sure: 420 },
     { id: "zipla-gel", ad: "Zıplayarak gel", kategori: "kelime", aciklama: "Her kelime yukarıdan düşer, hafifçe sekip yerine oturur.",
-      klasik: { giris: "asagi", aktif: "yok" }, ae: "yok", sure: 380 },
+      klasik: { giris: "asagi", aktif: "yok" }, ae: "yakin", sure: 380 },
     { id: "daktilo", ad: "Daktilo", kategori: "harf", aciklama: "Her kelime söylenirken harf harf yazılır.",
-      klasik: { giris: "fade", aktif: "yok" }, ae: "yok", sure: 600 },
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 600 },
     { id: "harf-belir", ad: "Harf harf belir", kategori: "harf", aciklama: "Kart açılırken harfler sırayla yumuşakça belirir.",
-      klasik: { giris: "fade", aktif: "yok" }, ae: "yok", sure: 350 },
-    { id: "netles", ad: "Netleş", kategori: "kart", aciklama: "Kart bulanıktan netleşerek belirir.",
       klasik: { giris: "fade", aktif: "yok" }, ae: "yakin", sure: 350 },
+    { id: "netles", ad: "Netleş", kategori: "kart", aciklama: "Kart bulanıktan netleşerek belirir.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 350 },
     { id: "yandan-kay", ad: "Yandan kay", kategori: "kart", aciklama: "Kart soldan yavaşlayarak kayıp belirir.",
-      klasik: { giris: "fade", aktif: "yok" }, ae: "yakin", sure: 380 },
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 380 },
     { id: "aralik-acil", ad: "Sinematik aralık", kategori: "kart", aciklama: "Harf aralığı genişten normale kapanırken kart belirir.",
-      klasik: { giris: "fade", aktif: "yok" }, ae: "yakin", sure: 450 },
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 450 },
     { id: "olcek-darbe", ad: "Ölçek darbesi", kategori: "karaoke", aciklama: "Konuşulan kelime kısa bir darbeyle büyüyüp geri döner.",
-      klasik: { giris: "yok", aktif: "zipla" }, ae: "yok", sure: 180 },
+      klasik: { giris: "yok", aktif: "zipla" }, ae: "tam", sure: 180 },
     { id: "renk-gecis", ad: "Renk geçişi", kategori: "karaoke", aciklama: "Konuşulan kelime vurgu rengine yumuşakça geçer, bitince geri döner.",
-      klasik: { giris: "yok", aktif: "yok" }, ae: "yok", sure: 120 },
+      klasik: { giris: "yok", aktif: "yok" }, ae: "tam", sure: 120 },
     { id: "sallanma", ad: "Sallanma", kategori: "karaoke", aciklama: "Konuşulan kelime iki kez hafifçe sağa sola sallanır.",
-      klasik: { giris: "yok", aktif: "titre" }, ae: "yok", sure: 320 },
+      klasik: { giris: "yok", aktif: "titre" }, ae: "tam", sure: 320 },
     /*
      * Parti 5: karaoke ve vurgu ailesi (kelimenin ölçülen zamanına bağlı) ve hareket ailesi. sure: dolguda vurgunun
      * önceki kelimeden çekilişi, kutuda kutunun belirişi, çizgide çizginin akışı, parlamada nabzın periyodu, nefeste
@@ -71,7 +72,7 @@
     { id: "karaoke-dolgu", ad: "Karaoke dolgu", kategori: "karaoke", aciklama: "Konuşulan kelime söylenirken soldan sağa vurgu rengiyle dolar.",
       klasik: { giris: "yok", aktif: "yok" }, ae: "yakin", sure: 150 },
     { id: "karaoke-birikimli", ad: "Biriken vurgu", kategori: "karaoke", aciklama: "Söylenen kelimeler vurgu renginde kalır; kart konuşuldukça boyanır.",
-      klasik: { giris: "yok", aktif: "yok" }, ae: "yakin", sure: 120 },
+      klasik: { giris: "yok", aktif: "yok" }, ae: "tam", sure: 120 },
     { id: "vurgu-kutusu", ad: "Vurgu kutusu", kategori: "karaoke", aciklama: "Konuşulan kelimenin arkasında dolu bir kutu kelimeden kelimeye atlar.",
       klasik: { giris: "yok", aktif: "yok" }, ae: "yok", sure: 90, renkler: ["vurguKutuRenk"] },
     { id: "vurgu-cizgi", ad: "Vurgu çizgisi", kategori: "karaoke", aciklama: "Konuşulan kelimenin altında vurgu renginde bir çizgi soldan sağa akar.",
@@ -83,17 +84,17 @@
     { id: "kromatik-yumusak", ad: "Yumuşak kromatik", kategori: "karaoke", aciklama: "Konuşulan kelimenin iki renkli gölgesi yanlardan kayıp onunla birleşir; titreme yok.",
       klasik: { giris: "yok", aktif: "yok" }, ae: "yok", sure: 220, renkler: ["vurguRenk2"] },
     { id: "buyuyen-vurgu", ad: "Büyüyen vurgu", kategori: "kelime", aciklama: "*Anahtar* kelime (yoksa kartın en uzun kelimesi) iri durur ve söylendiğinde patlayarak gelir.",
-      klasik: { giris: "yok", aktif: "zipla" }, ae: "yok", sure: 240 },
+      klasik: { giris: "yok", aktif: "zipla" }, ae: "yakin", sure: 240 },
     { id: "dusus", ad: "Düşüş", kategori: "kelime", aciklama: "Kart açılırken kelimeler sırayla yukarıdan düşer, iki kez sönümlenerek sekip oturur.",
-      klasik: { giris: "asagi", aktif: "yok" }, ae: "yok", sure: 520 },
+      klasik: { giris: "asagi", aktif: "yok" }, ae: "yakin", sure: 520 },
     { id: "kapak-cevir", ad: "Kapak çevir", kategori: "kart", aciklama: "Kart yatay ekseni çevresinde arkadan öne dönerek belirir.",
       klasik: { giris: "fade", aktif: "yok" }, ae: "yakin", sure: 420 },
     { id: "donerek", ad: "Dönerek gel", kategori: "kart", aciklama: "Kart hafifçe eğik ve küçük başlar, dönerek düzelir ve tam boyuna gelir.",
-      klasik: { giris: "pop", aktif: "yok" }, ae: "yakin", sure: 400 },
+      klasik: { giris: "pop", aktif: "yok" }, ae: "tam", sure: 400 },
     { id: "perde", ad: "Perde", kategori: "kart", aciklama: "Kart alttan yukarı açılan bir perdenin ardından ortaya çıkar.",
       klasik: { giris: "yukari", aktif: "yok" }, ae: "yakin", sure: 450 },
     { id: "nefes", ad: "Nefes", kategori: "surekli", aciklama: "Kart sakin bir nefes gibi çok hafifçe büyüyüp küçülür; podcast için.",
-      klasik: { giris: "fade", aktif: "yok" }, ae: "yok", sure: 1200 }
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 1200 }
   ];
 
   function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }

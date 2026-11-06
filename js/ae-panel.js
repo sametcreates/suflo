@@ -119,9 +119,15 @@ window.SufloAePanel = (function () {
       toast(r.adet + " altyazı katmanı eklendi", "good", 7000);
       // üç adımlı akış (js/altyazi-akis.js): başarılı ekleme 3. adımı "hazır ✓" yapar (Premiere'de yildizIste'nin işi)
       if (window.SufloAltyaziAkis && window.SufloAltyaziAkis.guncelle) window.SufloAltyaziAkis.guncelle({ uygulandi: true });
+      /*
+       * Uyarılar: planınkiler (yazı animasyonunun AE karşılığı: yaklaşık ya da klasik çift, animasyon adıyla), kurulu
+       * olmayan fontlar (iş başına bir kez, adlarıyla; katmanlar Arial'a geçti), italik ve bu sürümde kurulamayan
+       * animasyon parçaları (host atladı, iş durmadı)
+       */
       var notlar = plan.uyarilar.slice();
-      if (r.eksikFont && r.eksikFont.length) notlar.push("After Effects'te kurulu olmayan font: " + r.eksikFont.join(", ") + ". Fontu kurup katmanlarda yeniden seçebilirsin.");
+      if (r.eksikFont && r.eksikFont.length) notlar.push("After Effects'te kurulu olmayan font: " + r.eksikFont.join(", ") + ". Bu katmanlarda Arial kullanıldı; fontu kurup katmanlarda yeniden seçebilirsin.");
       if (r.italikYok) notlar.push("Bu After Effects sürümü italiği betikten açamıyor; yazı düz eklendi.");
+      if (r.atlanan && r.atlanan.length) notlar.push("Bu After Effects sürümünde kurulamayan animasyon parçaları atlandı: " + r.atlanan.join(", ") + ". Yazı onlarsız eklendi.");
       notlar.forEach(function (n) { toast(n, "warn", 9000); });
     } catch (e) {
       toast(hataMetni(e), "bad", 9000);

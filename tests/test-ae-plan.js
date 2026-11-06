@@ -174,7 +174,8 @@ function gorunumPlani(id, ek) {
   return P.plan(sCues, { mod: "stilli", ayar: a, w: 1920, h: 1080, fps: 25, isId: "g" });
 }
 var kutulu = gorunumPlani("kutulu");
-ok("Kutulu: arka plan kutusu uyarısı; kontursuz; Belirme girişi opaklık 0 → 100; vurgu animatörü ölçeksiz", kutulu.uyarilar.indexOf(P.UYARI.kutu) !== -1 &&
+ok("Kutulu: arka plan kutusu planı (uyarı yok); kontursuz; Belirme girişi opaklık 0 → 100; vurgu animatörü ölçeksiz", kutulu.uyarilar.length === 0 &&
+  kutulu.katmanlar.every(function (k) { return k.kutu && k.kutu.opak === 65 && js(k.kutu.renk) === "[0,0,0]"; }) &&
   kutulu.katmanlar[0].yazi.kontur === 0 && kutulu.katmanlar[0].giris[0].ozellik === "opaklik" && kutulu.katmanlar[0].giris[0].anahtarlar[0][1] === 0 &&
   kutulu.katmanlar[0].aktif.olcek === null && kutulu.katmanlar[0].golge === null);
 var glitch = gorunumPlani("glitch");
@@ -209,7 +210,7 @@ var emojiAd = P.plan([{ start: 0, end: 1, text: new Array(31).join("a") + "😀 
 var emojiAd2 = P.plan([{ start: 0, end: 1, text: new Array(30).join("a") + "😀 bbbbbbbb" }], { mod: "duz" }).katmanlar[0].ad;
 ok("katman adı: kesim emoji vekil çiftini bölmez (31. kod birimi yüksek vekilse bir önceden kesilir)", !yalnizVekil(emojiAd) && !yalnizVekil(emojiAd2) &&
   /a…$/.test(emojiAd) && /😀…$/.test(emojiAd2), js([emojiAd, emojiAd2]));
-ok("deterministik: aynı girdi aynı plan (JSON eşit), sürüm 1", js(P.plan(sCues, o)) === js(s) && s.surum === 1 && s.isId === "is1");
+ok("deterministik: aynı girdi aynı plan (JSON eşit), sürüm 2 (animatörlü plan)", js(P.plan(sCues, o)) === js(s) && s.surum === 2 && s.isId === "is1");
 ok("plan girdiyi değiştirmez", sCues[0].text === "Merhaba *dünya* bu bir deneme cümlesi" && sCues[0].start === 1);
 ok("aeMetni: kontrol karakterleri boşluk, boş satır düşer, CRLF tek kırılım", P.aeMetni("a\u0007b\r\n\n  c  ") === "a b\rc" && P.aeMetni(null) === "");
 /* ---------------- kalite motoru (parti 1): kart / satır kırılım dili ---------------- */
@@ -235,6 +236,147 @@ ok("aeMetni: kontrol karakterleri boşluk, boş satır düşer, CRLF tek kırıl
   ok("düz plan o.dil: uzun satır Türkçe-duyarlı sarılır (soru eki satır başında değil), kelime düşmez",
     !/\rmisin/.test(duzTr) && duzTr.replace(/\r/g, " ") === uzunDuz[0].text, js(duzTr));
 })();
+
+
+/* ---------------- Parti 7: yazı animasyonlarının After Effects planı ---------------- */
+var YA = require(path.join(ROOT, "js", "yazi-animasyonlari.js"));
+var aCues = [{ start: 1, end: 3.4, text: "Merhaba *dünya* bu bir deneme cümlesi", words: [
+  { start: 1, end: 1.4, text: "Merhaba" }, { start: 1.45, end: 1.8, text: "dünya" }, { start: 1.8, end: 1.95, text: "bu" },
+  { start: 2, end: 2.2, text: "bir" }, { start: 2.2, end: 2.6, text: "deneme" }, { start: 2.6, end: 3.4, text: "cümlesi" }] },
+  { start: 3.6, end: 6, text: "ikinci kart burada sakin" }, { start: 6, end: 6.3, text: "çok kısa kart" }];
+function aAyar(id, ek) { var a = AE.gorunum("temiz").ayar; a.anim = id; for (var k in ek || {}) a[k] = ek[k]; return a; }
+function aPlan(id, ek, kad) {
+  kad = kad || {};
+  return P.plan(aCues, { mod: "stilli", ayar: aAyar(id, ek), cueKind: "lines", w: kad.w || 1920, h: kad.h || 1080, fps: kad.fps || 25, sure: 60, isId: "a" });
+}
+// Planın bütün anahtar listeleri: { ad, liste, bas, son }
+function anahtarListeleri(k) {
+  var out = [];
+  k.animatorler.forEach(function (a) {
+    ["baslangicAnahtarlari", "sonAnahtarlari", "ofsetAnahtarlari", "miktarAnahtarlari"].forEach(function (f) { if (a.secici[f]) out.push({ ad: a.ad + "." + f, liste: a.secici[f], a: a }); });
+    Object.keys(a.anahtarlar || {}).forEach(function (f) { out.push({ ad: a.ad + "." + f, liste: a.anahtarlar[f], a: a }); });
+  });
+  k.katmanAnahtarlari.forEach(function (e) { out.push({ ad: "katman." + e.ozellik, liste: e.anahtarlar }); });
+  return out;
+}
+function harfSay(t) { return (t.match(/[\ud800-\udbff][\udc00-\udfff]|[^\s]/g) || []).length; }
+var hatalar = [], destek = {};
+YA.ANIMASYONLAR.forEach(function (kayit) {
+  var id = kayit.id, pl = aPlan(id), d = P.aeDestegi(id), e = [];
+  destek[id] = d;
+  if (js(aPlan(id)) !== js(pl)) e.push("deterministik değil");
+  if (kayit.ae !== d) e.push("katalog ae " + kayit.ae + " ≠ plan " + d);
+  var adim = "«" + kayit.ad + "»";
+  if (d === "yok") {
+    // Klasik çift: katmanlar, katalogdaki klasik giriş / vurgu çiftiyle kurulan planla aynı; uyarı adıyla
+    var kl = P.plan(aCues, { mod: "stilli", ayar: aAyar("", { giris: kayit.klasik.giris, aktif: kayit.klasik.aktif }), cueKind: "lines", w: 1920, h: 1080, fps: 25, sure: 60, isId: "a" });
+    if (js(pl.katmanlar) !== js(kl.katmanlar)) e.push("klasik yedekle aynı değil");
+    if (pl.uyarilar[0] !== P.UYARI.animYok.replace("{}", kayit.ad)) e.push("yok uyarısı");
+  } else {
+    if (pl.uyarilar.filter(function (u) { return u.indexOf(adim) === 0; }).length !== (d === "yakin" ? 1 : 0)) e.push("uyarı sayısı");
+    if (d === "yakin" && pl.uyarilar.indexOf(P.UYARI.animYakin.replace("{}", kayit.ad).replace("{}", P.NOTLAR[id])) === -1) e.push("yakın uyarısı / not");
+    if (d === "yakin" && !P.NOTLAR[id]) e.push("not yok");
+  }
+  pl.katmanlar.forEach(function (k) {
+    if (k.animasyon !== (d === "yok" ? "" : id)) e.push("animasyon alanı");
+    if (d !== "yok") {
+      if (!k.animatorler.length && !k.katmanAnahtarlari.length && !k.maske && k.son - k.bas > 1) e.push("yerel çıktı boş " + k.metin);
+      if (k.giris.length) e.push("klasik giriş de var");
+    }
+    var kelimeN = k.kelimeSayisi, harfN = harfSay(k.metin);
+    anahtarListeleri(k).forEach(function (L) {
+      var l = L.liste;
+      if (!l.length) { e.push(L.ad + " boş"); return; }
+      for (var i = 0; i < l.length; i++) {
+        if (l[i][0] < k.bas - 1e-9 || l[i][0] > k.son + 1e-9) e.push(L.ad + " katman dışı " + l[i][0]);
+        if (i && !(l[i][0] > l[i - 1][0])) e.push(L.ad + " zaman artmıyor");
+        if (L.a && L.a.secici.birim === "indeks" && /Anahtarlari$/.test(L.ad) && !/miktar/.test(L.ad)) {
+          var ust = L.a.tabani === "kelime" ? kelimeN : harfN;
+          if (l[i][1] < 0 || l[i][1] > ust) e.push(L.ad + " dizin sınır dışı " + l[i][1] + "/" + ust);
+          if (i && /baslangic|sonA/.test(L.ad) && L.a.secici.tut !== true && !(L.a.secici.tut instanceof Array) && l[i][1] < l[i - 1][1]) e.push(L.ad + " süpürme geri gidiyor");
+        }
+        if (/miktar/.test(L.ad) && (l[i][1] < -100 || l[i][1] > 100)) e.push("miktar aralık dışı");
+      }
+    });
+    k.animatorler.forEach(function (a) {
+      var s = a.secici;
+      if (["karakter", "kelime"].indexOf(a.tabani) === -1) e.push(a.ad + " taban");
+      if (s.birim !== "indeks" && s.birim !== "yuzde") e.push(a.ad + " birim");
+      if (s.birim === "yuzde" && !(s.baslangic === 0 && s.son === 100)) e.push(a.ad + " yüzde aralığı");
+      // Gizliden açığa süpürme: Son birim sayısı (kelime ya da boşluksuz harf)
+      if (s.birim === "indeks" && typeof s.son === "number" && s.baslangicAnahtarlari && !s.sonAnahtarlari && s.son !== (a.tabani === "kelime" ? kelimeN : harfN)) e.push(a.ad + " son ≠ birim sayısı");
+      if (/^Suflo/.test(a.ad) === false) e.push("ad");
+    });
+  });
+  if (e.length) hatalar.push(id + ": " + e.slice(0, 3).join(" | "));
+});
+ok("her katalog animasyonu: plan deterministik; anahtarlar zamanca artan ve katmanın in / out'u içinde; dizinler birim sayısında; birimler doğru; ae alanı plana uyar ('yok' → klasik yedek + uyarı, 'yakin' → adlı not)",
+  hatalar.length === 0, hatalar.join(" || "));
+ok("AE desteği: tam / yakın / yok dağılımı (yok yalnız süs katmanlı vurgu ailesi)", js(Object.keys(destek).filter(function (k) { return destek[k] === "yok"; }).sort()) ===
+  js(["kromatik-yumusak", "parlama", "vurgu-cizgi", "vurgu-kutusu"]) && Object.keys(destek).filter(function (k) { return destek[k] === "tam"; }).length >= 10, js(destek));
+
+// Animasyon seçilince klasik giriş / vurgu yerine metin animatörleri; *anahtar* kelime rengi kalır
+var kp = aPlan("kelime-pop").katmanlar[0];
+ok("kelime pop: Scale 0 kelime animatörü, Start her kelimenin penceresinde i → i + 1, kelime gruplaması, klasik Pop girişi yok, *vurgu* sabit",
+  kp.animatorler.length === 1 && js(kp.animatorler[0].ozellikler) === '{"olcek":[0,0,100]}' && kp.animatorler[0].tabani === "kelime" &&
+  kp.animatorler[0].secici.son === kp.kelimeSayisi && kp.kelimeSayisi === 2 && kp.animatorler[0].secici.baslangicAnahtarlari[0][0] === kp.bas && kp.gruplama === "kelime" && kp.giris.length === 0 &&
+  kp.sabitVurgu.length === 1 && kp.aktif && kp.aktif.olcek === null, js(kp.animatorler[0].secici));
+var rg = aPlan("renk-gecis", { vurgu: false }).katmanlar[0];
+ok("renk geçişi: vurgu rengine kayan [Başlangıç, Son) aralığı (doğrusal), etkin kelime animasyonun kendisi (klasik etkin kelime yok)",
+  rg.aktif === null && js(rg.animatorler[0].ozellikler.dolguRengi) === js([1, 0.8235, 0.2471]) && rg.animatorler[0].secici.sonAnahtarlari[1][1] === 1 &&
+  rg.animatorler[0].secici.baslangicAnahtarlari.every(function (a, i, l) { return !i || a[1] >= l[i - 1][1]; }) && !rg.animatorler[0].secici.tut);
+var it2 = aPlan("iki-ton", { vurguRenk2: "#00ff00" }).katmanlar[0];
+ok("iki ton: iki renk animatörü (vurgu / ikinci vurgu), çift ve tek kelimeler; *anahtar* kelime de sırasının rengini alır",
+  it2.animatorler.length === 2 && js(it2.animatorler[1].ozellikler.dolguRengi) === "[0,1,0]" && it2.sabitVurgu[0].i0 === 1 && js(it2.sabitVurgu[0].renk) === "[0,1,0]" &&
+  it2.animatorler[0].secici.sonAnahtarlari.some(function (a) { return a[1] === 0; }));
+var nt = aPlan("netles").katmanlar[0], al = aPlan("aralik-acil").katmanlar[0];
+ok("netleş: Blur animatörü (kartın tamamı, yüzde) 10 → 0 ve katman opaklığı; sinematik aralık: Tracking (1/1000 em) genişten 0'a",
+  nt.animatorler[0].secici.birim === "yuzde" && js(nt.animatorler[0].anahtarlar.bulaniklik[0][1]) === "[10,10]" && js(nt.animatorler[0].anahtarlar.bulaniklik[1][1]) === "[0,0]" &&
+  nt.katmanAnahtarlari[0].ozellik === "opaklik" && al.animatorler[0].anahtarlar.izleme[0][1] === Math.round(18 / al.yazi.boyut * 1000) &&
+  al.animatorler[0].anahtarlar.izleme[2][1] === 0);
+var nf = aPlan("nefes").katmanlar;
+ok("nefes: katman ölçeği 100 ↔ 103, kart sonundan önce 100'de; çok kısa kartta anahtar yok", nf[1].katmanAnahtarlari[0].ozellik === "olcek" &&
+  nf[1].katmanAnahtarlari[0].anahtarlar.every(function (a) { return a[1][0] === 100 || a[1][0] === 103; }) &&
+  nf[1].katmanAnahtarlari[0].anahtarlar[nf[1].katmanAnahtarlari[0].anahtarlar.length - 1][1][0] === 100 &&
+  nf[1].katmanAnahtarlari[0].anahtarlar[nf[1].katmanAnahtarlari[0].anahtarlar.length - 1][0] <= nf[1].son - 0.15 + 1e-6 &&
+  nf[nf.length - 1].son - nf[nf.length - 1].bas < 0.5 && nf[nf.length - 1].katmanAnahtarlari.length === 0, js(nf.map(function (k) { return [k.metin, k.katmanAnahtarlari.length]; })));
+var pr = aPlan("perde").katmanlar[0];
+ok("perde: sourceRectAtTime'a bağlı maske yolu ifadesi (createPath) ve hafif yükselme", pr.maske && /sourceRectAtTime\(T, false\)/.test(pr.maske.ifade) &&
+  /createPath\(/.test(pr.maske.ifade) && /linear\(time, 1, /.test(pr.maske.ifade) && pr.katmanAnahtarlari[0].ozellik === "konum");
+
+// Kutu: metne bağlı şekil katmanının planı; ölçü sourceRectAtTime, yatay pay piksel en-boyuna göre, kutu ölçeklenmez / dönmez
+var ku = aPlan("donerek", { kutu: true, kutuRenk: "#112233", kutuOpak: 80 }).katmanlar[0].kutu;
+ok("kutu: renk / opaklık ayardan, pay 20 (1080 tabanı) ve puntonun %10'u, ifadeler sourceRectAtTime + pixelAspect + üst katmanın ölçek / dönmesini geri alır",
+  ku && js(ku.renk) === js([0.0667, 0.1333, 0.2]) && ku.opak === 80 && ku.payX === 20 && ku.izle === false &&
+  /parent\.sourceRectAtTime\(T, false\)/.test(ku.ifade.boyut) && /thisComp\.pixelAspect/.test(ku.ifade.boyut) && /10000 \/ v/.test(ku.ifade.olcek) &&
+  ku.ifade.donme === "-parent.transform.rotation" && /parent\.fromComp\(parent\.toComp\(/.test(ku.ifade.konum) && /, T\)\)$/.test(ku.ifade.konum), js(ku));
+ok("kutu kapalıyken plan yok; klasik Yukarı kay girişinde kutu kartla kayar (izle)", aPlan("netles").katmanlar[0].kutu === null &&
+  P.plan(aCues, { mod: "stilli", ayar: Object.assign(AE.gorunum("zarif").ayar, { kutu: true }), w: 1920, h: 1080, fps: 25 }).katmanlar[0].kutu.izle === true &&
+  aPlan("yandan-kay", { kutu: true }).katmanlar[0].kutu.izle === true);
+ok("kutu ifadeleri ASCII ve ES3 (var / for; let / => yok: eski ifade motoru da çalıştırır)", [ku.ifade.konum, ku.ifade.olcek, ku.ifade.boyut, pr.maske.ifade].every(function (x) {
+  return /^[\x09\x0a\x20-\x7e]+$/.test(x) && !/\blet\b|\bconst\b|=>|`/.test(x);
+}));
+
+// Ölçek: 4K ve dikey kadraj, kare olmayan piksel
+var k4 = aPlan("yukari-suzul", { kutu: true }, { w: 3840, h: 2160 }).katmanlar[0], k1 = aPlan("yukari-suzul", { kutu: true }).katmanlar[0];
+ok("4K: kayma, kutu payı ve punto kısa kenarla ölçeklenir (×2)", k4.animatorler[0].ozellikler.konum[1] === 2 * k1.animatorler[0].ozellikler.konum[1] &&
+  k4.kutu.payX === 2 * k1.kutu.payX && Math.abs(k4.yazi.boyut - 2 * k1.yazi.boyut) <= 1, js([k4.animatorler[0].ozellikler, k1.animatorler[0].ozellikler]));
+var kd = aPlan("yandan-kay", {}, { w: 1080, h: 1920 }).katmanlar[0];
+ok("9:16: yandan kayış genişliğin %8'i (kompozisyon pikseli), kayma 1080 tabanında", kd.katmanAnahtarlari[0].anahtarlar[0][1][0] === yuvarla2(kd.konum[0] - Math.round(1080 * 0.08)));
+function yuvarla2(v) { return Math.round(v * 10) / 10; }
+var kare29 = aPlan("daktilo", {}, { fps: 29.97 });
+ok("29,97 fps: kart sınırları kareye oturur, anahtarlar kart içinde", kare29.katmanlar.every(function (k) {
+  return anahtarListeleri(k).every(function (L) { return L.liste.every(function (a) { return a[0] >= k.bas - 1e-9 && a[0] <= k.son + 1e-9; }); });
+}));
+
+// Uzun transkript: plan kart başına doğrusal (yüzlerce kart)
+var uzun = [];
+for (var u = 0; u < 600; u++) uzun.push({ start: u * 2, end: u * 2 + 1.8, text: "bir iki üç dört beş altı" });
+var t0 = Date.now(), pu = P.plan(uzun, { mod: "stilli", ayar: aAyar("karaoke-dolgu", { kutu: true }), w: 1920, h: 1080, fps: 25, isId: "u" }), sure = Date.now() - t0;
+ok("uzun transkript: 600 kart planı hızlı ve her kartın anahtarı kendi kelime / harf sayısıyla sınırlı", pu.katmanlar.length >= 600 && sure < 5000 &&
+  pu.katmanlar.every(function (k) { return anahtarListeleri(k).every(function (L) { return L.liste.length <= 2 * harfSay(k.metin) + 4; }); }), sure + " ms");
+ok("klasik görünümde yazı animasyonu alanları boş (eski çıktı aynı)", s.katmanlar.every(function (k) { return k.animasyon === "" && !k.animatorler.length && !k.katmanAnahtarlari.length &&
+  k.maske === null && k.ucBoyut === false && k.kutu === null && k.gruplama === "kelime"; }));
 
 ok("MIN_SURUM manifestteki AEFT alt sınırıyla aynı", new RegExp('<Host Name="AEFT" Version="\\[' + P.MIN_SURUM + '\\.0,').test(require("fs").readFileSync(path.join(ROOT, "CSXS", "manifest.xml"), "utf8")));
 

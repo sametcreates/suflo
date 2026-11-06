@@ -197,7 +197,8 @@ function kopru(env, aePanel) {
         call: function (fn, arg) {
           kayit.cagri.push({ fn: fn, arg: arg });
           if (fn === "KS_getContext") return Promise.resolve(o.baglam || { ok: true, hasSeq: true, width: 1080, height: 1920, fps: 30, seqDur: 20 });
-          if (fn === "KSAE_altyaziOlustur") return Promise.resolve(o.olustur || { ok: true, adet: arg.katmanlar.length, filigran: !!arg.filigran, eksikFont: o.eksikFont || [] });
+          if (fn === "KSAE_altyaziOlustur") return Promise.resolve(o.olustur || { ok: true, adet: arg.katmanlar.length, filigran: !!arg.filigran, eksikFont: o.eksikFont || [],
+            atlanan: o.atlanan || [] });
           if (fn === "KSAE_altyaziKaldir") return Promise.resolve({ ok: true, removed: 4 });
           return Promise.resolve({ ok: false, error: "?" });
         }
@@ -207,7 +208,9 @@ function kopru(env, aePanel) {
         hasSegments: function () { return segs.length > 0; },
         aeVerisi: function (stilli) {
           var AEm = require(path.join(KOK, "js", "altyazi-efekt.js"));
-          return stilli ? { cues: segs, cueKind: "lines", ayar: AEm.gorunum("temiz").ayar, guvenli: false }
+          var ayar = AEm.gorunum("temiz").ayar;
+          if (o.anim) ayar.anim = o.anim;
+          return stilli ? { cues: segs, cueKind: "lines", ayar: ayar, guvenli: false }
             : { cues: segs.map(function (s) { return { start: s.start, end: s.end, text: s.text.replace(/\*/g, "") }; }), cueKind: "lines", ayar: null, guvenli: false };
         }
       },
@@ -261,6 +264,43 @@ function kopru(env, aePanel) {
     st.kayit.toast.some(function (t) { return t[0] === "1 altyazı katmanı eklendi" && t[1] === "good"; }) &&
     !st.kayit.toast.some(function (t) { return /deneme/.test(t[0]); }) &&
     st.kayit.toast.some(function (t) { return /kurulu olmayan font: Montserrat-Bold/.test(t[0]) && t[1] === "warn"; }), js(st.kayit.toast));
+  ok("eksik font uyarısı: adlar bir kez, Arial'a geçildiği söylenir", st.kayit.toast.filter(function (t) { return /kurulu olmayan font/.test(t[0]); }).length === 1 &&
+    st.kayit.toast.some(function (t) { return t[0] === "After Effects'te kurulu olmayan font: Montserrat-Bold. Bu katmanlarda Arial kullanıldı; fontu kurup katmanlarda yeniden seçebilirsin."; }));
+
+  // Parti 7: yazı animasyonu AE'de yaklaşık / yok → adlı Türkçe uyarı; host'un atladığı parçalar tek uyarıda; kapı değişmez (denemesiz)
+  var APm = require(path.join(KOK, "js", "ae-plan.js"));
+  var yak = panel("AEFT", { anim: "kelime-pop", atlanan: ["Suflo kelime pop", "Arka plan kutusu"] });
+  await yak.P.ekle(true);
+  var yakPlan = yak.kayit.cagri.filter(function (c) { return c.fn === "KSAE_altyaziOlustur"; })[0].arg;
+  ok("yazı animasyonu (yaklaşık): planda metin animatörü, adlı uyarı; atlanan parçalar tek uyarıda; kapı yine denemesiz overlay",
+    yakPlan.katmanlar[0].animasyon === "kelime-pop" && yakPlan.katmanlar[0].animatorler.length === 1 && js(yak.kayit.gate) === '[["overlay",null]]' &&
+    yak.kayit.harca.length === 0 &&
+    yak.kayit.toast.some(function (t) { return t[1] === "warn" && t[0] === APm.UYARI.animYakin.replace("{}", "Kelime pop").replace("{}", APm.NOTLAR["kelime-pop"]); }) &&
+    yak.kayit.toast.filter(function (t) { return /kurulamayan animasyon parçaları atlandı: Suflo kelime pop, Arka plan kutusu\./.test(t[0]) && t[1] === "warn"; }).length === 1,
+    js(yak.kayit.toast));
+  var yokA = panel("AEFT", { anim: "parlama" });
+  await yokA.P.ekle(true);
+  ok("yazı animasyonu (AE'de yok): klasik çift, 'Parlama' adıyla uyarı", yokA.kayit.toast.some(function (t) {
+    return t[0] === "«Parlama» yazı animasyonu After Effects çıktısında yok; en yakın klasik giriş ve vurgu animasyonuyla eklendi." && t[1] === "warn"; }));
+  var tamA = panel("AEFT", { anim: "renk-gecis" });
+  await tamA.P.ekle(true);
+  ok("yazı animasyonu (tam): uyarı yok", !tamA.kayit.toast.some(function (t) { return t[1] === "warn"; }), js(tamA.kayit.toast));
+  var duzA = panel("AEFT", { anim: "kelime-pop" });
+  await duzA.P.ekle(false);
+  ok("düz ekleme animasyonu hiç taşımaz (ücretsiz, kapısız)", duzA.kayit.gate.length === 0 &&
+    duzA.kayit.cagri.filter(function (c) { return c.fn === "KSAE_altyaziOlustur"; })[0].arg.katmanlar.every(function (k) { return !k.animatorler.length && !k.kutu; }));
+  var en = require(path.join(KOK, "i18n", "en.js"));
+  var I18N = require(path.join(KOK, "js", "i18n.js"));
+  I18N.setDictionary(en);
+  var cevYak = I18N.translate(APm.UYARI.animYakin.replace("{}", "Kelime pop").replace("{}", APm.NOTLAR["kelime-pop"]));
+  var cevYok = I18N.translate(APm.UYARI.animYok.replace("{}", "Parlama"));
+  var cevAtla = I18N.translate("Bu After Effects sürümünde kurulamayan animasyon parçaları atlandı: Suflo kelime pop. Yazı onlarsız eklendi.");
+  ok("uyarılar İngilizceye çevrilir (animasyon adı ve not dahil); her yaklaşık notun karşılığı var", cevYak ===
+    "The “Word pop” text animation was added to After Effects as a close approximation: words grow in from small, without the final bounce." &&
+    cevYok === "The “Glow” text animation isn't available in After Effects output; it was added with the closest classic entrance and highlight animation." &&
+    /^Animation parts this After Effects version couldn't build were skipped: Suflo word pop\. /.test(cevAtla) &&
+    Object.keys(APm.NOTLAR).every(function (k) { return I18N.translate(APm.NOTLAR[k]) !== APm.NOTLAR[k]; }), js([cevYak, cevYok, cevAtla]));
+
   var aeSrc = ayikla(oku("js/ae-panel.js"));
   ok("ae-panel.js: deneme / filigran / denemeHarca yok", !/deneme|denemeHarca|filigranGerekli/.test(aeSrc.replace(/"[^"\n]*"/g, '""')), (aeSrc.match(/[^\n]*(deneme|filigran)[^\n]*/) || [""])[0]);
   var htmlAe = oku("index.html");

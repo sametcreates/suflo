@@ -248,6 +248,8 @@ function extractJs(src, file) {
     if (onceki && onceki.t === "p" && onceki.v === "(" && toks[k - 3] && toks[k - 3].v === "console") continue;
     var sablonMetni = (t.t === "tpl" ? [] : zincir(toks, k)).map(function (p) { return p.lit === null ? "" : p.lit; }).join("");
     if (/^(https?:|Dialogue:|Style:|color=)/.test(sablonMetni)) continue;
+    // After Effects ifadesi (js/ae-plan.js: kutu / perde; + zincirinin tamamı kod, arayüzde görünmez)
+    if (/\b(thisComp|sourceRectAtTime|parent\.transform|createPath)\b/.test(sablonMetni)) continue;
     var sablon = t.t === "tpl" ? (function () {
       var r = [];
       t.parts.forEach(function (p, i) { if (i) r.push({ lit: null }); r.push({ lit: p }); });
