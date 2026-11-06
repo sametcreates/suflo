@@ -430,6 +430,14 @@
           </div>
 
           <div class="efekt-ayarlar" id="cap-efekt-ayarlar">
+            <!-- Animasyon motoru v2: yazı animasyonu (katalog js/yazi-animasyonlari.js; gruplar captions.js'ten dolar) -->
+            <div class="field efekt-anim">
+              <label for="cap-efekt-anim">Animasyon</label>
+              <select id="cap-efekt-anim">
+                <option value="" selected>Klasik (giriş + vurgu ayrı)</option>
+              </select>
+              <p class="hint" id="cap-efekt-anim-ipucu" hidden>Animasyon giriş ve vurgu hareketinin yerini alır; kelime vurgusu rengi, gölge, kutu ve konum geçerli kalır.</p>
+            </div>
             <div class="field-grid">
               <div class="field">
                 <label for="cap-efekt-giris">Giriş animasyonu</label>
@@ -2908,6 +2916,9 @@
   <script src="js/auto-emoji.js"></script>
   <script src="js/style-share.js"></script>
   <script src="js/marka-kiti.js"></script>
+  <!-- Animasyon motoru v2: yazı animasyonları kataloğu (saf; style-engine.js'ten önce) ve geriye uyumlu stil kodu (SFL1. + ek) -->
+  <script src="js/yazi-animasyonlari.js"></script>
+  <script src="js/stil-kodu.js"></script>
   <script src="js/style-engine.js"></script>
   <script src="js/altyazi-efekt.js"></script>
   <script src="js/caption-mogrt-json.js"></script>

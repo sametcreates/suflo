@@ -79,7 +79,9 @@
   var UYARI = {
     kutu: "Arka plan kutusu After Effects çıktısında henüz yok; yazı kutusuz eklendi.",
     aktif: "Titre ve Glitch kelime hareketleri After Effects çıktısında henüz yok; etkin kelime yalnız vurgu rengini alır.",
-    zipla: "Zıpla kelime hareketi After Effects'te etkin kelimeyi büyüterek gösterilir."
+    zipla: "Zıpla kelime hareketi After Effects'te etkin kelimeyi büyüterek gösterilir.",
+    // Animasyon motoru v2: yazı animasyonları AE'de henüz yok (katalogdaki klasik giriş / vurgu çiftiyle çizilir)
+    anim: "Seçili yazı animasyonu After Effects çıktısında henüz yok; en yakın klasik giriş ve vurgu animasyonuyla eklendi."
   };
   var HATA = {
     comp: "After Effects'te bir kompozisyon aç.",
@@ -358,7 +360,10 @@
   function stilliKartlar(cues, ayar, kad, o, uyarilar) {
     var ae = AE(), cmj = CMJ();
     if (!ae || !cmj) throw new Error("Altyazı Efektleri modeli yüklenemedi.");
-    var n = ae.normalize(ayar);
+    // Yazı animasyonu (animasyon motoru v2) seçiliyse en yakın klasik giriş / vurgu çifti (uyarıyla)
+    var animVar = !!(ae.animasyonu && ae.animasyonu(ayar));
+    var n = ae.klasikAyar ? ae.klasikAyar(ayar) : ae.normalize(ayar);
+    if (animVar) uyarilar.push(UYARI.anim);
     var cueKind = o && o.cueKind ? o.cueKind : "lines";
     var guvenli = !!(o && o.guvenli);
     var olcek = Math.min(kad.w, kad.h) / 1080;

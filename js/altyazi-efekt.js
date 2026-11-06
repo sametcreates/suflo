@@ -28,10 +28,13 @@
     if (!m && typeof require === "function") { try { m = require(yol); } catch (e) { m = null; } }
     return m;
   }
-  var api = factory(yukle("SufloStyleShare", "./style-share.js"), function () { return yukle("SufloStyleEngine", "./style-engine.js"); });
+  // Yazı animasyonları kataloğu (animasyon motoru v2): index.html'de önce yüklenir, Node'da require
+  var YA = (root && root.SufloYaziAnimasyon) || null;
+  if (!YA && typeof require === "function") { try { YA = require("./yazi-animasyonlari.js"); } catch (e) { YA = null; } }
+  var api = factory(yukle("SufloStyleShare", "./style-share.js"), function () { return yukle("SufloStyleEngine", "./style-engine.js"); }, YA);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloAltyaziEfekt = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, motorBul) {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, motorBul, YA) {
   "use strict";
 
   // Stil motoru (hazır konumların kadraja göre noktası için); index.html'de önce yüklenir, Node'da require
@@ -76,6 +79,8 @@
 
   /*
    * Hazır görünümler. "temiz" stil motorundaki efekt varsayılanıyla birebir aynı (test denetler).
+   * anim (animasyon motoru v2): yazı animasyonu, js/yazi-animasyonlari.js kimliği; "" klasik (giriş + vurgu ayrı).
+   * Hazır görünümler klasik: görünüm seçmek seçili animasyonu bırakır.
    * kase / punct: yazım biçimi ve noktalama (Altyazı ayarları), görünüm seçilince onlar da dolar (3.2'nin
    * noktalamasız stillerinin yerini alan Vurucu / Canlı / Glitch noktalamasız).
    * Her görünüm her alanı VARSAYILAN sırasıyla taşır (normalize'dan aynen geçer). Adım 17: Vurucu sert,
@@ -85,27 +90,27 @@
     { id: "temiz", ad: "Temiz", ayar: {
       giris: "fade", aktif: "yok", vurgu: true, vurguRenk: "#ffd23f", renk: "#ffffff", font: "Montserrat",
       kalin: true, italik: false, boyut: 76, kontur: 5, konturRenk: "#000000", konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
     { id: "vurucu", ad: "Vurucu", ayar: {
       giris: "pop", aktif: "zipla", vurgu: true, vurguRenk: "#ffe600", renk: "#ffffff", font: "Anton",
       kalin: true, italik: false, boyut: 112, kontur: 8, konturRenk: "#000000", konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false,
-      golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
+      golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
     { id: "canli", ad: "Canlı", ayar: {
       giris: "zipla", aktif: "zipla", vurgu: true, vurguRenk: "#ff5fa2", renk: "#ffffff", font: "Archivo Black",
       kalin: true, italik: false, boyut: 92, kontur: 6, konturRenk: "#16121f", konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
     { id: "zarif", ad: "Zarif", ayar: {
       giris: "yukari", aktif: "yok", vurgu: true, vurguRenk: "#e3c27a", renk: "#f7f3ea", font: "Lora",
       kalin: false, italik: false, boyut: 70, kontur: 2, konturRenk: "#0b0b0d", konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true,
-      golge: { renk: "#000000", opak: 60, mesafe: 3, yumusak: 10 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
+      golge: { renk: "#000000", opak: 60, mesafe: 3, yumusak: 10 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
     { id: "kutulu", ad: "Kutulu", ayar: {
       giris: "fade", aktif: "yok", vurgu: true, vurguRenk: "#ffd23f", renk: "#ffffff", font: "Montserrat",
       kalin: true, italik: false, boyut: 64, kontur: 0, konturRenk: "#000000", konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true,
-      golge: null, kutu: true, kutuRenk: "#000000", kutuOpak: 65, konumX: null, konumY: null } },
+      golge: null, kutu: true, kutuRenk: "#000000", kutuOpak: 65, konumX: null, konumY: null, anim: "" } },
     { id: "glitch", ad: "Glitch", ayar: {
       giris: "asagi", aktif: "glitch", vurgu: true, vurguRenk: "#2af5ff", renk: "#ffffff", font: "Bebas Neue",
       kalin: true, italik: false, boyut: 118, kontur: 3, konturRenk: "#0b1020", konum: 5, satir: 1, kelime: 3, kase: "upper", punct: false,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } }
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } }
   ];
 
   /*
@@ -148,6 +153,8 @@
     var out = kopya(t);
     if (own(a, "giris") && idler(GIRISLER).indexOf(a.giris) !== -1) out.giris = a.giris;
     if (own(a, "aktif") && idler(AKTIFLER).indexOf(a.aktif) !== -1) out.aktif = a.aktif;
+    // Yazı animasyonu: katalog kimliği ya da "" (klasik); bilinmeyen kimlik tabanda kalır
+    if (own(a, "anim") && (a.anim === "" || animKaydi(a.anim))) out.anim = a.anim;
     ["vurgu", "kalin", "italik"].forEach(function (k) { if (own(a, k) && typeof a[k] === "boolean") out[k] = a[k]; });
     ["vurguRenk", "renk", "konturRenk"].forEach(function (k) { if (own(a, k) && typeof a[k] === "string" && RENK.test(a[k])) out[k] = a[k].toLowerCase(); });
     if (own(a, "font") && FONTLAR.indexOf(a.font) !== -1) out.font = a.font;
@@ -181,6 +188,8 @@
   }
 
   function kirp(n, ar) { return Math.max(ar[0], Math.min(ar[1], Math.round(n))); }
+  // Katalogdaki yazı animasyonu kaydı ya da null ("" / bilinmeyen / katalog yüklenmedi)
+  function animKaydi(id) { return YA && YA.bul && typeof id === "string" && id ? YA.bul(id) : null; }
   function golgeNormalize(g) {
     var out = kopya(GOLGE_VARSAYILAN);
     if (typeof g.renk === "string" && RENK.test(g.renk)) out.renk = g.renk.toLowerCase();
@@ -191,11 +200,33 @@
   // Stil motoruna / SFL1 koduna giden ince ayar (kase / punct metin kuralıdır, buraya girmez; guvenli çağıranın)
   function overrides(ayar) {
     var n = normalize(ayar);
-    return {
+    var o = {
       font: n.font, renk: n.renk, konturRenk: n.konturRenk, vurguRenk: n.vurguRenk, boyut: n.boyut, kontur: n.kontur, konum: n.konum,
       giris: n.giris, aktif: n.aktif, vurgu: n.vurgu, kalin: n.kalin, italik: n.italik, satir: n.satir, kelime: n.kelime,
       golge: n.golge ? kopya(n.golge) : null, kutu: n.kutu, kutuRenk: n.kutuRenk, kutuOpak: n.kutuOpak, konumX: n.konumX, konumY: n.konumY
     };
+    // Yazı animasyonu yalnız seçiliyse (klasikte alan hiç yok: stil motoru / SFL1 / Shorts paketi çıktısı aynı)
+    if (n.anim) o.anim = n.anim;
+    return o;
+  }
+
+  /*
+   * Yazı animasyonunun en yakın klasik karşılığı (animasyon motoru v2). Premiere yerel çıktının sözleşmesi (textAnim 0-5,
+   * hlAnim 0-3), After Effects planı ve eski paneller yazı animasyonunu bilmez: ayar giriş / vurgu animasyonu katalogdaki
+   * klasik çiftle, anim "" olarak döner. anim yoksa normalize(ayar) aynen.
+   */
+  function klasikAyar(ayar) {
+    var n = normalize(ayar), k = animKaydi(n.anim);
+    if (k) { n.giris = k.klasik.giris; n.aktif = k.klasik.aktif; }
+    n.anim = "";
+    return n;
+  }
+  // Seçili yazı animasyonu: { id, ad, klasik: { giris, aktif }, girisAd, aktifAd } ya da null (klasik)
+  function animasyonu(ayar) {
+    var k = animKaydi(normalize(ayar).anim);
+    if (!k) return null;
+    function ad(liste, id) { for (var i = 0; i < liste.length; i++) if (liste[i].id === id) return liste[i].ad; return id; }
+    return { id: k.id, ad: k.ad, klasik: kopya(k.klasik), girisAd: ad(GIRISLER, k.klasik.giris), aktifAd: ad(AKTIFLER, k.klasik.aktif) };
   }
 
   function eskiGorunum(styleId) {
@@ -393,8 +424,9 @@
     return n.kalin && e.b ? e.b : e.n;
   }
 
+  // Yazı animasyonu seçiliyse en yakın klasik çift (klasikAyar): sözleşme yalnız textAnim 0-5 / hlAnim 0-3 bilir
   function sablonIndeksleri(ayar) {
-    var n = normalize(ayar);
+    var n = klasikAyar(ayar);
     return { textAnim: Math.max(0, idler(GIRISLER).indexOf(n.giris)), hlAnim: Math.max(0, idler(AKTIFLER).indexOf(n.aktif)) };
   }
 
@@ -425,6 +457,8 @@
     eskiGorunum: eskiGorunum,
     eskiStilden: eskiStilden,
     gorunumuBul: gorunumuBul,
+    klasikAyar: klasikAyar,
+    animasyonu: animasyonu,
     KONUM_NOKTALARI: kopya(KONUM_NOKTALARI),
     YAPISMA: YAPISMA,
     konumNoktasi: konumNoktasi,

@@ -78,8 +78,9 @@
    * kase / punct: altyazı metninin yazım biçimi ve noktalaması (Altyazı sekmesi ya da hazır görünüm).
    * Adım 17: gölge nesnesi (yalnız renk + üç sayı) ya da null, kutu, serbest konum (null = hazır konum).
    */
+  // anim: yazı animasyonu (animasyon motoru v2; "" klasik). Stil motoru katalogda olmayanı "" yapar
   var EFEKT_SECIM_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime", "font", "renk", "konturRenk", "vurguRenk",
-    "boyut", "kontur", "konum", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY"];
+    "boyut", "kontur", "konum", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY", "anim"];
   // Stil motoruna gitmeyen metin kuralı alanları
   var METIN_ALANLARI = ["kase", "punct"];
   function golgeSecimi(g) {
@@ -245,6 +246,8 @@
       boyut: st.boyut, kontur: st.kontur, konum: st.konum, guvenli: !!dikey };
     // Altyazı Efektleri alanları (giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime; gölge, kutu, serbest konum)
     if (SE && SE.EFEKT_ALANLARI && styleId === "efekt") SE.EFEKT_ALANLARI.forEach(function (k) { if (st[k] !== undefined) ov[k] = st[k]; });
+    // Yazı animasyonu (panelin seçimi) yalnız seçiliyse: klasik paketin overrides'ı eskisi gibi
+    if (styleId === "efekt" && typeof st.anim === "string" && st.anim) ov.anim = st.anim;
     var serbest = styleId === "efekt" && typeof ov.konumX === "number" && isFinite(ov.konumX) && typeof ov.konumY === "number" && isFinite(ov.konumY);
     return { overrides: ov, konum: Number(st.konum) || 5, konumY: serbest ? ov.konumY : null };
   }

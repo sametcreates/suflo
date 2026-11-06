@@ -18,7 +18,10 @@
  *   - yerlesim(w, h, oran, o): şablonun 1920×1080 kompozisyonunu sekansa yerleştiren Motion › Scale (kartı kapsayan en
  *     küçük ölçek: AE şablonu kompozisyon çözünürlüğünde çizilir, %100 üstü yumuşatır) ve Caption_Position.
  *   - izAraligi(parcalar): grubun izdeki ayak izi (importMGT şablonu 1 saatlik overwrite eder, sonra kırpılır).
- *   - bildirimEkleri(o): yerel çıktının önizlemeden farkları (Arial, italik, vurgu, Marka Kiti logosu, konuşmacı renkleri).
+ *   - bildirimEkleri(o): yerel çıktının önizlemeden farkları (Arial, italik, vurgu, Marka Kiti logosu, konuşmacı renkleri,
+ *     yazı animasyonu: animasyonNotu).
+ *   - animasyonNotu(ayar): yazı animasyonu (animasyon motoru v2) sözleşmede yok; şablon en yakın klasik giriş / vurgu
+ *     çiftini (altyazi-efekt.js klasikAyar → sablonIndeksleri) çizer, kullanıcıya bu söylenir.
  *   - fontSecimi / fontKuruluMu / fontKlasorleri / adobeFontKlasorleri / fontPostScriptAdlari / fontKurulumPlani:
  *     Premiere yalnız sisteme kurulu (ya da Adobe Fonts'ta etkin) fontu çizer. Bilinen aile (PostScript eşlemesi olan)
  *     kurulu değilse, aile bilinmiyorsa ya da font bu oturumda kurulduysa (Premiere yeniden başlayınca görür) Arial'a
@@ -483,9 +486,16 @@
    * logo (Marka Kiti logosu açık), konusmaci (Podcast Modu konuşmacı renkleri açık), konumYok (Caption_Position /
    * Motion › Scale yazılamadı) }. Logo ve konuşmacı renkleri yalnız video katmanında çizilir: yolu da söylenir.
    */
+  // Yazı animasyonu seçiliyse kullanıcıya not (yoksa ""): yerel çıktı en yakın klasik çifti çizer
+  function animasyonNotu(ayar) {
+    var ae = AE(), a = ae && ae.animasyonu ? ae.animasyonu(ayar) : null;
+    return a ? "Bu animasyon Premiere yerel çıktıda en yakın karşılığıyla (" + a.girisAd + " + " + a.aktifAd + ") gelir" : "";
+  }
+
   function bildirimEkleri(o) {
     o = o || {};
     var ek = [], f = o.font || {};
+    if (typeof o.anim === "string" && o.anim) ek.push(o.anim);
     if (f.yedek) ek.push(f.neden === "yeniden-baslat" ? "yazı tipi Arial (Premiere'i yeniden başlat)" : "yazı tipi Arial");
     if (f.italikYok) ek.push("italik yerel çıktıda yok");
     if (o.vurguKaybi) ek.push("anahtar kelime vurgusu yerel çıktıda yok");
@@ -611,6 +621,7 @@
     yerlesim: yerlesim,
     izAraligi: izAraligi,
     bildirimEkleri: bildirimEkleri,
+    animasyonNotu: animasyonNotu,
     fontKuruluMu: fontKuruluMu,
     fontSecimi: fontSecimi,
     fontPostScriptAdlari: fontPostScriptAdlari,

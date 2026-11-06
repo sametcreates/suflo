@@ -310,7 +310,8 @@ var ku = fnGovde(capSrc, "function stilKoduUygula(");
 ok("kod uygula: önce temel görünüm (eski kod: en yakın görünüm), sonra stiliYaz(tarif), sonra önizleme", ku.indexOf("gorunumUygula(taban") > 0 &&
   ku.indexOf("gorunumUygula(taban") < ku.indexOf("stiliYaz(ov)") && ku.indexOf("stiliYaz(ov)") < ku.indexOf("efektOnizlemeTazele(true)") &&
   ku.indexOf("onizlemeOynat()") === -1 && /AE\.eskiStilden\(r\.styleId, ov\)/.test(ku));
-ok("kod uygula: izinli stiller yalnız stil motorununkiler (Altyazı Efektleri + eski kodlar)", /SS\.decode\(String\(kod \|\| ""\), function \(id\) \{ return motorStiliMi\(id\); \}\)/.test(ku));
+// Animasyon motoru v2: çözücü SufloStilKodu (style-share.js'i sarar; "ek"teki yazı animasyonu), yoksa SS
+ok("kod uygula: izinli stiller yalnız stil motorununkiler (Altyazı Efektleri + eski kodlar)", /(SS|\(window\.SufloStilKodu \|\| SS\))\.decode\(String\(kod \|\| ""\), function \(id\) \{ return motorStiliMi\(id\); \}\)/.test(ku));
 var kr = fnGovde(capSrc, "function stilKredisi(");
 ok("kredi çipi yalnız textContent ve doğrulanmış adla", /b\.textContent = /.test(kr) && !/innerHTML/.test(kr) && /SS\.validAuthor\(ad\)/.test(kr));
 ok("vurgu rengi oluşturucuda hep seçilebilir (pasif değil)", /kutu\.classList\.remove\("pasif"\)/.test(fnGovde(capSrc, "function vurguKutusuDurumu(")));

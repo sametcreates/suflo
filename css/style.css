@@ -3764,6 +3764,9 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt .onizleme-sahne.dikey { max-height: 380px; }
 /* Ayarlar */
 .efekt-ayarlar .field { margin-bottom: 8px; }
+/* Animasyon motoru v2: yazı animasyonu seçiliyken giriş / vurgu animasyonu kapalı (soluk), ipucu altta */
+.efekt-anim .hint { margin: 4px 0 0; }
+.efekt-ayarlar select:disabled { opacity: .5; cursor: not-allowed; }
 .efekt-renkler { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .efekt-renkler > .switch { display: inline-flex; margin: 0 10px 6px 0; }
 .efekt-ayarlar input[type="number"] { width: 100%; padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--text); border: 1px solid var(--line); border-radius: 9px; }
