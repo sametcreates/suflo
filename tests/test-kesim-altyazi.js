@@ -66,6 +66,8 @@ function altyaziKur(o) {
       : "function saveDraftNow() { kayit.taslak++; } function saveDraftSoon() { kayit.taslak++; }",
     "function qualityReport() { throw new Error('UYGULAMA_DEVAM'); }",
     "function kurSecenekleri(s) { return { minSure: 0.8, maxSure: 6, sonSinir: Number(s) > 0 ? Number(s) : undefined }; }",
+    // kalite motoru: "Otomatik (kadraja göre)" satır uzunluğu ve kırılım dili (gerçek işlevler)
+    govde("function kadrajBoyutu("), govde("function uzunlukDegeri("), govde("function kirilimDili("),
     govde("function dilKodu("), govde("function durumAl("), govde("function durumYukle("), govde("function snapshot("), govde("function undo("),
     govde("async function apply("),
     BLOK,

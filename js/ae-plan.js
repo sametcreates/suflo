@@ -276,18 +276,19 @@
    * taşıyordu). Temel puntoda sığmayan satır önce dengeli iki satıra (js/caption-layout.js dengeliSar: 21/21, 38/4 değil),
    * iki satıra da sığmazsa kelime düşürmeden daha çok satıra bölünür. Döner: satırlar.
    */
-  function duzSar(metin, sigan) {
+  // dil (isteğe bağlı): altyazının dili, kırılım Türkçe-duyarlı (js/tr-kirilim.js)
+  function duzSar(metin, sigan, dil) {
     var cl = CL(), out = [];
     metin.split("\r").forEach(function (s) {
       if (s.length <= sigan) { out.push(s); return; }
-      var parca = cl && cl.dengeliSar ? String(cl.dengeliSar(s, sigan, 2)).split("\n") : acgozluSar(s, sigan);
+      var parca = cl && cl.dengeliSar ? String(cl.dengeliSar(s, sigan, 2, dil)).split("\n") : acgozluSar(s, sigan);
       parca.forEach(function (p) { if (p) out.push(p); });
     });
     return out;
   }
 
   // Ücretsiz düz kip: her altyazı satırı bir katman, alt güvenli bölgede ortalı; uzun satır sarılır, punto yalnız yedek olarak küçülür
-  function duzKartlar(cues, kad, guvenli) {
+  function duzKartlar(cues, kad, guvenli, dil) {
     var olcek = Math.min(kad.w, kad.h) / 1080, dikey = kad.h > kad.w * 1.2;
     var se = SE(), ga = se && se.GUVENLI_ALAN && se.GUVENLI_ALAN[2] ? Number(se.GUVENLI_ALAN[2].y) : DIKEY_ALT_YEDEK;
     var altY = dikey ? ga : 1 - BASLIK_GUVENLI;
@@ -307,7 +308,7 @@
       var metin = aeMetni(String(c && c.text != null ? c.text : "").replace(/\*([^*\s][^*]*?)\*/g, "$1"));
       var bas = sayi(c && c.start), son = sayi(c && c.end);
       if (!metin || bas === null || son === null || !(son > bas)) return;
-      var satirlar = duzSar(metin, sigan);
+      var satirlar = duzSar(metin, sigan, dil);
       metin = satirlar.join("\r");
       var enUzun = 1;
       satirlar.forEach(function (s) { enUzun = Math.max(enUzun, s.length); });
@@ -361,8 +362,9 @@
     var cueKind = o && o.cueKind ? o.cueKind : "lines";
     var guvenli = !!(o && o.guvenli);
     var olcek = Math.min(kad.w, kad.h) / 1080;
-    var liste = cmj.satirlar(cues || [], n, { kadraj: { w: kad.w, h: kad.h, guvenli: guvenli }, cueKind: cueKind });
-    var p = ae.konumNoktasi(n, { w: kad.w, h: kad.h, guvenli: guvenli, ornek: { cues: cues || [], cueKind: cueKind } });
+    var dil = o && typeof o.dil === "string" ? o.dil : undefined;
+    var liste = cmj.satirlar(cues || [], n, { kadraj: { w: kad.w, h: kad.h, guvenli: guvenli }, cueKind: cueKind, dil: dil });
+    var p = ae.konumNoktasi(n, { w: kad.w, h: kad.h, guvenli: guvenli, ornek: { cues: cues || [], cueKind: cueKind, dil: dil } });
     var konum = [yuvarla(p.x / 100 * kad.w, 1), yuvarla(p.y / 100 * kad.h, 1)];
     var font = o && typeof o.font === "string" && o.font ? o.font : ae.sablonFontu(n);
     var vurguRenk = rgb01(n.vurguRenk);
@@ -412,7 +414,8 @@
   /*
    * plan(cues, o) — cues: panelin altyazı satırları ({ start, end, text, words? }; kompozisyon saniyesi; stilli kipte
    * *vurgu* işaretli). o: { mod: "duz" | "stilli", ayar (Altyazı Efektleri ayarı), cueKind, guvenli, font (PostScript adı,
-   * verilmezse ayarın), w, h, fps, sure (kompozisyon), filigran (panel artık vermez: AE'de deneme hakkı yok; host desteği duruyor), isId }.
+   * verilmezse ayarın), w, h, fps, sure (kompozisyon), filigran (panel artık vermez: AE'de deneme hakkı yok; host desteği duruyor), isId,
+   * dil (altyazının dili: satır / kart kırılımı Türkçe-duyarlı; verilmezse tr + en) }.
    * Aynı girdi aynı planı verir (zaman damgası / rastgelelik yok; iş kimliği çağırandan).
    * Döner: { surum, isaret, isId, mod, comp, katmanlar: [...], filigran: null | {...}, uyarilar: [...] }
    */
@@ -421,7 +424,7 @@
     var kad = kadrajOku(o);
     var mod = o.mod === "stilli" ? "stilli" : "duz";
     var uyarilar = [];
-    var kartlar = mod === "stilli" ? stilliKartlar(cues, o.ayar, kad, o, uyarilar) : duzKartlar(cues, kad, !!o.guvenli);
+    var kartlar = mod === "stilli" ? stilliKartlar(cues, o.ayar, kad, o, uyarilar) : duzKartlar(cues, kad, !!o.guvenli, typeof o.dil === "string" ? o.dil : undefined);
     kartlar = zamanla(kartlar, kad);
     var katmanlar = kartlar.map(function (k, i) {
       var g = k._giris ? girisAnahtarlari(k._giris, k.bas, k.son, k.konum, k._olcek) : [];

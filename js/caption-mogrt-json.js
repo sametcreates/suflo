@@ -124,7 +124,8 @@
     var ov = ae ? ae.overrides(ayar) : (ayar || {});
     var kad = kadrajOku(o);
     if (kad && kad.guvenli) ov.guvenli = true;
-    var kartlar = se.efektSatirlari({ cues: cues || [], cueKind: o && o.cueKind ? o.cueKind : "lines" }, ov,
+    // o.dil: altyazının dili (kalite motoru: kart / satır kırılımı önizlemeyle aynı dilde; verilmezse tr + en)
+    var kartlar = se.efektSatirlari({ cues: cues || [], cueKind: o && o.cueKind ? o.cueKind : "lines", dil: o && typeof o.dil === "string" ? o.dil : undefined }, ov,
       kad ? { width: kad.w, height: kad.h, genislik: kad.genislik } : undefined);
     var out = [];
     kartlar.forEach(function (k) {
@@ -148,7 +149,14 @@
         onceki = kb;
       });
       var satir = { start: bas, end: son, text: metin, kelimeler: zam, vurgu: vur };
-      if (kad && k.fs > 0 && k.fs0 > 0) { satir.fs = k.fs; satir.fs0 = k.fs0; }
+      if (kad && k.fs > 0 && k.fs0 > 0) {
+        satir.fs = k.fs; satir.fs0 = k.fs0;
+        /*
+         * Kalite motoru: tek başına kadraja sığmayan uzun kelimenin kartı önizlemede yatayda sıkışır (k.sx, \fscx);
+         * şablonun yatay ölçeği yok: aynı genişlik için punto o oranda küçülür (en az 1).
+         */
+        if (k.sx > 0 && k.sx < 100) satir.fs = Math.max(1, Math.floor(k.fs * k.sx / 100));
+      }
       out.push(satir);
     });
     out.sort(function (a, b) { return a.start - b.start; });
@@ -202,7 +210,7 @@
 
   /*
    * build(cues, ayar, o) → { parcalar: [{ start, end, json, bayt, satir, punto }], satirSayisi, vurguKaybi, asiri }
-   * o: { cueKind ("lines" | "words" | "cumulative"), fps, font, punto, sure (sn), bayt, kadraj: { w, h, guvenli } }
+   * o: { cueKind ("lines" | "words" | "cumulative"), fps, font, punto, sure (sn), bayt, kadraj: { w, h, guvenli }, dil (altyazının dili; kart kırılımı) }
    * Parça başı ve sonu kare sınırına oturur (Premiere klibi kareye yuvarlar; komşu parçalar aynı izde çakışmasın),
    * satır zamanları parçanın (kareye oturmuş) başına göredir. Tek satır sınırı aşarsa yine kendi parçasıdır (asiri).
    * o.kadraj (sekansın boyu; yerlesim'inkiyle aynı) verilirse satır sığdırma (PUNTO_ORANI): parçanın puntosu (d[3],

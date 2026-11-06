@@ -1332,14 +1332,16 @@ window.KCaptions = (function () {
       birlestir: s.kisaBirlestir !== false,
       minSure: s.altyaziMinSure,
       maxSure: s.altyaziMaxSure,
-      sonSinir: Number(sonSinir) > 0 ? Number(sonSinir) : undefined
+      sonSinir: Number(sonSinir) > 0 ? Number(sonSinir) : undefined,
+      dil: kirilimDili(),
+      kadraj: kadrajBoyutu()
     };
   }
 
   // Kelime sınırı yalnız satır modlarında (32 / 42 karakter, 2 satır × 42) anlamlı: diğerlerinde gizli
   function kelimeSiniriDurumu() {
     var alan = el("cap-kelime-siniri-alan");
-    if (alan) alan.hidden = !/^(l\d+|c\d+x\d)$/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
+    if (alan) alan.hidden = !/^(l\d+|c\d+x\d|auto)$/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
   }
 
   // Satır uzunluğu › Kelime sınırı: 0 kapalı, yoksa 2..12
@@ -1353,7 +1355,8 @@ window.KCaptions = (function () {
   /*
    * Satır uzunluğu menüsü 3.2'de "32 / 42 karakter"i kelime zamanından kuruyor (l32 / l42);
    * eski tercih, şablon ve stil kodlarındaki c32 / c42 aynı menü girdisine eşlenir. Menüde
-   * olmayan değer en yakın satır moduna (42 karakter) düşer: select boş kalmasın.
+   * olmayan değer en yakın satır moduna (42 karakter) düşer: select boş kalmasın. "auto"
+   * (Otomatik, kadraja göre) menüde olduğundan aynen kabul edilir.
    */
   function uzunlukSecimi(v) {
     v = String(v || "");
@@ -1365,6 +1368,50 @@ window.KCaptions = (function () {
       return "l42";
     }
     return v;
+  }
+
+  /*
+   * Kalite motoru (parti 1): "Otomatik (kadraja göre)" (#cap-maxlen "auto") açık sekansın oranından çözülür
+   * (caption-layout.js otomatikUzunluk: yatay 2 × 42, kare / 4:5 2 × 32, dikey 9:16 2 × 24; sekans yoksa 42).
+   * Satır kuran, kalite denetimi yapan ve kesimden sonra uyarlayan her yol menü değerini uzunlukDegeri'nden okur.
+   */
+  function kadrajBoyutu() {
+    try {
+      var c = window.KApp && window.KApp.ctx ? window.KApp.ctx() : null;
+      var w = Number(c && c.width), h = Number(c && c.height);
+      return w > 0 && h > 0 ? { w: w, h: h } : null;
+    } catch (e) { return null; }
+  }
+  function uzunlukDegeri() {
+    var v = el("cap-maxlen") ? String(el("cap-maxlen").value || "") : "";
+    if (v !== "auto") return v;
+    var L = window.SufloCaptionLayout;
+    return L && L.otomatikUzunluk ? L.otomatikUzunluk(kadrajBoyutu()) : "l42";
+  }
+  /*
+   * Stil kodu (SFL1.) "auto" taşımaz: eski paneller ve site style-share.js'in listesindeki değerleri okur. Çözülmüş
+   * değer kodda geçerliyse o, değilse en yakını (2 × 32 / 2 × 24 → 32 karakter, aksi 42 karakter) yazılır.
+   */
+  function paylasimUzunlugu() {
+    var v = uzunlukDegeri(), adaylar = [v.replace(/^l(\d+)$/, "c$1"), /^c(2\d|3\d)x\d$/.test(v) ? "c32" : "c42", "c42"];
+    var S = window.SufloStyleShare;
+    for (var i = 0; i < adaylar.length; i++) {
+      try {
+        var r = S.decode(S.encode({ styleId: EFEKT, text: { maxlen: adaylar[i] } }));
+        if (r.ok && r.recipe.text.maxlen === adaylar[i]) return adaylar[i];
+      } catch (e) {}
+    }
+    return "c42";
+  }
+  // Satır / kart kırılımının dili (js/tr-kirilim.js): çeviri varsa hedef dil, yoksa seçili ya da algılanan dil;
+  // bilinmiyorsa undefined (tr + en kuralları)
+  function kirilimDili() {
+    try {
+      if (ceviriDili && ceviriVar()) return ceviriDili;
+      if (cevrimdisiEn()) return "en";
+      var d = (el("cap-lang") && el("cap-lang").value) || algilananDil;
+      return d ? String(d) : undefined;
+    } catch (e) { return undefined; }
   }
 
   /* ---------------- Terim sözlüğü ---------------- */
@@ -2111,7 +2158,7 @@ window.KCaptions = (function () {
   function konumOrnegi() {
     try {
       var cues = motorOnizlemeCueleri({ aile: EFEKT });
-      return cues && cues.length ? { cues: cues, cueKind: cueler().length ? motorCueTuru() : "words" } : null;
+      return cues && cues.length ? { cues: cues, cueKind: cueler().length ? motorCueTuru() : "words", dil: kirilimDili() } : null;
     } catch (e) { return null; }
   }
   /*
@@ -2689,6 +2736,8 @@ window.KCaptions = (function () {
   function loadPrefs() {
     var p = K.settings().capPrefs;
     // Kayıtlı tercih yokken İngilizce arayüzde altyazı dili Otomatik (Whisper dili kendisi bulur)
+    // Kalite motoru: kayıtlı tercih yokken satır uzunluğu "Otomatik (kadraja göre)"; kayıtlı tercih kendi değerinde kalır
+    if (!p && el("cap-maxlen")) el("cap-maxlen").value = uzunlukSecimi("auto");
     if (!p) { if (arayuzDili() === "en" && el("cap-lang")) el("cap-lang").value = ""; efektVarsayilan(true); return; }
     try {
       if (p.lang !== undefined) el("cap-lang").value = p.lang;
@@ -2857,7 +2906,8 @@ window.KCaptions = (function () {
         // Altyazı Efektleri kodunda hareket şiddeti yok (hep Dengeli); eski kimlikler kendi şiddetiyle
         styleId: secilenMotorStili, intensity: secilenMotorStili === EFEKT ? undefined : st.yogunluk, overrides: motorAyarlari(st),
         // l32 / l42 eski sürümlerde yok: aynı menü girdisi c32 / c42 olarak paylaşılır (içe alırken geri eşlenir)
-        text: { maxlen: el("cap-maxlen").value.replace(/^l(\d+)$/, "c$1"), kase: el("cap-case").value, punct: !!el("cap-punct").checked },
+        // "Otomatik (kadraja göre)" kodda çözülmüş değer olarak (paylasimUzunlugu): eski paneller ve site okur
+        text: { maxlen: el("cap-maxlen").value === "auto" ? paylasimUzunlugu() : el("cap-maxlen").value.replace(/^l(\d+)$/, "c$1"), kase: el("cap-case").value, punct: !!el("cap-punct").checked },
         author: yazar
       }),
       yazarGecersiz: !!yazar && !SS.validAuthor(yazar)
@@ -3274,7 +3324,8 @@ window.KCaptions = (function () {
         tempFiles.push(audioSrc);
       }
 
-      var lenVal = el("cap-maxlen").value; // "l42" karakter, "c42x2" 2 satır, "w3" kelime, "k1"/"kc" kelime-zamanli
+      // "l42" karakter, "c42x2" 2 satır, "w3" kelime, "k1"/"kc" kelime-zamanli; "auto" kadraja göre çözülür
+      var lenVal = uzunlukDegeri();
       // Kelime kelime / birikimli modlar UCRETSIZDIR (Samet karari, 20 Agu 2026)
       var karaoke = /^k/.test(lenVal);
       var mapped = [];
@@ -3574,8 +3625,8 @@ window.KCaptions = (function () {
       if (iy.durum === "degisti") return { ok: false, neden: "degisti" };
       yol = iy.yol;
     }
-    var ayar = CL.uzunlukAyari(el("cap-maxlen") ? el("cap-maxlen").value : "");
-    var r = kesimEsleModulu().zincirEsle(segments, yol, { maxChars: ayar.maxChars || 42, kelimeModu: segmentsMode });
+    var ayar = CL.uzunlukAyari(uzunlukDegeri());
+    var r = kesimEsleModulu().zincirEsle(segments, yol, { maxChars: ayar.maxChars || 42, kelimeModu: segmentsMode, dil: kirilimDili() });
     cancelDraft();
     snapshot("kesimden sonra uyarlama");
     var son = yol[yol.length - 1];
@@ -3625,7 +3676,7 @@ window.KCaptions = (function () {
     var liste = (words || []).filter(function (w) { return w && isFinite(Number(w.start)) && String(w.text == null ? "" : w.text).trim(); });
     if (!liste.length || !M) return { ok: false, neden: "bos" };
     var kurulan;
-    try { kurulan = CT.segmentleriKur(M.kelimelerdenSegment(liste), el("cap-maxlen").value, kurSecenekleri(o.sonSinir)); }
+    try { kurulan = CT.segmentleriKur(M.kelimelerdenSegment(liste), uzunlukDegeri(), kurSecenekleri(o.sonSinir)); }
     catch (eKur) { return { ok: false, neden: "kur", hata: eKur && eKur.message ? eKur.message : String(eKur) }; }
     if (!kurulan.segments.length) return { ok: false, neden: "bos" };
     cancelDraft();
@@ -3671,7 +3722,7 @@ window.KCaptions = (function () {
    */
   function ornekYukle(veri, offset, sure) {
     if (busy || !veri || !window.SufloOnboarding) return false;
-    var lenVal = el("cap-maxlen").value;
+    var lenVal = uzunlukDegeri();
     var girdi = window.SufloOnboarding.ornekGirdisi(veri, lenVal, offset);
     if (!girdi.length) return false;
     var ornekSonu = Number(sure) > 0 ? (Number(offset) || 0) + Number(sure) : 0;
@@ -3720,7 +3771,8 @@ window.KCaptions = (function () {
   /* ---------------- Segment düzenleme ---------------- */
 
   function qualityOptions() {
-    var len = el("cap-maxlen") ? el("cap-maxlen").value : "l42";
+    // "auto" kadraja göre çözülür: kalite sınırları satırların kurulduğu bütçeyle aynı
+    var len = el("cap-maxlen") ? uzunlukDegeri() : "l42";
     var mc = /^[cl](\d+)(?:x(\d))?$/.exec(len);
     return {
       lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || arayuzDili(),
@@ -5437,7 +5489,7 @@ window.KCaptions = (function () {
       var built = window.SufloStyleEngine.compile(konusmaciRenkleri({
         styleId: st.aile, intensity: st.yogunluk, cues: cues, width: ob.w, height: ob.h,
         cueKind: cueler().length ? motorCueTuru() : "words",
-        overrides: motorAyarlari(st)
+        overrides: motorAyarlari(st), dil: kirilimDili()
       }));
       K.fs.writeFileSync(assYol, built.ass, "utf8");
       // Katmanla aynı font dosyaları (Altyazı Efektleri'nde kalın kapalıysa Montserrat-Regular)
@@ -6195,7 +6247,7 @@ window.KCaptions = (function () {
     var w = Number(probe.width) || 1920, h = Number(probe.height) || 1080;
     var fontSec = CMJ.fontSecimi(ayar, sistemFontDosyalari(), { bekleyen: yerelBekleyenFontlar });
     var guvenliYer = !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked);
-    var oran = AE.sablonKonumu(ayar, { w: w, h: h, guvenli: guvenliYer, ornek: { cues: cs, cueKind: tur } });
+    var oran = AE.sablonKonumu(ayar, { w: w, h: h, guvenli: guvenliYer, ornek: { cues: cs, cueKind: tur, dil: kirilimDili() } });
     var yer = CMJ.yerlesim(w, h, oran, { ayar: ayar });
     // Video katmanının çizip yerel şablonun çizmediği: Marka Kiti logosu, Podcast Modu konuşmacı renkleri (bildirimde)
     var kit = markaKiti();
@@ -6209,7 +6261,7 @@ window.KCaptions = (function () {
     for (var ki = 0; ki < kademeler.length; ki++) {
       // kadraj: şablon satırı sığdırmaz; kartlar önizlemedeki gibi kadraja sığdırılmış puntoyla (Arial'a düşülünce Arial'ın genişliğiyle)
       var plan = CMJ.build(cs, ayar, { cueKind: tur, fps: probe.fps, font: fontSec.ps, punto: yer.punto, bayt: kademeler[ki],
-        kadraj: { w: w, h: h, guvenli: guvenliYer } });
+        kadraj: { w: w, h: h, guvenli: guvenliYer }, dil: kirilimDili() });
       if (!plan.parcalar.length) throw new Error("Yazılacak altyazı yok.");
       var batch = "efk-" + Date.now().toString(36);
       // Ayak izi: her parça önce 1 saatlik şablon olarak (overwrite) düşer; iz ilk parçadan son parça + 1 saate kadar boş
@@ -6341,7 +6393,9 @@ window.KCaptions = (function () {
           offset: baslangic,
           width: g,
           height: y,
-          overrides: motorAyarlari(st)
+          overrides: motorAyarlari(st),
+          // kalite motoru: kart / satır kırılımı önizlemeyle aynı dilde
+          dil: kirilimDili()
         }));
         ass = stilDerlemesi.ass;
       } else {
@@ -6666,7 +6720,7 @@ window.KCaptions = (function () {
         if (motorStiliMi(assStil.aile)) {
           icerik = window.SufloStyleEngine.compile(konusmaciRenkleri({
             styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler({ vurgu: true, kelimeler: true }), cueKind: motorCueTuru(),
-            overrides: motorAyarlari(assStil)
+            overrides: motorAyarlari(assStil), dil: kirilimDili()
           })).ass;
         } else {
           icerik = buildAss({ karaoke: assKelimeVerisi(segmentsMode, assStil.animasyon, segments), animasyon: assStil.animasyon });
@@ -7353,9 +7407,9 @@ window.KCaptions = (function () {
      * ayarı, "Platform arayüzünden kaçın"); değilse SRT / caption izinin düz satırları.
      */
     aeVerisi: function (stilli) {
-      if (!stilli) return { cues: cueler(), cueKind: "lines", ayar: null, guvenli: false };
+      if (!stilli) return { cues: cueler(), cueKind: "lines", ayar: null, guvenli: false, dil: kirilimDili() };
       return { cues: cueler({ vurgu: true, kelimeler: true }), cueKind: motorCueTuru(), ayar: efektAyari(),
-        guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked) };
+        guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked), dil: kirilimDili() };
     },
     // Shorts sekanslari icin ham satirlar (*vurgu* ve orig korunur) ve mod
     rawSegments: function () { return JSON.parse(JSON.stringify(segments)); },

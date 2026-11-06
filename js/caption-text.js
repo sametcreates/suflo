@@ -438,7 +438,8 @@
    * 21 olurdu). Ölçülmüş kelimeler metinle bire bir tutuyorsa parçalar ÖLÇÜLMÜŞ zamanla bölünür (parça =
    * ilk kelimesinin başı); tutmuyorsa süre karakter oranıyla paylaşılır, kelimeler orta noktalarıyla dağılır.
    */
-  function splitLong(segs, maxChars, maxDur, maxLines) {
+  // dil (isteğe bağlı): altyazının dili, parça kırılımı Türkçe-duyarlı seçilir (js/tr-kirilim.js)
+  function splitLong(segs, maxChars, maxDur, maxLines, dil) {
     var out = [];
     maxLines = Math.max(1, Math.floor(Number(maxLines)) || 1);
     segs.forEach(function (s) {
@@ -449,7 +450,7 @@
       if (sigar && dur <= maxDur) { out.push(s); return; }
       if (!CL) { out.push(s); return; }      // düzen modülü yoksa (olmamalı) satır bölünmeden kalır
       var enAz = dur > maxDur ? Math.ceil(dur / maxDur) : 1;
-      CL.karakterleBol(s, maxChars, { maxLines: maxLines, enAz: enAz }).forEach(function (p) { out.push(p); });
+      CL.karakterleBol(s, maxChars, { maxLines: maxLines, enAz: enAz, dil: dil }).forEach(function (p) { out.push(p); });
     });
     return out;
   }
@@ -466,6 +467,8 @@
    *   secenek.minSure / maxSure: satır modlarında en kısa / en uzun ekran süresi (0,8 / 6 sn)
    *   secenek.sonSinir: en kısa süre uzatmasının üst sınırı, sekans zamanı (klip / In-Out / ses sonu);
    *           verilmezse motor satırlarının en geç bitişi: son satır sesin ötesine uzamaz
+   *   secenek.dil: altyazının dili (kalite motoru: satır / parça kırılımı Türkçe-duyarlı; verilmezse tr + en)
+   *   secenek.kadraj: { w, h } sekansın boyu ("auto" satır uzunluğu kadraja göre çözülür)
    * l32/l42/c42x2 satırları ölçülmüş kelimelerden kurulur (caption-layout.js kelimedenSatirlar);
    * kelime yoksa l32/l42 bugünkü c32/c42 yolunun aynısıdır, c42x2 aynı yolu iki satırlık bütçeyle izler.
    * Döner: { segments, mode } — mode: "k1" | "kc" | "w" | "plain"
@@ -514,10 +517,10 @@
       }
       return { segments: splitWords(trimOverlongCues(temiz), n), mode: "w" };
     }
-    var ayar = CL ? CL.uzunlukAyari(lenVal) : null;
+    var ayar = CL ? CL.uzunlukAyari(lenVal, secenek.kadraj) : null;
     if (ayar && (ayar.tur === "l" || ayar.maxLines > 1)) return satirModu(liste, ayar, olculmus, secenek);
     liste = trimOverlongCues(cleanSegments(liste, secenek));
-    return { segments: splitLong(liste, parseInt(lenVal.slice(1), 10) || 42, 4.5), mode: "plain" };
+    return { segments: splitLong(liste, (ayar && ayar.maxChars) || parseInt(lenVal.slice(1), 10) || 42, 4.5, 1, secenek.dil), mode: "plain" };
   }
 
   /*
@@ -609,11 +612,11 @@
     return isFinite(enGec) ? enGec : undefined;
   }
 
-  // Okunabilir satır modu (l32 / l42 / c42x2): ayar = CL.uzunlukAyari(lenVal)
+  // Okunabilir satır modu (l32 / l42 / c42x2 / auto): ayar = CL.uzunlukAyari(lenVal, secenek.kadraj)
   function satirModu(liste, ayar, olculmus, secenek) {
     var o = {
       maxChars: ayar.maxChars, maxLines: ayar.maxLines, maxWords: secenek.maxWords, araKir: 0.6,
-      minSure: secenek.minSure, maxSure: secenek.maxSure, aralik: 0.2, sonSinir: uzamaSiniri(liste, secenek)
+      minSure: secenek.minSure, maxSure: secenek.maxSure, aralik: 0.2, sonSinir: uzamaSiniri(liste, secenek), dil: secenek.dil
     };
     function sure(x, v, enAz) { var n = Number(x); return x !== null && x !== undefined && x !== "" && isFinite(n) && n >= enAz ? n : v; }
     o.minSure = sure(secenek.minSure, 0.8, 0);
@@ -654,12 +657,12 @@
       // altyazı kaybolmaz)
       cues = trimOverlongCues(temiz);
       if (birlestir) cues = CL.kisaBirlestir(cues, o);
-      cues = CL.zamanHijyeni(splitLong(cues, ayar.maxChars, o.maxSure, ayar.maxLines), o);
+      cues = CL.zamanHijyeni(splitLong(cues, ayar.maxChars, o.maxSure, ayar.maxLines, secenek.dil), o);
     } else {
       // kelimesiz l32 / l42: bugünkü c32 / c42 yolunun aynısı
-      return { segments: splitLong(trimOverlongCues(temiz), ayar.maxChars, 4.5), mode: "plain" };
+      return { segments: splitLong(trimOverlongCues(temiz), ayar.maxChars, 4.5, 1, secenek.dil), mode: "plain" };
     }
-    if (ayar.maxLines > 1) cues.forEach(function (c) { c.text = CL.dengeliSar(c.text, ayar.maxChars, ayar.maxLines); });
+    if (ayar.maxLines > 1) cues.forEach(function (c) { c.text = CL.dengeliSar(c.text, ayar.maxChars, ayar.maxLines, secenek.dil); });
     return { segments: cues, mode: "plain" };
   }
 

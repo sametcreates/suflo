@@ -146,7 +146,7 @@ ok("guvenli olmadan cikti degisiklik oncesiyle bayt bayt ayni (" + sayilan + " d
 /* ---- 3.2 adim 4: Belgesel bandinin dengeli \N bolmesi altyazi iziyle ortak (js/caption-layout.js) ---- */
 var seKaynak = fs.readFileSync(path.join(__dirname, "..", "js", "style-engine.js"), "utf8");
 ok("balancedText, dengeliUzunluk ve breakIndex iki satir kirilimini caption-layout.js ikiyeBolNoktasi'ndan alir (eski yerel donguler yok)",
-  /if \(CL && CL\.ikiyeBolNoktasi\) return CL\.ikiyeBolNoktasi\(words\);/.test(seKaynak) && /var best = ikiyeBol\(words\);/.test(seKaynak) &&
+  /if \(CL && CL\.ikiyeBolNoktasi\) return CL\.ikiyeBolNoktasi\(words, false\);/.test(seKaynak) && /var best = ikiyeBol\(words\);/.test(seKaynak) &&
   /var i = ikiyeBol\(words\);/.test(seKaynak) && /var i = ikiyeBol\(group\.map\(/.test(seKaynak) && !/bestScore/.test(seKaynak));
 // require'siz ortamda (caption-layout.js yok) yedek kural ayni kirilimi verir: Belgesel ve kelime gruplari bayt bayt ayni
 var kutuSe = { module: { exports: {} }, console: console };
@@ -313,8 +313,11 @@ var uzun = "Bugün size kamerayla ilgili birkaç şey anlatacağım".split(" ").
 function nSay(ass) { return olaylar(ass).map(function (l) { return (l.match(/\\N/g) || []).length; }); }
 ok("efekt satır 1: hiç \\N yok", nSay(efekt({ satir: 1, kelime: 7, vurgu: false }, { cues: uzun })).every(function (n) { return n === 0; }));
 ok("efekt satır 2: 3+ kelimelik kart iki satır", nSay(efekt({ satir: 2, kelime: 7, vurgu: false }, { cues: uzun })).every(function (n) { return n === 1; }));
-ok("efekt satır 3: 5+ kelimelik kart üç satır", nSay(efekt({ satir: 3, kelime: 7, vurgu: false }, { cues: uzun })).every(function (n) { return n === 2; }));
-var u3 = olaylar(efekt({ satir: 3, kelime: 7, vurgu: false, giris: "yok" }, { cues: uzun }))[0];
+// Kalite motoru (parti 1): satır sayısı ÜST SINIR. 16:9'da iki satıra sığan kart 3 satır olmaz; 9:16'da üç satır
+ok("efekt satır 3 (üst sınır): 16:9'da iki satıra sığan kart iki satır, 9:16'da üç satır",
+  nSay(efekt({ satir: 3, kelime: 7, vurgu: false }, { cues: uzun })).every(function (n) { return n === 1; }) &&
+  nSay(efekt({ satir: 3, kelime: 7, vurgu: false }, { cues: uzun, w: 1080, h: 1920 })).every(function (n) { return n === 2; }));
+var u3 = olaylar(efekt({ satir: 3, kelime: 7, vurgu: false, giris: "yok" }, { cues: uzun, w: 1080, h: 1920 }))[0];
 ok("efekt satır 3: en uzun satırı en kısa kırılım", /\}Bugün size\\Nkamerayla ilgili\\Nbirkaç şey anlatacağım$/.test(u3) ||
   /\}Bugün size kamerayla\\Nilgili birkaç\\Nşey anlatacağım$/.test(u3), u3.slice(-80));
 ok("efekt en çok kelime: kart en çok N kelime (7 kelime, 3'er → 3 kart)", olaylar(efekt({ kelime: 3, vurgu: false, giris: "yok" }, { cues: uzun })).length === 3);
@@ -413,11 +416,16 @@ var kutStil = kut.split("\n").filter(function (l) { return /^Style: SufloKutu,/.
 var kutOl = olaylar(kut).filter(function (l) { return /,SufloKutu,/.test(l); });
 ok("efekt kutu: ikinci stil satırı SufloKutu (BorderStyle 3, aynı yazı tipi / punto / kalın / italik)", kutStil.length === 1 &&
   styleAlanlari(kut).slice(1, 10).join() === kutStil[0].split(",").slice(1, 10).join() && kutStil[0].split(",")[15] === "3", kutStil[0]);
+// Kalite motoru: kart 16:9'da tek satıra sığar (satır sayısı üst sınır); 9:16'da iki satır, kutu aynı kırılımla
+var kutD = efekt({ giris: "yok", kutu: true, kutuRenk: "#112233", kutuOpak: 60 }, { w: 1080, h: 1920 });
+var kutDOl = olaylar(kutD).filter(function (l) { return /,SufloKutu,/.test(l); });
 ok("efekt kutu: kart başına bir kutu olayı (katman 0), kartın tamamı boyunca; renk \\3c, opaklık %60 → 66, yatay pay 20, dikey pay 0",
   kutOl.length === 1 && /^Dialogue: 0,0:00:00\.00,0:00:02\.44,SufloKutu,/.test(kutOl[0]) &&
-  /\{\\an2\\pos\(960,907\)\\fs\d+\\q2\\1a&HFF&\\3c&H00332211\\3a&H66&\\xbord20\\ybord0\\shad0\}Bunu gören herkes\\Nşaşırdı bugün$/.test(kutOl[0]), kutOl[0]);
+  /\{\\an2\\pos\(960,907\)\\fs\d+\\q2\\1a&HFF&\\3c&H00332211\\3a&H66&\\xbord20\\ybord0\\shad0\}Bunu gören herkes şaşırdı bugün$/.test(kutOl[0]) &&
+  kutDOl.length === 1 && /\\ybord0\\shad0\}Bunu gören herkes\\Nşaşırdı bugün$/.test(kutDOl[0]), kutOl[0] + " | " + kutDOl[0]);
 ok("efekt kutu: metin katmanları üstte (3), kutu metnin satır kırılımıyla aynı", katmanlar(kut).filter(function (n) { return n === 3; }).length === 5 &&
-  olaylar(kut).filter(function (l) { return /^Dialogue: 3,/.test(l); }).every(function (l) { return /\\N/.test(l); }));
+  olaylar(kut).filter(function (l) { return /^Dialogue: 3,/.test(l); }).every(function (l) { return !/\\N/.test(l); }) &&
+  olaylar(kutD).filter(function (l) { return /^Dialogue: 3,/.test(l); }).every(function (l) { return /herkes\\N/.test(l.replace(/\{[^}]*\}/g, "")); }));
 var kutKay = olaylar(efekt({ giris: "yukari", kutu: true })).filter(function (l) { return /SufloKutu/.test(l); })[0];
 var kutPop = olaylar(efekt({ giris: "pop", kutu: true })).filter(function (l) { return /SufloKutu/.test(l); })[0];
 ok("efekt kutu + giriş: kayan girişte kartla kayar, ölçek / saydamlık girişi almaz (şablondaki gibi)",
@@ -429,10 +437,11 @@ ok("efekt kutu + gölge: kutu 0, gölge 1, metin 3", (function () {
   return k[0] === 0 && k.filter(function (n) { return n === 1; }).length === 5 && k.filter(function (n) { return n === 3; }).length === 5;
 })());
 
-var xy = olaylar(efekt({ giris: "yok", konumX: 30, konumY: 40 }));
+// 3 kelimelik kartlar: 16:9'da kart tek satır (kalite motoru) ve dar; X %30'da kadraj kenarına kırpılmaz
+var xy = olaylar(efekt({ giris: "yok", konumX: 30, konumY: 40, kelime: 3 }));
 ok("efekt serbest konum: \\an5, kartın ortası X·genişlik, Y·yükseklik (1920×1080'de %30 / %40 → 576, 432)", /^Dialogue: 1,.*\{\\an5\\pos\(576,432\)/.test(xy[0]), xy[0]);
 ok("efekt serbest konum hazır konumun (konum 8) önüne geçer; ikisinden biri yoksa hazır konum",
-  /\{\\an5\\pos\(576,432\)/.test(olaylar(efekt({ giris: "yok", konum: 8, konumX: 30, konumY: 40 }))[0]) &&
+  /\{\\an5\\pos\(576,432\)/.test(olaylar(efekt({ giris: "yok", konum: 8, konumX: 30, konumY: 40, kelime: 3 }))[0]) &&
   /\{\\an8\\pos\(960,238\)/.test(olaylar(efekt({ giris: "yok", konum: 8, konumX: 30 }))[0]));
 ok("efekt serbest konum: %5-95'e kırpılır (0 → 5, 120 → 95), kesirli değer yuvarlanır",
   efekt({ giris: "yok", konumX: 0, konumY: 120 }) === efekt({ giris: "yok", konumX: 5, konumY: 95 }) &&
@@ -450,11 +459,11 @@ var sagX = Number(/\\pos\((\d+),/.exec(sag[0])[1]);
 var sagSerbest = Number(/\\pos\((\d+),/.exec(olaylar(efekt({ giris: "yok", konumX: 95, konumY: 50 }, { w: 1080, h: 1920 }))[0])[1]);
 ok("efekt serbest konum 9:16 + 'Platform arayüzünden kaçın': kart sağdaki ikon sütunundan (%87) uzak, kapalıyken kadraj kenarına dek",
   sagX < sagSerbest && sagX < 1080 * 0.87, sagX + " / " + sagSerbest);
-ok("efekt serbest konum + zıpla: hareketli kelime kartın noktasından zıplar", olaylar(efekt({ giris: "yok", aktif: "zipla", konumX: 30, konumY: 40 }))
+ok("efekt serbest konum + zıpla: hareketli kelime kartın noktasından zıplar", olaylar(efekt({ giris: "yok", aktif: "zipla", konumX: 30, konumY: 40, kelime: 3 }))
   .some(function (l) { return /^Dialogue: 2,.*\\move\(576,432,576,417,0,100\)/.test(l); }));
-ok("efekt serbest konum + glitch: kopyalar kartın noktasının iki yanında", olaylar(efekt({ giris: "yok", aktif: "glitch", konumX: 30, konumY: 40 }))
+ok("efekt serbest konum + glitch: kopyalar kartın noktasının iki yanında", olaylar(efekt({ giris: "yok", aktif: "glitch", konumX: 30, konumY: 40, kelime: 3 }))
   .some(function (l) { return /^Dialogue: 0,.*\\pos\(565,432\)/.test(l); }));
-ok("efekt serbest konum + kutu: kutu kartla aynı noktada", /SufloKutu,,0,0,0,,\{\\an5\\pos\(576,432\)/.test(efekt({ giris: "yok", kutu: true, konumX: 30, konumY: 40 })));
+ok("efekt serbest konum + kutu: kutu kartla aynı noktada", /SufloKutu,,0,0,0,,\{\\an5\\pos\(576,432\)/.test(efekt({ giris: "yok", kutu: true, konumX: 30, konumY: 40, kelime: 3 })));
 /*
  * Adım 17 ikinci inceleme: efektKonumlari'nın xSinir'i serbestKart'ın yatay bandı. Örnek kartlar verilince bandın
  * kenarları, X 5 / 95 isteyen kartın çizildiği yerdir (kart ortası, ±0,15 %); kutu payı ve 9:16 + güvenli alanda ikon
@@ -483,6 +492,136 @@ ok("efekt serbest konum + kutu: kutu kartla aynı noktada", /SufloKutu,,0,0,0,,\
   ok("efektKonumlari: ornek boş / bozuksa örneksiz bant; çıktı (compile) değişmez", J(engine.efektKonumlari({}, 1920, 1080, { cues: [] }).xSinir) === J(yok) &&
     J(engine.efektKonumlari({}, 1920, 1080, { cues: "x" }).xSinir) === J(yok) && J(engine.efektKonumlari({}, 1920, 1080, null).xSinir) === J(yok));
 })();
+
+/*
+ * Kalite motoru (parti 1): Altyazı Efektleri kart / satır kırılımı. ÖNCE = caption-layout.js'siz yüklenen motor (yalinSe:
+ * eski açgözlü groupWords + eski efektKirilimlari), SONRA = bugünkü motor. 16:9 / 9:16 / 1:1, "Platform arayüzünden kaçın"
+ * açık / kapalı.
+ */
+var KADRAJLAR = [[1920, 1080], [1080, 1920], [1080, 1080]];
+function kelimeler(metin, adim) { return metin.split(" ").map(function (t, i) { return { start: +(i * (adim || 0.32)).toFixed(3), end: +(i * (adim || 0.32) + 0.3).toFixed(3), text: t }; }); }
+// vurgu / giriş / vurgu animasyonu kapalı: her kart tek olay (katman 1); döner: [{ bas, son, metin ("\N" korunur), fs, ham }]
+function kartlarOf(ass) {
+  return olaylar(ass).filter(function (l) { return /^Dialogue: 1,/.test(l); }).map(function (l) {
+    var p = l.split(","), ham = p.slice(9).join(",");
+    var fs = /\\fs(\d+)/.exec(ham);
+    return { bas: p[1], son: p[2], metin: ham.replace(/\{[^}]*\}/g, ""), fs: fs ? Number(fs[1]) : 0, ham: ham };
+  });
+}
+function kartMetinleri(ass) { return kartlarOf(ass).map(function (k) { return k.metin; }); }
+function efK(motor, cues, wh, ov, ek) {
+  return motor.compile(Object.assign({ styleId: "efekt", cues: cues, cueKind: "words", width: wh[0], height: wh[1],
+    overrides: Object.assign({ giris: "yok", vurgu: false }, ov || {}) }, ek || {})).ass;
+}
+// c) açgözlü groupWords "…önemli bir" + "şey…" bırakıyordu
+var cKel = kelimeler("Bugün size çok önemli bir şey anlatacağım.");
+var cOnce = kartMetinleri(efK(yalinSe, cKel, [1920, 1080], { kelime: 5 }));
+ok("c ÖNCE: açgözlü gruplama 'bir'i kart sonunda bırakır (5 + 2 kelime)", cOnce.length === 2 && /önemli bir$/.test(cOnce[0]) && cOnce[1] === "şey anlatacağım.", JSON.stringify(cOnce));
+[false, true].forEach(function (guv) {
+  KADRAJLAR.forEach(function (wh) {
+    var k = kartMetinleri(efK(engine, cKel, wh, { kelime: 5, guvenli: guv }));
+    var duz = k.map(function (m) { return m.replace(/\\N/g, " "); });
+    ok("c SONRA " + wh.join("×") + (guv ? " + güvenli" : "") + ": dengeli kartlar 'Bugün size çok önemli' + 'bir şey anlatacağım.', 'bir' kart / satır sonunda değil",
+      duz.join("|") === "Bugün size çok önemli|bir şey anlatacağım." && k.every(function (m) { return !/ bir(\\N|$)/.test(m); }) &&
+      (wh[0] > wh[1] ? k.every(function (m) { return m.indexOf("\\N") === -1; }) : true), JSON.stringify(k));
+  });
+});
+// d) satir bir ÜST SINIR: sığan kart kırılmaz
+var dKel = kelimeler("Bu çok iyi");
+ok("d ÖNCE: 3 kelimelik kısa kart satir 2'de hep iki satır ('Bu çok\\Niyi')", kartMetinleri(efK(yalinSe, dKel, [1080, 1920]))[0] === "Bu çok\\Niyi");
+[false, true].forEach(function (guv) {
+  KADRAJLAR.forEach(function (wh) {
+    var k = kartMetinleri(efK(engine, dKel, wh, { guvenli: guv }));
+    ok("d SONRA " + wh.join("×") + (guv ? " + güvenli" : "") + ": 'Bu çok iyi' tek satır (satir 2 üst sınır)", k.length === 1 && k[0] === "Bu çok iyi", JSON.stringify(k));
+  });
+});
+var d3 = kartMetinleri(efK(engine, kelimeler("Bugün size kamerayla ilgili birkaç şey anlatacağım"), [1080, 1920], { satir: 3, kelime: 7 }))[0];
+ok("d: 3 satır modunda iki satıra sığmayan kart üç satır; son satır 3 karakter ya da daha kısa tek kelime değil",
+  (d3.match(/\\N/g) || []).length === 2 && !/\\N\S{1,3}$/.test(d3), d3);
+var kisaSon = kartMetinleri(efK(engine, kelimeler("Arkadaşlar bugün çok güzel şeyler göreceğiz bu"), [1080, 1920], { satir: 2, kelime: 7 }))[0];
+ok("d: son satır tek kısa kelime ('bu') kalmaz (daha iyi kırılım varken)", !/\\N\S{1,3}$/.test(kisaSon) && /\\N/.test(kisaSon), kisaSon);
+// e) tek başına kadraja sığmayan uzun kelime kendi kartında, yalnız o kart küçülür (taban + \fscx)
+var eKel = [{ start: 0, end: 1, text: "Afyonkarahisarlılaştıramadıklarımızdanmışsınızcasına" }, { start: 1, end: 2, text: "tamam" }];
+var eOv = { font: "Anton", boyut: 112, kelime: 3, satir: 1 };
+var eOnce = kartlarOf(efK(yalinSe, eKel, [1080, 1920], eOv));
+ok("e ÖNCE: iki kelime tek kartta, kart tümüyle \\fs32'ye küçülür", eOnce.length === 1 && eOnce[0].fs === 32, JSON.stringify(eOnce.map(function (k) { return [k.metin, k.fs]; })));
+[false, true].forEach(function (guv) {
+  KADRAJLAR.forEach(function (wh) {
+    var k = kartlarOf(efK(engine, eKel, wh, Object.assign({ guvenli: guv }, eOv)));
+    var taban = Math.max(Math.round(30 * Math.min(wh[0], wh[1]) / 1080), 1);
+    var tamFs = Math.round(112 * Math.min(wh[0], wh[1]) / 1080);
+    ok("e SONRA " + wh.join("×") + (guv ? " + güvenli" : "") + ": uzun kelime kendi kartında (\\fs ≥ " + taban + ", \\fscx ≥ 85), 'tamam' tam puntoda (\\fs" + tamFs + ")",
+      k.length === 2 && k[0].metin === eKel[0].text && k[1].metin === "tamam" && k[0].fs >= taban && k[1].fs === tamFs && !/\\fscx/.test(k[1].ham) &&
+      (/\\fscx(\d+)/.test(k[0].ham) ? Number(/\\fscx(\d+)/.exec(k[0].ham)[1]) >= 85 : true), JSON.stringify(k.map(function (x) { return [x.fs, /\\fscx\d+/.exec(x.ham) && /\\fscx\d+/.exec(x.ham)[0]]; })));
+  });
+});
+var ePop = efK(engine, eKel, [1080, 1920], Object.assign({ giris: "pop" }, eOv));
+ok("e: uzun kelime kartında ölçek girişi yatay sıkıştırmayla çarpılır (\\t sonunda \\fscx85, \\fscy100); diğer kart \\fscx100",
+  /\\fs\d+\\fscx85\\q2.*\\fscx0\\fscy0\\t\(0,300,\\fscx85\\fscy100\)\}Afyon/.test(ePop) && /\\fs112\\q2.*\\t\(0,300,\\fscx100\\fscy100\)\}tamam/.test(ePop), olaylar(ePop)[0]);
+var eKutu = olaylar(efK(engine, eKel, [1080, 1920], Object.assign({ kutu: true }, eOv))).filter(function (l) { return /SufloKutu/.test(l); });
+ok("e: kutu uzun kelime kartında aynı \\fs ve \\fscx ile", eKutu.length === 2 && /\\fscx85\\q2/.test(eKutu[0]) && !/\\fscx/.test(eKutu[1]), eKutu[0]);
+var eSat = engine.efektSatirlari({ cues: eKel, cueKind: "words" }, eOv, { width: 1080, height: 1920 });
+ok("e: efektSatirlari (yerel çıktı / AE) aynı kartlar, uzun kelime kartında sx; diğerinde yok",
+  eSat.length === 2 && eSat[0].sx === 85 && eSat[0].fs === kartlarOf(efK(engine, eKel, [1080, 1920], eOv))[0].fs && eSat[1].sx === undefined && eSat[1].fs === 112, JSON.stringify(eSat.map(function (k) { return [k.fs, k.sx]; })));
+// dil: compile options.dil kırılım cezasının dili (verilmezse tr + en)
+var dilKel = kelimeler("Sen bunu yapabilir misin acaba");
+ok("compile dil: Türkçede soru eki kartın başına düşmez; başka dilde (de) yalnız denge",
+  kartMetinleri(efK(engine, dilKel, [1920, 1080], { kelime: 4 }, { dil: "tr" })).join("|") === "Sen bunu|yapabilir misin acaba" &&
+  kartMetinleri(efK(engine, dilKel, [1920, 1080], { kelime: 4 })).join("|") === "Sen bunu|yapabilir misin acaba" &&
+  kartMetinleri(efK(engine, dilKel, [1920, 1080], { kelime: 4 }, { dil: "de" })).join("|") === "Sen bunu yapabilir|misin acaba");
+ok("efektSatirlari / efektKonumlari ornek.dil'i kullanır (önizleme, yerel çıktı ve AE aynı kartlar)",
+  engine.efektSatirlari({ cues: dilKel, cueKind: "words", dil: "de" }, { kelime: 4 }).map(function (k) { return k.kelimeler.length; }).join() === "3,2" &&
+  engine.efektSatirlari({ cues: dilKel, cueKind: "words", dil: "tr" }, { kelime: 4 }).map(function (k) { return k.kelimeler.length; }).join() === "2,3");
+/*
+ * Kart / zaman değişmezleri: kartlar üst üste binmez, her kelime bir kez ve sırasıyla, *vurgu* işareti korunur.
+ * Kelime sayısı 1-10, satır 1-3, üç kadraj, güvenli açık / kapalı; boş transkript ve tek kelime.
+ */
+var uzunTr = "Merhaba arkadaşlar bugün sizlere *abonelerimizden* gelen soruları cevaplayacağım. Peki bu işi gerçekten yapabilir misiniz, yoksa bırakalım mı? " +
+  "Toplam 1.250 TL ödedik ve 3 ayda bitirdik. Dr. Ayşe Yılmaz da bizimle. Mükemmelleştirebileceklerimizden biri de *renkler* oldu! 🔥 Harika";
+var uzunKel = uzunTr.split(" ").map(function (t, i) { return { start: +(i * 0.4).toFixed(2), end: +(i * 0.4 + 0.36).toFixed(2), text: t, speaker: i > 30 ? "B" : "A" }; });
+var duzKelimeler = uzunTr.replace(/\*/g, "").split(" ");
+var bozulan = [];
+KADRAJLAR.forEach(function (wh) {
+  [false, true].forEach(function (guv) {
+    [1, 2, 3].forEach(function (satir) {
+      [1, 3, 5, 7, 10].forEach(function (kelime) {
+        var ad = wh.join("×") + (guv ? "+g" : "") + " s" + satir + " k" + kelime;
+        var ass = efK(engine, uzunKel, wh, { satir: satir, kelime: kelime, guvenli: guv });
+        var k = kartlarOf(ass);
+        var sira = [];
+        k.forEach(function (x) { x.metin.split(/\\N| /).forEach(function (w) { sira.push(w); }); });
+        if (sira.join(" ") !== duzKelimeler.join(" ")) bozulan.push(ad + " kelime sırası");
+        for (var i = 1; i < k.length; i++) if (k[i].bas < k[i - 1].son) bozulan.push(ad + " çakışma " + i);
+        k.forEach(function (x) { if ((x.metin.match(/\\N/g) || []).length > satir - 1) bozulan.push(ad + " satır " + x.metin); if (x.metin.split(/\\N| /).length > kelime) bozulan.push(ad + " kelime " + x.metin); });
+        if (!/\{\\1c&H003FD2FF\}abonelerimizden\{/.test(ass) || !/\{\\1c&H003FD2FF\}renkler\{/.test(ass)) bozulan.push(ad + " vurgu");
+      });
+    });
+  });
+});
+ok("kart değişmezleri (90 durum): kartlar üst üste binmez, her kelime bir kez ve sırasıyla, satır / kelime sınırı, *vurgu* korunur",
+  bozulan.length === 0, bozulan.slice(0, 4).join(" | "));
+ok("boş transkript, tek kelime, yalnız noktalama, büyük harf İ/ı: efekt düşmez",
+  olaylar(efK(engine, [], [1080, 1920])).length === 0 && kartMetinleri(efK(engine, [{ start: 0, end: 1, text: "Merhaba" }], [1080, 1920])).join() === "Merhaba" &&
+  kartMetinleri(efK(engine, kelimeler("Bunu ?"), [1080, 1920])).join("|") === "Bunu ?" &&
+  kartMetinleri(efK(engine, kelimeler("BU İŞİ GERÇEKTEN YAPABİLİR MİSİN SEN"), [1920, 1080], { kelime: 4 })).join("|") === "BU İŞİ GERÇEKTEN|YAPABİLİR MİSİN SEN");
+ok("Arapça ve emoji: kelime düşmez, satır / kart sırası korunur", (function () {
+  var t = "هذا نص عربي طويل جدا للاختبار هنا 🔥 ثم نكمل الكلام بعد ذلك";
+  var k = kartMetinleri(efK(engine, kelimeler(t), [1080, 1920], { kelime: 4 }));
+  return k.map(function (m) { return m.replace(/\\N/g, " "); }).join(" ") === t;
+})());
+// Eski stiller: dil verilse de kalite motoru kapalı, çıktı anlık görüntüyle bayt bayt aynı
+var eskiDil = [];
+eskiStiller.forEach(function (s2) {
+  [[1920, 1080], [1080, 1920]].forEach(function (d) {
+    ["words", "lines"].forEach(function (k) {
+      ["tr", "en", "ar"].forEach(function (dil) {
+        var anahtar = s2.id + "@" + d[0] + "x" + d[1] + ":" + k + ":yok";
+        if (snap[anahtar] !== ozet(engine.compile({ styleId: s2.id, cues: k === "words" ? snapKelime : snapSatir, cueKind: k, width: d[0], height: d[1], dil: dil }))) eskiDil.push(anahtar + " " + dil);
+      });
+    });
+  });
+});
+ok("eski 12 stil: compile dil (tr / en / ar) verilse de anlık görüntüyle bayt bayt aynı (kalite motoru yalnız efekt'te)", eskiDil.length === 0, eskiDil.slice(0, 4).join(", "));
 
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {
@@ -635,7 +774,8 @@ if (!ffmpeg) {
       for (var yk = 0; yk < b[1]; yk++) {
         for (var xk = 0; xk < b[0]; xk++) { var q = (yk * b[0] + xk) * 3; if (px[q] > 235 && px[q + 1] > 235 && px[q + 2] > 235) { if (ust < 0) ust = yk; alt = yk; break; } }
       }
-      var ciz = (ust + alt) / 2 / b[1] * 100, nokta = engine.efektKonumlari(ov, b[0], b[1]).noktalar[k].y;
+      // kalite motoru: kartın satır sayısı içeriğe bağlı (satir üst sınır); nokta çizilen örnek kartlarla hesaplanır
+      var ciz = (ust + alt) / 2 / b[1] * 100, nokta = engine.efektKonumlari(ov, b[0], b[1], { cues: ortaCues, cueKind: "words" }).noktalar[k].y;
       ok("efektKonumlari gerçek çizim " + b[0] + "×" + b[1] + " konum " + k + ": hazır konum noktası kartın çizilen ortası (±%1,5)",
         ust >= 0 && Math.abs(ciz - nokta) <= 1.5, "çizilen %" + ciz.toFixed(1) + " · nokta %" + nokta);
     });

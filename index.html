@@ -335,6 +335,9 @@
             <label for="cap-maxlen">Satır uzunluğu</label>
             <select id="cap-maxlen">
               <optgroup label="Satır">
+                <!-- Kalite motoru (parti 1): sekansın oranından 2 × 42 (yatay) / 2 × 32 (kare, 4:5) / 2 × 24 (9:16);
+                     kayıtlı tercihi olmayan ilk açılışın varsayılanı (captions.js loadPrefs), caption-layout.js otomatikUzunluk -->
+                <option value="auto">Otomatik (kadraja göre)</option>
                 <option value="w2">2 kelime</option>
                 <option value="w3">3 kelime</option>
                 <option value="w4">4 kelime</option>
@@ -2893,6 +2896,8 @@
   <script src="js/whisper-args.js"></script>
   <script src="js/model-ice-aktar.js"></script>
   <script src="js/engine.js"></script>
+  <!-- Kalite motoru: Türkçe-duyarlı satır / kart kırılım cezası (saf); caption-layout.js ve style-engine.js'ten önce -->
+  <script src="js/tr-kirilim.js"></script>
   <script src="js/caption-layout.js"></script>
   <script src="js/caption-quality.js"></script>
   <script src="js/whisper-words.js"></script>

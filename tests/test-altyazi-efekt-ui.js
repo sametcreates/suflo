@@ -110,7 +110,7 @@ function ortam(o) {
     govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon("),
     govde("function efektVarsayilan("), govde("function sablonumUygula("),
     govde("function efektSayi("), govde("function efektSayiAlani("), govde("function serbestKonumDegeri("), govde("function efektBagimliDurum("),
-    govde("function konumAktif("), govde("function konumOlcusu("), govde("function konumOrnegi("), govde("function konumTuslariniTut("),
+    govde("function konumAktif("), govde("function konumOlcusu("), govde("function kirilimDili("), govde("function konumOrnegi("), govde("function konumTuslariniTut("),
     govde("function motorOnizlemeCueleri("), govde("function sahneNoktasi("), govde("function artiGoster("), govde("function konumYaz("),
     govde("function konumDegisti("), govde("function konumSuruklemeAdim("), govde("function konumSuruklemeBitir("), govde("function konumSifirla("),
     govde("function konumSurukleBagla("), govde("function sahneErisimi("), govde("function stilYedegi("), govde("function stilYedeginiYukle("),
@@ -381,7 +381,9 @@ var sahne = sk.dom["cap-sahne"];
 function olay(ad, e) { (sahne.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 7, button: 0, target: sahne, preventDefault: function () {} }, e || {})); }); }
 // sahnenin %'si → sayfa pikseli (400 × 225 sahne (100, 50)'de)
 function px(x, y, ek) { return Object.assign({ clientX: 100 + x / 100 * 400, clientY: 50 + y / 100 * 225 }, ek || {}); }
-var alt0 = AE.konumNoktasi(sk.api.efektAyari());   // Temiz Alt'ın kart ortası (50 · 76,9)
+// Temiz Alt'ın kart ortası (50 · 76,9). Kalite motoru: kartın satır sayısı üst sınır, nokta önizlemenin örnek kartlarıyla
+// (konumOrnegi: "Bunu *sakın* kaçırma arkadaşlar bugün" 16:9'da iki satır) hesaplanır
+var alt0 = AE.konumNoktasi(sk.api.efektAyari(), { w: 1920, h: 1080, ornek: sk.api.konumOrnegi() });
 var kayit0 = sk.kayit(), tazele0 = sk.api.onizleme.tazele.length, ciz0 = sk.api.onizleme.ciz;
 olay("pointerdown", px(alt0.x, alt0.y));
 ok("sürükle: basınca işaretçi yakalanır, artı işareti kartın şimdiki ortasında ('Alt · hazır konum'); basmak yazıyı oynatmaz, çizmez",
@@ -407,7 +409,8 @@ ok("bırakınca: işaretçi bırakılır, konum tercihe yazılır, gerçek öniz
   sk.api.onizleme.tazele.length === tazele0 + 1 && sk.api.durum().gorunum === "" && sk.dom["cap-konum-serbest"].hidden === false &&
   sk.dom["cap-konum-serbest-deger"].textContent === "X %60 · Y %20", J(prefs7 && [prefs7.konumX, prefs7.konumY]));
 var ov8 = sk.api.motorAyarlari(sk.api.stil());
-ok("serbest konum motora gider ve çizilir (1920×1080'de %60 / %20 → 1152, 216)", ov8.konumX === 60 && ov8.konumY === 20 && /\\an5\\pos\(1152,216\)/.test(ciz(Object.assign({}, ov8, { giris: "yok" })).ass));
+// 3 kelimelik kart: 16:9'da tek satır ve dar (kalite motoru), X %60'ta kadraj kenarına kırpılmaz
+ok("serbest konum motora gider ve çizilir (1920×1080'de %60 / %20 → 1152, 216)", ov8.konumX === 60 && ov8.konumY === 20 && /\\an5\\pos\(1152,216\)/.test(ciz(Object.assign({}, ov8, { giris: "yok", kelime: 3 })).ass));
 // kartın kenarından tutmak: kart ortası basılan noktaya zıplamaz, fark korunur
 olay("pointerdown", px(64, 24));
 olay("pointermove", px(70, 30));
@@ -513,7 +516,7 @@ gc.api.gorunumUygula("temiz");
 gc.api.konumSurukleBagla();
 var gs = gc.dom["cap-sahne"];
 function gOlay(ad, e) { (gs.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 3, button: 0, target: gs, preventDefault: function () {} }, e || {})); }); }
-var gAlt = AE.konumNoktasi(gc.api.efektAyari());
+var gAlt = AE.konumNoktasi(gc.api.efektAyari(), { w: 1920, h: 1080, ornek: gc.api.konumOrnegi() });
 gOlay("pointerdown", px(gAlt.x, gAlt.y));
 gOlay("pointermove", px(50, 61));
 var gecisKonum = gc.dom["cap-konum"].value;

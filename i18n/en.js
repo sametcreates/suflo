@@ -3528,6 +3528,8 @@
   add({
     // Line length menu, word limit (Captions › settings)
     "2 satır × 42 (YouTube/TV)": "2 lines × 42 (YouTube/TV)",
+    // Caption quality engine (batch 1): line length from the sequence frame (16:9 2 × 42, 1:1 / 4:5 2 × 32, 9:16 2 × 24)
+    "Otomatik (kadraja göre)": "Automatic (by frame)",
     "Kelime sınırı": "Word limit",
     "Satır modunda bir satıra en çok kaç kelime girer (0 = kapalı, 2–12). Kelime zamanı olan transkriptte geçerli.":
       "The most words one caption can hold in line mode (0 = off, 2–12). Applies to transcripts with word timings.",

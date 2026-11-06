@@ -212,6 +212,30 @@ ok("katman adı: kesim emoji vekil çiftini bölmez (31. kod birimi yüksek veki
 ok("deterministik: aynı girdi aynı plan (JSON eşit), sürüm 1", js(P.plan(sCues, o)) === js(s) && s.surum === 1 && s.isId === "is1");
 ok("plan girdiyi değiştirmez", sCues[0].text === "Merhaba *dünya* bu bir deneme cümlesi" && sCues[0].start === 1);
 ok("aeMetni: kontrol karakterleri boşluk, boş satır düşer, CRLF tek kırılım", P.aeMetni("a\u0007b\r\n\n  c  ") === "a b\rc" && P.aeMetni(null) === "");
+/* ---------------- kalite motoru (parti 1): kart / satır kırılım dili ---------------- */
+(function () {
+  var dc = [{ start: 0, end: 2, text: "Sen bunu yapabilir misin acaba" }];
+  var da = AE.normalize({ kelime: 4, satir: 1, giris: "yok" });
+  function metinler(dil, mod) {
+    var o = { mod: mod, ayar: da, cueKind: "lines", w: 1920, h: 1080, fps: 25, sure: 5, isId: "d" };
+    if (dil !== undefined) o.dil = dil;
+    return P.plan(dc, o).katmanlar.filter(function (k) { return k.tur !== "filigran"; }).map(function (k) { return k.metin; }).join("|");
+  }
+  ok("stilli plan o.dil: kartlar önizleme / yerel çıktıyla aynı dilde (tr: soru eki kart başında değil; de: yalnız denge; yok: tr + en)",
+    metinler("tr", "stilli") === "Sen bunu|yapabilir misin acaba" && metinler("de", "stilli") === "Sen bunu yapabilir|misin acaba" &&
+    metinler(undefined, "stilli") === metinler("tr", "stilli") &&
+    js(CMJ.satirlar(dc, da, { kadraj: { w: 1920, h: 1080 }, cueKind: "lines", dil: "de" }).map(function (x) { return x.text; })) === js(["Sen bunu yapabilir", "misin acaba"]),
+    js([metinler("tr", "stilli"), metinler("de", "stilli")]));
+  var panelKaynak = require("fs").readFileSync(path.join(ROOT, "js", "ae-panel.js"), "utf8");
+  var capKaynak = require("fs").readFileSync(path.join(ROOT, "js", "captions.js"), "utf8");
+  ok("AE paneli planı altyazının diliyle kurar (KCaptions.aeVerisi → plan o.dil)", /isId: isKimligi\(\), dil: v\.dil \}\);/.test(panelKaynak) &&
+    (capKaynak.slice(capKaynak.indexOf("aeVerisi: function (stilli)")).match(/dil: kirilimDili\(\)/g) || []).length >= 2);
+  var uzunDuz = [{ start: 0, end: 3, text: "Bu işi gerçekten yapabilir misin, yoksa bırakalım mı? Peki ya sonra ne olacak" }];
+  var duzTr = P.plan(uzunDuz, { mod: "duz", w: 1080, h: 1920, fps: 25, sure: 5, isId: "d", dil: "tr" }).katmanlar[0].metin;
+  ok("düz plan o.dil: uzun satır Türkçe-duyarlı sarılır (soru eki satır başında değil), kelime düşmez",
+    !/\rmisin/.test(duzTr) && duzTr.replace(/\r/g, " ") === uzunDuz[0].text, js(duzTr));
+})();
+
 ok("MIN_SURUM manifestteki AEFT alt sınırıyla aynı", new RegExp('<Host Name="AEFT" Version="\\[' + P.MIN_SURUM + '\\.0,').test(require("fs").readFileSync(path.join(ROOT, "CSXS", "manifest.xml"), "utf8")));
 
 console.log("\n" + passed + " passed, " + failed + " failed");

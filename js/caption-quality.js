@@ -178,8 +178,9 @@
       var parts;
       if (ml > 1 && CL) {
         // iki satir: butceye (ml × limit) sigan parcalar, her biri dengeli kirilimla
-        parts = CL.karakterleBol({ start: s.start, end: s.end, text: duz }, limit, { maxLines: ml }).map(function (p) {
-          return CL.dengeliSar(p.text, limit, ml);
+        // kalite motoru: parça ve satır kırılımı altyazının dilinde Türkçe-duyarlı (options.lang)
+        parts = CL.karakterleBol({ start: s.start, end: s.end, text: duz }, limit, { maxLines: ml, dil: options && options.lang }).map(function (p) {
+          return CL.dengeliSar(p.text, limit, ml, options && options.lang);
         });
       } else {
         parts = splitText(duz, limit);

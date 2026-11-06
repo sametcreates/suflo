@@ -110,8 +110,9 @@ window.SufloAePanel = (function () {
       if (!b || !b.ok) throw new Error((b && b.error) || "After Effects'e bağlanılamadı.");
       if (!b.hasSeq) throw new Error(AP().HATA.comp);
       var v = KCaptions.aeVerisi(stilli);
+      // dil: altyazının dili (kalite motoru: kart / satır kırılımı önizleme ve Premiere çıktısıyla aynı)
       var plan = AP().plan(v.cues, { mod: stilli ? "stilli" : "duz", ayar: v.ayar, cueKind: v.cueKind, guvenli: v.guvenli,
-        w: b.width, h: b.height, fps: b.fps, sure: b.seqDur, filigran: false, isId: isKimligi() });
+        w: b.width, h: b.height, fps: b.fps, sure: b.seqDur, filigran: false, isId: isKimligi(), dil: v.dil });
       if (!plan.katmanlar.length) throw new Error("Kompozisyonun süresine düşen altyazı yok.");
       var r = await K.call("KSAE_altyaziOlustur", plan, 600000);
       if (!r || !r.ok) throw new Error((r && r.error) || "Altyazı katmanları eklenemedi.");

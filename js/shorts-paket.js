@@ -377,7 +377,9 @@ window.KShortsPaket = (function () {
         if (!cc.cues.length) return { atla: "altyazi-bos" };
         var W = ciftBoyut(ctx.width, 1080), H = ciftBoyut(ctx.height, 1920), fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : 30;
         var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt, job.secim.gorunum === "panel");
-        var der = SE.compile({ styleId: job.secim.stilId, cueKind: cc.cueKind, cues: cc.cues, offset: 0, width: W, height: H, overrides: sa.overrides });
+        // dil: kalite motorunun kart / satır kırılım dili (Short'un dili; Altyazı Efektleri'nde Türkçe-duyarlı)
+        var der = SE.compile({ styleId: job.secim.stilId, cueKind: cc.cueKind, cues: cc.cues, offset: 0, width: W, height: H, overrides: sa.overrides,
+          dil: typeof job.lang === "string" ? job.lang : undefined });
         var sure = CT.katmanSuresi(cc.cues[cc.cues.length - 1].end, Number(ctx.end) || 0, fps, false);
         var yol = cikti("altyazi", k);
         await OR.render(K, { ass: der.ass, fontFiles: der.fontFiles, g: W, y: H, fps: fps, sure: sure, cikti: yol,

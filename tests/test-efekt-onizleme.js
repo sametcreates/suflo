@@ -70,6 +70,8 @@ function ortam() {
     "function motorOnizlemeCueleri() { return [{ start: 0.15, end: 0.7, text: 'Bunu' }, { start: 0.77, end: 1.3, text: 'gören' }]; }\n" +
     "function onizlemeBoyutu() { return { w: 960, h: 540, dikey: false }; } function konusmaciRenkleri(o) { return o; }\n" +
     "function cueler() { return []; } function motorCueTuru() { return 'words'; } function markaKiti() { return null; }\n" +
+    // kalite motoru: kart / satır kırılım dili (paneldeki kirilimDili; burada bilinmiyor → tr + en)
+    "function kirilimDili() { return undefined; }\n" +
     "function motorAyarlari(st) { return { font: st.font, boyut: st.boyut, renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk, kontur: st.kontur, konum: st.konum, giris: st.giris, aktif: st.aktif, vurgu: st.vurgu, kalin: st.kalin, italik: st.italik, satir: st.satir, kelime: st.kelime }; }\n" +
     "function uzantiDizini() { return '/ext'; } function guvenliAlanFiltresi() { return ''; } function sahneOraniniAyarla() {} function sahneYedekBoyut() {}\n" +
     "function dosyaUrl(p) { return 'file://' + p; } function onizlemeCiz() {} function onizlemeOynatDom() { say.dom++; } function temizMogrtAdi() { return 'Şablon'; }\n" +
