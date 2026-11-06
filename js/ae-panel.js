@@ -117,6 +117,8 @@ window.SufloAePanel = (function () {
       var r = await K.call("KSAE_altyaziOlustur", plan, 600000);
       if (!r || !r.ok) throw new Error((r && r.error) || "Altyazı katmanları eklenemedi.");
       toast(r.adet + " altyazı katmanı eklendi", "good", 7000);
+      // üç adımlı akış (js/altyazi-akis.js): başarılı ekleme 3. adımı "hazır ✓" yapar (Premiere'de yildizIste'nin işi)
+      if (window.SufloAltyaziAkis && window.SufloAltyaziAkis.guncelle) window.SufloAltyaziAkis.guncelle({ uygulandi: true });
       var notlar = plan.uyarilar.slice();
       if (r.eksikFont && r.eksikFont.length) notlar.push("After Effects'te kurulu olmayan font: " + r.eksikFont.join(", ") + ". Fontu kurup katmanlarda yeniden seçebilirsin.");
       if (r.italikYok) notlar.push("Bu After Effects sürümü italiği betikten açamıyor; yazı düz eklendi.");

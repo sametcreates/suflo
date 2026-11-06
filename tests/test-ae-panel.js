@@ -218,6 +218,7 @@ function kopru(env, aePanel) {
       }
     };
     sb.window = sb;
+    if (o.akis) sb.SufloAltyaziAkis = o.akis;
     sb.SufloAePlan = require(path.join(KOK, "js", "ae-plan.js"));
     vm.createContext(sb);
     vm.runInContext(oku("js/ae-panel.js"), sb, { filename: "js/ae-panel.js" });
@@ -277,6 +278,16 @@ function kopru(env, aePanel) {
   var hatali = panel("AEFT", { olustur: { ok: false, error: "Altyazi katmanlari eklenemedi: x" } });
   await hatali.P.ekle(true);
   ok("host hatası: hak düşmez, hata bildirilir", hatali.kayit.harca.length === 0 && hatali.kayit.toast.some(function (t) { return t[1] === "bad" && /eklenemedi/.test(t[0]); }));
+  // Parti 4 doğrulaması: üç adımlı akışın 3. adımı Premiere'de başarılı uygulamada (yildizIste) "hazır ✓" olur; AE'de
+  // ekleme bunu hiç bildirmiyordu, adım çubuğu başarılı eklemeden sonra da "Uygula · şu an" kalıyordu
+  var akisCagri = [], akisStub = { guncelle: function (ek) { akisCagri.push(ek); } };
+  var akisOk = panel("AEFT", { akis: akisStub });
+  await akisOk.P.ekle(false);
+  ok("AE başarılı ekleme üç adımlı akışa bildirilir (3. adım hazır ✓)", js(akisCagri) === js([{ uygulandi: true }]), js(akisCagri));
+  akisCagri.length = 0;
+  await panel("AEFT", { akis: akisStub, olustur: { ok: false, error: "x eklenemedi" } }).P.ekle(true);
+  await panel("AEFT", { akis: akisStub, kapi: false }).P.ekle(true);
+  ok("AE: host hatasında ve kapı geçmezse akışa 'uygulandı' bildirilmez", akisCagri.length === 0, js(akisCagri));
   var compsuz = panel("AEFT", { baglam: { ok: true, hasSeq: false } });
   await compsuz.P.ekle(false);
   ok("kompozisyon yokken: Türkçe neden, ekleme çağrısı yok", compsuz.kayit.cagri.filter(function (c) { return c.fn === "KSAE_altyaziOlustur"; }).length === 0 &&
