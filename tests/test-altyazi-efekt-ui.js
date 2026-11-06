@@ -138,7 +138,7 @@ function ortam(o) {
     "var SS = window.SufloStyleShare, AE = window.SufloAltyaziEfekt, EFEKT = 'efekt';\n" +
     cap.slice(cap.indexOf("  var EFEKT_SAYILARI = "), cap.indexOf("\n", cap.indexOf("\"cap-kutu-opak\": [50, 0, 100] };")) + 1) +
     "var secilenMogrt = null, secilenMotorStili = '', secilenGorunum = '', sonGorunum = '', bekleyenMogrtYolu = '', stilKrediAd = '';\n" +
-    "var katmanIptal = null;\n" +
+    "var katmanIptal = null, katmanHazirlaniyor = false;\n" +
     "var FONTLAR = SS.fontFiles();\n" +
     "var PRESETS = {}; window.SufloStyleEngine.list().forEach(function (p) { PRESETS[p.id] = motorPreset(p.id); });\n" +
     "var onizleme = { durdur: 0, ciz: 0, tazele: [], oynat: 0 };\n" +

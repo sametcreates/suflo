@@ -73,6 +73,10 @@
       // alan adı: önünde harf / rakam, ardından bilinen uzantı (sonrası bitiş, /, nokta ya da kesme işaretiyle ek)
       var kalan = tum.slice(konum + 1 + sonra.length);
       if (UZANTI.test(sonra) && /[0-9A-Za-z-]$/.test(tum.slice(0, konum)) && /^(|[\/.'’][\s\S]*|[,;:!?)]*)$/.test(kalan)) return m;
+      // yalnız büyük harfle başlayan sözcük yeni cümledir ("geldik.Sonra"); küçük harf ya da tümü büyük
+      // harf kalanı dosya uzantısı / teknik addır (Node.js, video.mp4, ASP.NET, C#.NET) — dokunulmaz
+      var bas = sonra.charAt(0), govde = sonra.slice(1);
+      if (bas === bas.toLowerCase() || (govde && govde === govde.toUpperCase())) return m;
       return ". ";
     });
   }

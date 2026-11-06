@@ -1078,7 +1078,9 @@
    * olan dar BMP kümesi. ♪ ★ ✓ gibi sıradan semboller emoji sayılmaz (çizilir).
    */
   var EMOJI = /[\uD800-\uDFFF\uFE0F\u231A\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD\u25FE\u2614\u2615\u2648-\u2653\u267F\u2693\u26A1\u26AA\u26AB\u26BD\u26BE\u26C4\u26C5\u26CE\u26D4\u26EA\u26F2\u26F3\u26F5\u26FA\u26FD\u2705\u270A\u270B\u2728\u274C\u274E\u2753-\u2755\u2757\u2795-\u2797\u27B0\u27BF\u2B1B\u2B1C\u2B50\u2B55]/;
-  var EMOJI_TUMU = new RegExp(EMOJI.source + "|\u200D|\u20E3", "g");
+  // Sıra önemli: önce bütün diziler (tuş kapağı "1️⃣", VS16'lı sembol "❤️ ⚠️ ©️ ↔️"), sonra tek karakter. Yalnız
+  // VS16 silinseydi taban sembol (❤ U+2764, ⚠ U+26A0) kalır, libass onu yedek fontta tek renk çizerdi.
+  var EMOJI_TUMU = new RegExp("[0-9#*]\\uFE0F?\\u20E3|[\\u00A9\\u00AE\\u203C-\\u2BFF]\\uFE0F|" + EMOJI.source + "|\u200D|\u20E3", "g");
   function emojiVar(text) { return EMOJI.test(String(text || "")); }
   // Emojiyi (ve birleştirici ZWJ / tuş kapağı izlerini) at, kalan boşlukları topla
   function emojiSil(text) {

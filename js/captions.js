@@ -1940,9 +1940,13 @@ window.KCaptions = (function () {
       if (styleBtn) { styleBtn.disabled = true; styleBtn.textContent = "Görünüm seçerek ekle"; }
     }
     // stilli katman çizilirken kapalı kalır (İptal yanında; ikinci render başlamasın)
-    if (styleBtn && katmanIptal) styleBtn.disabled = true;
+    if (styleBtn && (katmanIptal || katmanHazirlaniyor)) styleBtn.disabled = true;
     // üç adımlı akış (js/altyazi-akis.js): stil durumu ve tek düğmenin etiketi
     if (typeof SufloAltyaziAkis !== "undefined" && SufloAltyaziAkis.guncelle) SufloAltyaziAkis.guncelle();
+    // "Düz altyazı izi" seçiliyse ipucu düz yolu anlatır (tür guncelle'den sonra okunur: güncel stil / MOGRT durumu)
+    if (hint && typeof SufloAltyaziAkis !== "undefined" && SufloAltyaziAkis.tur && SufloAltyaziAkis.tur() === "duz") {
+      hint.textContent = "Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Animasyonlu ekleme için yukarıda bir görünüm seç ya da efekti ayarla.";
+    }
   }
 
   function mogrtStiliniSec(item) {
@@ -6151,9 +6155,12 @@ window.KCaptions = (function () {
    * Stilli katman render'ı sürerken 3. adımda "İptal" (#cap-uygula-iptal; #cap-cancel düzeni): ffmpeg (parçalı
    * render'da bütün parça süreçleri) öldürülür, yarım çıktı ve geçici klasörler silinir, timeline'a dokunulmaz,
    * deneme hakkı düşmez (Pro.denemeHarca yalnız yerleştirmeden sonra). Render sürerken stil düğmesi kapalı:
-   * ikinci tık ikinci render başlatmasın. katmanIptal: süren render'ın jetonu (yoksa null).
+   * ikinci tık ikinci render başlatmasın. katmanIptal: süren render'ın jetonu (yoksa null). katmanHazirlaniyor:
+   * overlayUygula tıklamadan bitişe kadar (render başlamadan önceki KS_overlaySpec / ASS kurulumu dahil) süren iş:
+   * çift tık ikinci render başlatmasın, İptal yalnız birini durdurup ötekini timeline'a koymasın.
    */
   var katmanIptal = null;
+  var katmanHazirlaniyor = false;
   var katmanIptalAcilis = 0;   // düğmenin göründüğü an: çift tıkın ikinci tıkı işi hemen iptal etmesin
   function katmanIptalGoster(goster) {
     var b = el("cap-uygula-iptal");
@@ -6170,8 +6177,17 @@ window.KCaptions = (function () {
     var b = el("cap-uygula-iptal");
     if (b) b.disabled = true;
     if (K.log) K.log("[katman] kullanici iptal etti");
-    status("İptal ediliyor…", "warn");
+    uygulaDurumu("İptal ediliyor…", "warn");
     j.iptal();
+  }
+  /*
+   * Stilli katmanın ilerlemesi / hatası: #cap-status (1. adım; MCP durumOku onu okur) ve 3. adımda düğmenin ve
+   * İptal'in hemen altındaki #cap-uygula-durum (kullanıcı uygulamayı oradan başlatır; 1. adım ekranın çok üstünde).
+   */
+  function uygulaDurumu(m, c) {
+    status(m, c);
+    var d = el("cap-uygula-durum");
+    if (d) { d.className = "inline-status" + (c ? " " + c : ""); d.textContent = m || ""; }
   }
 
   function uygulaEtiketiniSifirla() {
@@ -6515,12 +6531,12 @@ window.KCaptions = (function () {
    */
   async function overlayUygula() {
     // Katman zaten çiziliyor: ikinci tık ikinci render başlatmaz (İptal düğmesi görünür)
-    if (katmanIptal) { status("Altyazı katmanı zaten hazırlanıyor: bitmesini bekle ya da İptal'e bas.", "warn"); return; }
+    if (katmanIptal || katmanHazirlaniyor) { uygulaDurumu("Altyazı katmanı zaten hazırlanıyor: bitmesini bekle ya da İptal'e bas.", "warn"); return; }
     // Pro: animasyonlu katman (ucretsizde kanca basligiyla ortak 3 deneme hakki; deneme ciktisi filigranli)
     if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { overlayUygula().then(uygulaEtiketiniSifirla); } })) return;
     // Deneme yalniz Altyazi Efektleri icin: tercihlerden geri yuklenen bir MOGRT stili deneme kapisindan sizmasin
     if (typeof Pro !== "undefined" && !Pro.isPro() && secilenMogrt) {
-      status("Deneme yalnız Altyazı Efektleri için. Bir efekt görünümü seç ya da Pro'ya geç.", "warn");
+      uygulaDurumu("Deneme yalnız Altyazı Efektleri için. Bir efekt görünümü seç ya da Pro'ya geç.", "warn");
       KApp.toast("Deneme yalnız Altyazı Efektleri için.", "warn");
       return;
     }
@@ -6534,13 +6550,17 @@ window.KCaptions = (function () {
     emojiAtlaBirKez = false;
     emojiAtlaDugmesi(false);
     if (!secilenMogrt && !emojiAtla && emojiIceriyorMu()) {
-      status("Altyazıda emoji var. Stilli katman motoru emoji çizemiyor; " +
+      uygulaDurumu("Altyazıda emoji var. Stilli katman motoru emoji çizemiyor; " +
         "emojili altyazı için \"Sekansa uygula\"yı kullan (Premiere renkli çizer), " +
         "emojileri kaldır ya da \"Emojileri bu katmanda atla\" ile emojisiz ekle (transkript değişmez).", "warn");
       emojiAtlaDugmesi(true);
       return;
     }
 
+    // Buradan bitişe kadar ikinci tık (çift tık, tek "Timeline'a uygula") ikinci işi başlatmaz
+    katmanHazirlaniyor = true;
+    var stilDugmesi = el("cap-apply-style");
+    if (stilDugmesi) stilDugmesi.disabled = true;
     try {
       if (secilenMogrt) {
         await mogrtStiliniUygula();
@@ -6552,7 +6572,7 @@ window.KCaptions = (function () {
       } else if (yerelCiktiSecili()) {
         KApp.toast("Deneme hakkı filigranlı video katmanı ekler; Premiere yerel çıktı (render yok) Pro'da.", "warn", 8000);
       }
-      status("Sekans bilgisi alınıyor…");
+      uygulaDurumu("Sekans bilgisi alınıyor…");
       var spec = await K.call("KS_overlaySpec", {});
       if (!spec.ok) throw new Error(spec.error);
 
@@ -6632,7 +6652,7 @@ window.KCaptions = (function () {
         katman = await window.SufloOverlayRender.render(K, {
           ass: ass, fontFiles: fontDosyalari, g: g, y: y, fps: fps, sure: sure, cikti: cikti,
           fontDizini: K.path.join(uzantiDizini(), "fonts"), logo: logo, iptal: jeton || undefined,
-          durum: function (m) { if (!jeton || !jeton.iptalEdildi) status(m); }
+          durum: function (m) { if (!jeton || !jeton.iptalEdildi) uygulaDurumu(m); }
         });
       } finally {
         katmanIptal = null;
@@ -6647,7 +6667,7 @@ window.KCaptions = (function () {
       }
       if (katman && katman.logoAtlandi) KApp.toast("Marka Kiti logosu bulunamadı; katman logosuz eklendi. Ayarlar › Marka Kiti'nden logoyu yeniden seç.", "warn", 9000);
 
-      status("Timeline'a yerleştiriliyor…");
+      uygulaDurumu("Timeline'a yerleştiriliyor…");
       // Premiere'deki klip adı: Altyazı Efektleri katmanı; eski kimlikler (yarım kalmış eski iş) eski adıyla
       var katmanAdi = stilDerlemesi && stilDerlemesi.id === EFEKT ? "Suflo Altyazı Efekti" : "Suflo Stil · " + (stilDerlemesi ? stilDerlemesi.id : "Özel");
       var yer = await K.call("KS_placeOverlay", { path: cikti, scope: scope, name: katmanAdi }, 120000);
@@ -6662,15 +6682,18 @@ window.KCaptions = (function () {
       }
 
       var mb = (K.fs.statSync(cikti).size / 1048576).toFixed(1);
-      status("");
+      uygulaDurumu("");
       KApp.toast("Altyazı " + yer.trackName + " katmanına eklendi" +
         (yer.newTrack ? " (yeni katman açıldı)" : "") + " · " + mb + " MB", "good", 8000);
       yildizIste();
     } catch (e) {
-      if (e && e.iptal) status("İptal edildi", "warn");
-      else status("✕ " + K.hataYardimi(e), "bad");
+      // 3. adımdaki satır ve bildirim: başarısız stilli ekleme sessiz kalmasın (apply() ve MOGRT gibi)
+      if (e && e.iptal) { uygulaDurumu("İptal edildi", "warn"); KApp.toast("Altyazı katmanı iptal edildi; timeline'a dokunulmadı.", "warn", 6000); }
+      else { var hm = "✕ " + K.hataYardimi(e); uygulaDurumu(hm, "bad"); KApp.toast(hm, "bad", 9000); }
     } finally {
       emojisizCikti = false;
+      katmanHazirlaniyor = false;
+      uygulamaIpucunuGuncelle();
     }
   }
 
@@ -7089,7 +7112,9 @@ window.KCaptions = (function () {
       durum: function () {
         // üretim durumu setBusy'den gelir (guncelle({ uretiliyor })), "busy" değil: başka araçların transkripsiyonu sayılmaz
         return { altyaziVar: segments.length > 0, stilSecili: !!secilenMotorStili && !secilenMogrt, mogrtSecili: !!secilenMogrt };
-      }
+      },
+      // tür değişince 3. adımın ipucu ("Düz altyazı izi" seçiliyken stilli yolu anlatmasın)
+      turDegisti: function () { uygulamaIpucunuGuncelle(); }
     });
     onSonuc(function (bilgi) { A.sonucGeldi(bilgi); });
   }

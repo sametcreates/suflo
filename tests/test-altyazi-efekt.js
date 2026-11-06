@@ -434,5 +434,17 @@ ok("yeni görünümün stil kodu eski panelde (SS.decode, 'ek' bilinmez) aklı b
     SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", overrides: o }).eventCount > 0;
 }));
 
+/* ---------------- kart gruplama: CJK cümle sonu ve uzun koşuda doğrusal süre ---------------- */
+function uzunCue(n, f) { var a = []; for (var i = 0; i < n; i++) a.push({ start: i * 0.3, end: i * 0.3 + 0.25, text: f(i) }); return a; }
+var jaKart = SE.efektSatirlari({ cues: uzunCue(200, function (i) { return i % 7 === 6 ? "です。" : "日本語"; }), cueKind: "words", dil: "ja" }, {});
+var jaGecen = jaKart.filter(function (k) { return k.kelimeler.slice(0, -1).some(function (w) { return /。$/.test(w.text); }); });
+ok("efektGrupla: Japonca '。' cümle sonu, kart onu aşmaz", jaKart.length > 0 && jaGecen.length === 0, jaGecen.length + " / " + jaKart.length);
+var t0 = Date.now();
+var trUzun = SE.efektSatirlari({ cues: uzunCue(9000, function (i) { return ["bugün", "size", "kamerayla", "ilgili", "birkaç", "şey"][i % 6]; }), cueKind: "words", dil: "tr" }, {});
+var trSure = Date.now() - t0;
+ok("efektGrupla: 9000 kelimelik noktalamasız koşu dondurmaz (< 2,5 sn; eskiden ~8 sn), kart sayısı ceil(n / 5)", trSure < 2500 && trUzun.length === 1800, trSure + " ms, " + trUzun.length + " kart");
+var kisaKosu = SE.efektSatirlari({ cues: uzunCue(40, function (i) { return ["bugün", "size", "kamerayla", "ilgili", "birkaç", "şey"][i % 6]; }), cueKind: "words", dil: "tr" }, {});
+ok("efektGrupla: pencere eşiğinin altındaki koşu eskisi gibi tek DP (40 kelime → 8 kart)", kisaKosu.length === 8, kisaKosu.length);
+
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -294,6 +294,27 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
     HS("[Parsed_subtitles_1 @ 0x5] Glyph 0x1F525 not found, selecting one more font for (Inter, 700, 0)\n", 137) === "bilinmiyor" &&
     /^Altyazı katmanı üretilemedi: fontselect: \(Inter/.test(HM("[Parsed_subtitles_1 @ 0x5] fontselect: (Inter, 700, 0) -> /x.ttf, 0, Inter", 1, bag)),
     HS("[Parsed_subtitles_1 @ 0x55d0] fontselect: (Inter, 700, 0) -> /tmp/x/Inter-Bold.ttf, 0, Inter-Bold", 1));
+  // doğrulama: fontsdir=. ile libass çalışma klasöründeki HER dosyayı font diye dener; her çizimde (başarıda da)
+  // "Error opening memory font 'altyazi.ass'" yazar. Font olmayan dosyanın satırı font hatası değildir.
+  var LIBASS_GERCEK = "ffmpeg version 6.1.1 Copyright (c) 2000-2023 the FFmpeg developers\n" +
+    "Input #0, lavfi, from 'color=c=black@0.0:s=1280x720:r=25:d=3,format=rgba':\n" +
+    "  Duration: N/A, start: 0.000000, bitrate: N/A\n" +
+    "  Stream #0:0: Video: rawvideo (RGBA / 0x41424752), rgba, 1280x720 [SAR 1:1 DAR 16:9], 25 tbr, 25 tbn\n" +
+    "[Parsed_subtitles_1 @ 0x55d0c] Error opening memory font 'altyazi.ass'\n" +
+    "[Parsed_subtitles_1 @ 0x55d0c] Error opening memory font: 'logo.png'\n" +
+    "[Parsed_subtitles_1 @ 0x55d0c] Using font provider fontconfig\n";
+  ok("hata: libass'in ASS / logo dosyasını font diye deneme satırı font hatası sayılmaz; salt okunur disk 'izin'",
+    HS(LIBASS_GERCEK + "[out#0/mov @ 0x55d0d] Error opening output /Volumes/USB/suflo.mov: Read-only file system\nError opening output files: Read-only file system\n", 1) === "izin" &&
+    HS(LIBASS_GERCEK + "Error: EROFS: read-only file system, open '/mnt/x/a.mov'", -1) === "izin" &&
+    HS(LIBASS_GERCEK + "[out#0/mov @ 0x1] Error writing trailer: Input/output error\n", 1) === "bilinmiyor" &&
+    /Input\/output error$/.test(HM(LIBASS_GERCEK + "[out#0/mov @ 0x1] Error writing trailer: Input/output error\n", 1, bag)),
+    [HS(LIBASS_GERCEK + "Error opening output files: Read-only file system\n", 1), HS(LIBASS_GERCEK + "Error writing trailer: Input/output error\n", 1)].join(","));
+  ok("hata: öldürülen süreç (son satır ilerleme) font sayılmaz; gerçek font dosyası hatası hâlâ font",
+    HS(LIBASS_GERCEK + "frame=  120 fps= 60 q=-0.0 size=    1024kB time=00:00:04.80 bitrate=1747.6kbits/s speed=2.4x\n", 137) === "bilinmiyor" &&
+    HS(LIBASS_GERCEK + "[Parsed_subtitles_1 @ 0x55d0c] Error opening memory font: 'Anton-Regular.ttf'\n", 1) === "font" &&
+    HS("[Parsed_subtitles_1 @ 0x1] Error opening font: '/x/Inter.OTF', 0\n", 1) === "font" &&
+    HS("[Parsed_subtitles_1 @ 0x1] Loading font file './logo.png'\n[Parsed_subtitles_1 @ 0x1] Error opening memory font 'logo.png'\n", 139) === "bilinmiyor",
+    HS(LIBASS_GERCEK + "frame=  120 fps= 60 q=-0.0 size=    1024kB time=00:00:04.80\n", 137));
   ok("hata: Windows'un her çizimdeki fontconfig uyarısı tek başına font hatası sayılmaz",
     HS("Fontconfig error: Cannot load default config file: No such file: (null)\nConversion failed!", 1) === "bilinmiyor" &&
     HM("Fontconfig error: Cannot load default config file\nConversion failed!", 1, bag) === "Altyazı katmanı üretilemedi: Conversion failed!");
@@ -303,7 +324,7 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
     HM("a\n  [mov @ 0x55aa] moov atom not found  \n\n", 1, { onek: "Başlık katmanı üretilemedi: " }) === "Başlık katmanı üretilemedi: moov atom not found" &&
     HM("", 3, {}) === "Altyazı katmanı üretilemedi: ffmpeg kod 3" && HM(new Array(50).join("x") + new Array(400).join("y"), 1).length <= 230);
   var hEn = [HM("No such filter: 'subtitles'", 1, bag), HM("No space left on device", 1, bag), HM("Permission denied", 1, bag), HM("Invalid frame size", 1, bag),
-    HM("Error opening font", 1, bag), HM("[zaman aşımı]", -1, bag), HM("", -2, bag), HM("x\nbozuk", 1, bag)].map(function (m) { return I18Nb.translate(m); });
+    HM("Error opening font: 'Anton.ttf'", 1, bag), HM("[zaman aşımı]", -1, bag), HM("", -2, bag), HM("x\nbozuk", 1, bag)].map(function (m) { return I18Nb.translate(m); });
   ok("hata metinleri İngilizce (yol ve ffmpeg satırı çevrilmeden)", hEn.every(function (t) { return !/kaldı|yazılamıyor|geçersiz|yüklenemedi|aştı|edildi|üretilemedi|filtresi/.test(t); }) &&
     /Suflo Çıktı$/.test(hEn[1]) && /: bozuk$/.test(hEn[7]), hEn.join(" | "));
 
@@ -404,6 +425,34 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
   var sonCd = Kcd.calisan[Kcd.calisan.length - 1];
   ok("birleştirmede disk dolu: parçalar silinip tek süreçle yeniden çizilir", rcd.parca === 1 && Kcd.calisan.length === 5 && sonCd.cwd.indexOf("parca-") === -1 &&
     sonCd.args.indexOf("concat") === -1 && sonCd.args.indexOf("1250") !== -1, Kcd.calisan.length);
+  // doğrulama: bir parça hata verince kardeş parçalar öldürülür (boşuna çizmesin); yalnız öldürülerek bitebilen sahte süreçler
+  var Kpk = akisK({ cpus: 4, bekle: true, hata: function (c) { return /parca-1$/.test(c.cwd) ? { code: 1, stderr: "[x @ 0x1] bozuk\n" } : null; } });
+  var ppk = OR.render(Kpk, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "pk.mov") });
+  await new Promise(function (r) { setTimeout(r, 20); });
+  var kardesler = Kpk.calisan.slice(0, 3).filter(function (c) { return !/parca-1$/.test(c.cwd); });
+  ok("parça hatası: kardeş parça süreçleri öldürülür", kardesler.length === 2 && kardesler.every(function (c) { return c.olduruldu === true; }),
+    kardesler.map(function (c) { return c.cwd.slice(-7) + ":" + !!c.olduruldu; }).join(","));
+  Kpk.calisan.forEach(function (c) { if (c.bitir) c.bitir(); });
+  await new Promise(function (r) { setTimeout(r, 20); });
+  Kpk.calisan.forEach(function (c) { if (c.bitir) c.bitir(); });
+  var rpk = await ppk;
+  ok("parça hatası (kardeşler öldürülünce): tek süreçle biter", rpk.parca === 1, rpk.parca);
+  // doğrulama: parça klasörüne kopyalarken disk doldu (ENOSPC): ham hata değil, tek süreçle (tek kopya yeter) yeniden; hiçbir parça başlamaz
+  var Kcp = akisK({ cpus: 4 }), cpLog = [];
+  Kcp.log = function (m) { cpLog.push(m); };
+  Kcp.fs = Object.assign({}, fs, { copyFileSync: function (a, b) {
+    if (/parca-2/.test(b)) { var e = new Error("ENOSPC: no space left on device, copyfile '" + a + "' -> '" + b + "'"); e.code = "ENOSPC"; throw e; }
+    return fs.copyFileSync(a, b);
+  } });
+  var rcp = await OR.render(Kcp, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "cp.mov") });
+  ok("parça klasörü kopyası ENOSPC: tek süreçle yeniden, parça süreci hiç başlamaz, neden günlükte", rcp.parca === 1 && Kcp.calisan.length === 1 &&
+    Kcp.calisan[0].cwd.indexOf("parca-") === -1 && cpLog.some(function (l) { return /tek süreçle yeniden: parça klasörü hazırlanamadı: ENOSPC/.test(l); }) &&
+    fs.readdirSync(tmp).length === 0, Kcp.calisan.length + " | " + cpLog.join(" | "));
+  var Kcp2 = akisK({ cpus: 4 }), hcp2 = null;
+  Kcp2.fs = Object.assign({}, fs, { copyFileSync: function (a, b) { var e = new Error("ENOSPC: no space left on device, copyfile"); e.code = "ENOSPC"; throw e; } });
+  Kcp2.run = (function (eski) { return function (exe, args, opt) { return opt.cwd.indexOf("parca-") === -1 ? Promise.resolve({ code: 1, stderr: "[out @ 0x1] No space left on device\n" }) : eski(exe, args, opt); }; })(Kcp2.run);
+  try { await OR.render(Kcp2, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "cp2.mov") }); } catch (e) { hcp2 = e; }
+  ok("tek süreç de diske sığmazsa: anlaşılır 'Diskte yer kalmadı' (ham ENOSPC değil)", hcp2 && /^Diskte yer kalmadı/.test(hcp2.message), hcp2 && hcp2.message);
   ok("parça hataları sonrası geçici klasör yok", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
   ok("geçici render klasörleri temizlendi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
 

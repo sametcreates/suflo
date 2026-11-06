@@ -38,7 +38,10 @@
   var HATIRLANAN = ["cap-ozellestir", "cap-diger-araclar", "cap-mogrt-sar"];
   var GELISMIS = "cap-gelismis";
   var DEPO = { acik: "suflo.akis.acik", tur: "suflo.akis.tur", kaydirma: "suflo.akis.ilkKaydirma" };
-  var TEK_ETIKET = "Timeline'a uygula";
+  // After Effects'te caption izi / timeline yok: düz yol etkin kompozisyona metin katmanı ekler (ae-panel ekle(false))
+  function tekEtiket(d) { return d && d.ae ? "Kompozisyona ekle" : "Timeline'a uygula"; }
+  var BOS_METIN = "Önce altyazı oluştur. Timeline'a uygulama ve dosya olarak indirme altyazı hazır olunca açılır.";
+  var BOS_METIN_AE = "Önce altyazı oluştur. Kompozisyona ekleme ve dosya olarak indirme altyazı hazır olunca açılır.";
   var STIL_YOK_IPUCU = "Önce 2. adımda bir stil seç";
   var KAYDIRMA_TUSLARI = { PageUp: 1, PageDown: 1, ArrowUp: 1, ArrowDown: 1, Home: 1, End: 1, " ": 1, Spacebar: 1 };
 
@@ -79,7 +82,8 @@
    *   durum: () => { altyaziVar, uretiliyor, stilSecili, mogrtSecili },
    *   depo: localStorage | () => localStorage (isteğe bağlı),
    *   ae: () => bool (isteğe bağlı; yoksa body.host-ae),
-   *   hareketAzalt: () => bool (isteğe bağlı; yoksa prefers-reduced-motion)
+   *   hareketAzalt: () => bool (isteğe bağlı; yoksa prefers-reduced-motion),
+   *   turDegisti: (tur) => void (isteğe bağlı; kullanıcı / rehber türü seçince, guncelle'den sonra)
    * }
    */
   function baglayici(o) {
@@ -146,7 +150,7 @@
       var h = hedefDugme(d);
       var uyari = !!(h && h.classList && h.classList.contains("warn"));
       var hedefMetin = h ? String(h.textContent || "").replace(/\s+/g, " ").trim() : "";
-      metinYaz(el("cap-uygula-tek-metin"), uyari && hedefMetin ? hedefMetin : TEK_ETIKET);
+      metinYaz(el("cap-uygula-tek-metin"), uyari && hedefMetin ? hedefMetin : tekEtiket(d));
       metinYaz(el("cap-uygula-tek-alt"), d.altyaziVar && !uyari ? hedefMetin : "");
       var kapali = !d.altyaziVar || d.uretiliyor || !h || !!h.disabled;
       tek.disabled = kapali;
@@ -178,6 +182,8 @@
         if (b.classList) b.classList.toggle("on", secili);
         b.setAttribute("aria-checked", secili ? "true" : "false");
         b.setAttribute("tabindex", secili ? "0" : "-1");
+        // düz düğmenin alt öğesi yok (textContent güvenli); stilli düğmenin .pro-inline'ı korunur (AE'de de doğru)
+        if (ad === "duz") metinYaz(b, d.ae ? "Düz metin katmanı · ücretsiz" : "Düz altyazı izi · ücretsiz");
         if (ad === "stil") {
           b.disabled = !stilVar;
           if (!stilVar) b.setAttribute("title", STIL_YOK_IPUCU);
@@ -198,7 +204,7 @@
       adimCubugu(s);
       // Transkript yokken 3. adım: yalnız ipucu ve kapalı tek düğme; tür seçimi ve ek satırlar (indir, AE) gizli
       var bos = el("cap-uygula-bos");
-      if (bos) bos.hidden = d.altyaziVar;
+      if (bos) { bos.hidden = d.altyaziVar; metinYaz(bos, d.ae ? BOS_METIN_AE : BOS_METIN); }
       ["cap-uygula-govde", "cap-uygula-ek"].forEach(function (id) { var n = el(id); if (n) n.hidden = !d.altyaziVar; });
       turCiz(d);
       // Kayıtlı bir Premiere şablonu seçiliyse şablon bölümü (oturumda bir kez) kendiliğinden açılır
@@ -216,6 +222,8 @@
       if (secenek && secenek.gecici) geciciTur = t;
       else { geciciTur = ""; bellekTur = t; depo.yaz(DEPO.tur, t); }
       guncelle();
+      // captions.js: 3. adımın ipucu seçilen türü anlatsın (o.turDegisti → uygulamaIpucunuGuncelle; o turSec çağırmaz)
+      if (typeof o.turDegisti === "function") { try { o.turDegisti(tur(sonDurum)); } catch (eT) {} }
     }
 
     function tekTiklandi() {
@@ -340,6 +348,7 @@
     guncelle: function (ek) { return varsayilan ? varsayilan.guncelle(ek) : null; },
     sonucGeldi: function (b) { return varsayilan ? varsayilan.sonucGeldi(b) : false; },
     turSec: function (t, s) { if (varsayilan) varsayilan.turSec(t, s); },
+    tur: function () { return varsayilan ? varsayilan.tur() : ""; },
     adimaGit: function (ad) { return varsayilan ? varsayilan.adimaGit(ad) : false; }
   };
 });

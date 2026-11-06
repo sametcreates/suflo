@@ -119,6 +119,8 @@ function akisBagla(b, hal, depo, ek) {
   var b1 = belgeKur(), c1 = capOrtam(b1);
   var ak1 = akisBagla(b1, c1.hal);
   c1.api.uygulamaIpucunuGuncelle();
+  ok("Premiere: düz tür ve boş durum Premiere sözcükleriyle (timeline, caption izi)", b1.dom["cap-uygula-tur-duz"].textContent === "Düz altyazı izi · ücretsiz" &&
+    /^Önce altyazı oluştur\. Timeline'a uygulama/.test(b1.dom["cap-uygula-bos"].textContent));
   ok("transkript + efekt seçili: tür varsayılanı stilli, tek düğme açık, etiket özgün düğmeden",
     ak1.tur() === "stil" && b1.dom["cap-uygula-tek"].disabled === false && b1.dom["cap-uygula-tek-metin"].textContent === "Timeline'a uygula" &&
     b1.dom["cap-uygula-tek-alt"].textContent === "Vurucu ile ekle" && b1.dom["cap-uygula-tur-stil"].attrs["aria-checked"] === "true" &&
@@ -303,6 +305,10 @@ function akisBagla(b, hal, depo, ek) {
   var cae = capOrtam(bae);
   var akae = akisBagla(bae, cae.hal);
   ok("AE: tür stilli, tek düğmenin alt etiketi AE düğmesinden", akae.tur() === "stil" && bae.dom["cap-uygula-tek-alt"].textContent === "Altyazı Efektleriyle ekle");
+  ok("AE: Premiere sözcükleri yok: 'Kompozisyona ekle', 'Düz metin katmanı · ücretsiz', boş durum kompozisyonu anar",
+    bae.dom["cap-uygula-tek-metin"].textContent === "Kompozisyona ekle" && bae.dom["cap-uygula-tur-duz"].textContent === "Düz metin katmanı · ücretsiz" &&
+    /^Önce altyazı oluştur\. Kompozisyona ekleme/.test(bae.dom["cap-uygula-bos"].textContent) && !/Timeline/.test(bae.dom["cap-uygula-bos"].textContent),
+    [bae.dom["cap-uygula-tek-metin"].textContent, bae.dom["cap-uygula-tur-duz"].textContent, bae.dom["cap-uygula-bos"].textContent].join(" | "));
   bae.dom["cap-uygula-tek"].click();
   await bekle();
   ok("AE stilli: tek düğme #ae-ekle-stil'e gider: Pro.gate(\"overlay\", { yeniden }) — deneme hakkı YOK, Premiere yolu çağrılmaz",
@@ -347,15 +353,29 @@ function akisBagla(b, hal, depo, ek) {
   b15.dom["cap-uygula-tur-stil"].click();
   ok("kullanıcı türü seçince geçici öneri biter ve seçimi kaydedilir", ak15.tur() === "stil" && dep15.v["suflo.akis.tur"] === "stil");
 
+  /* ---------------- 6b) tür seçimi 3. adımın ipucunu değiştirir ---------------- */
+  var b16 = belgeKur(), c16 = capOrtam(b16);
+  var ak16 = akisBagla(b16, c16.hal, sahteDepo(), { turDegisti: function () { c16.api.uygulamaIpucunuGuncelle(); } });
+  c16.api.uygulamaIpucunuGuncelle();
+  var stilIpucu16 = b16.dom["cap-apply-hint"].textContent;
+  b16.dom["cap-uygula-tur-duz"].click();
+  var duzIpucu16 = b16.dom["cap-apply-hint"].textContent;
+  ok("'Düz altyazı izi' seçilince ipucu düz yolu anlatır (stilli katmanı değil)", ak16.tur() === "duz" && /şeffaf bir video katmanı/.test(stilIpucu16) &&
+    /^Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur\./.test(duzIpucu16) && !/şeffaf/.test(duzIpucu16), duzIpucu16);
+  b16.dom["cap-uygula-tur-stil"].click();
+  ok("stilli türe dönünce stilli ipucu geri gelir; stil düğmesinin etiketi değişmez", ak16.tur() === "stil" && b16.dom["cap-apply-hint"].textContent === stilIpucu16 &&
+    b16.dom["cap-apply-style"].textContent === "Vurucu ile ekle", b16.dom["cap-apply-hint"].textContent);
+  ok("captions.js akışa turDegisti verir (uygulamaIpucunuGuncelle)", /turDegisti: function \(\) \{ uygulamaIpucunuGuncelle\(\); \}/.test(govde(cap, "function akisBagla(")));
+
   /* ---------------- 7) captions.js bağlantı noktaları ---------------- */
   ok("captions.js akışı init'te bağlar ve başarılı transkripti bildirir",
     /function akisBagla\(\) \{[\s\S]*?A\.bagla\(\{[\s\S]*?onSonuc\(function \(bilgi\) \{ A\.sonucGeldi\(bilgi\); \}\);/.test(cap) &&
     /uygulamaIpucunuGuncelle\(\);\n    akisBagla\(\);/.test(cap));
   ok("durum noktaları: stil değişimi, iş başlangıcı / bitişi, başarılı uygulama (bağlayıcı yoksa sessiz)",
-    /SufloAltyaziAkis\.guncelle\(\);\n  \}/.test(govde(cap, "function uygulamaIpucunuGuncelle(")) &&
+    /SufloAltyaziAkis\.guncelle\(\);\n    \/\/ "Düz altyazı izi"[^\n]*\n    if \(hint && typeof SufloAltyaziAkis !== "undefined" && SufloAltyaziAkis\.tur && SufloAltyaziAkis\.tur\(\) === "duz"\) \{\n[^\n]*\n    \}\n  \}$/.test(govde(cap, "function uygulamaIpucunuGuncelle(")) &&
     /SufloAltyaziAkis\.guncelle\(\{ uretiliyor: !!b \}\)/.test(govde(cap, "function setBusy(")) &&
     /SufloAltyaziAkis\.guncelle\(\{ uygulandi: true \}\)/.test(govde(cap, "function yildizIste(")) &&
-    (cap.match(/typeof SufloAltyaziAkis !== "undefined"/g) || []).length === 3);
+    (cap.match(/typeof SufloAltyaziAkis !== "undefined"/g) || []).length === 4);
 
   console.log("\n" + gecen + "/" + toplam + " gecti");
   if (gecen !== toplam) process.exit(1);

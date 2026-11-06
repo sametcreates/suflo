@@ -1166,6 +1166,8 @@
     "Önce Altyazı ayarlarından bir stil seç.": "Choose a style in Caption settings first.",
     "Yine de yeni iz ekle": "Add a new track anyway",
     "Yine de yeni iz ekle{}": "Add a new track anyway{}",
+    "Yine de yeni iz ekle · {n} sorun": "Add a new track anyway · {} issue(s)",
+    "{n} kritik sorunla yine de uygula": "Apply anyway with {} critical issue(s)",
     "{n} kritik altyazı sorunu var. Önce kırmızı satırları kontrol et veya Nizami düzelt'i kullan.": "{} critical caption issues. Check the red lines first or use Auto-fix.",
     "Bu sekansa zaten altyazı uygulandı; devam etmek yeni bir altyazı izi ekler.": "Captions were already applied to this sequence; continuing adds a new caption track.",
     "Yine de yeni altyazı izi ekle": "Add a new caption track anyway",
@@ -3390,6 +3392,8 @@
     "İptal ediliyor…": "Canceling…",
     "İptal edildi.": "Canceled.",
     "İptal edildi": "Canceled",
+    "Altyazı katmanı iptal edildi; timeline'a dokunulmadı.": "Caption layer canceled; the timeline wasn't touched.",
+    "parça klasörü hazırlanamadı: {}": "couldn't prepare the part folder: {}",
     // Auto Cut 3.4: live threshold (decode once, instant preview, min. speech, auto threshold)
     "Analizden sonra kaydırıcılar kesim haritasını anında günceller; ffmpeg yeniden çalışmaz.": "After the analysis, the sliders update the cut map instantly; ffmpeg doesn't run again.",
     "Eşiği klibin kendi sesinden öner: arka plan gürültüsünün 8 dB üstü": "Suggest a threshold from the clip's own audio: 8 dB above the background noise",
@@ -3563,6 +3567,8 @@
     "2 satır × 42 (YouTube/TV)": "2 lines × 42 (YouTube/TV)",
     // Caption quality engine (batch 1): line length from the sequence frame (16:9 2 × 42, 1:1 / 4:5 2 × 32, 9:16 2 × 24)
     "Otomatik (kadraja göre)": "Automatic (by frame)",
+    "Otomatik: satır bütçesi kadraja göre (sekansın oranından) seçilir": "Auto: the line budget follows the frame (the sequence's aspect ratio)",
+    "Satır bütçesi sekansın oranından: yatay 2 × 42, kare/4:5 2 × 32, 9:16 2 × 24": "Line budget from the sequence's aspect ratio: landscape 2 × 42, square/4:5 2 × 32, 9:16 2 × 24",
     "Kelime sınırı": "Word limit",
     "Satır modunda bir satıra en çok kaç kelime girer (0 = kapalı, 2–12). Kelime zamanı olan transkriptte geçerli.":
       "The most words one caption can hold in line mode (0 = off, 2–12). Applies to transcripts with word timings.",
@@ -3768,8 +3774,8 @@
     "Stil kodu modülü yüklenemedi.": "The style code module couldn't be loaded.",
     // Altyazı sekmesi › Stil kartı
     "ALTYAZI EFEKTLERİ · PREMIERE ŞABLONLARI": "CAPTION EFFECTS · PREMIERE TEMPLATES",
-    "Altyazı efektini kendin kur ya da aşağıdaki 17 gerçek altyazı şablonundan birini seç. Önizleme ücretsiz; timeline'a eklemek Pro (3 deneme hakkı).":
-      "Build your own caption effect, or pick one of the 17 real caption templates below. Previewing is free; adding to the timeline is Pro (3 free trials).",
+    "Aşağıdaki hazır görünümlerden birini seç ya da efekti kendin kur; 17 Premiere şablonu en altta. Önizleme ücretsiz; timeline'a eklemek Pro (3 deneme hakkı).":
+      "Pick one of the preset looks below or build your own effect; the 17 Premiere templates are at the bottom. Previewing is free; adding to the timeline is Pro (3 free trials).",
     "önizleme ücretsiz · After Effects gerekmez": "free preview · no After Effects needed",
     "Hazır görünümler": "Preset looks",
     "Giriş animasyonu": "Entrance animation",
@@ -4445,6 +4451,10 @@
     "Ekleme biçimi": "How to add",
     "Stilli · Altyazı Efektleri": "Styled · Caption Effects",
     "Düz altyazı izi · ücretsiz": "Plain caption track · free",
+    "Düz metin katmanı · ücretsiz": "Plain text layers · free",
+    "Kompozisyona ekle": "Add to composition",
+    "Önce altyazı oluştur. Kompozisyona ekleme ve dosya olarak indirme altyazı hazır olunca açılır.":
+      "Create captions first. Adding to the composition and downloading as a file unlock once captions are ready.",
     "Timeline'a uygula": "Apply to timeline",
     "Dosya olarak indir": "Download as a file",
     "Önce 2. adımda bir stil seç": "Choose a style in step 2 first"

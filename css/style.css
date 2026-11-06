@@ -4687,7 +4687,7 @@ body.host-ae [data-yalniz-premiere], body.host-ae [data-ae-gizli] { display: non
   background: none; color: var(--dim); font: inherit; font-size: 11.5px; text-align: left; cursor: pointer;
   transition: color .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
 }
-.cap-adimlar-oge b { font-weight: 620; min-width: 0; flex: 1 1 auto; line-height: 1.2; overflow-wrap: anywhere; }
+.cap-adimlar-oge b { font-weight: 620; min-width: 0; flex: 1 1 auto; line-height: 1.2; overflow-wrap: break-word; }
 .cap-adimlar-oge:hover { color: var(--text); background: rgba(255, 255, 255, .03); }
 .cap-adimlar-oge:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--glow-sm); }
 .cap-adim-no {
@@ -4700,8 +4700,9 @@ body.host-ae [data-yalniz-premiere], body.host-ae [data-ae-gizli] { display: non
 .cap-adimlar-oge[data-durum="aktif"] .cap-adim-durum { color: var(--accent-lite, var(--accent)); }
 .cap-adimlar-oge[data-durum="tamam"] .cap-adim-no { border-color: var(--good); color: var(--good); }
 .cap-adimlar-oge[data-durum="tamam"] .cap-adim-durum { color: var(--good); }
-/* Dar panelde durum yazısı alt satıra iner (yatay kaydırma olmasın) */
-@media (max-width: 340px) {
+/* Dar panelde (yan yana yerleşik Premiere paneli ~360–440 px dahil) durum yazısı alt satıra iner: etiket sözcük
+   ortasından bölünmez ("Oluş|tur"), yatay kaydırma olmaz. Kapsayıcı sorgusu yok: eski CEP Chromium'u desteklemeyebilir. */
+@media (max-width: 479px) {
   .cap-adimlar-oge { flex-wrap: wrap; row-gap: 1px; }
   .cap-adimlar-oge .cap-adim-durum { flex-basis: 100%; padding-left: 22px; }
 }

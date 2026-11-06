@@ -267,7 +267,13 @@
    * libass'in başarılı çizimde de yazdığı bilgi satırları (font eşlemesi, emoji için yedek font arayışı). ffmpeg
    * mesajsız çökerse / öldürülürse son satır bunlardan biri olur: "font" sayılmamalı (yanlış "yeniden kur" önerisi).
    */
-  var FONT_BILGI = /^fontselect: \(.*\) -> |^Glyph 0x[0-9a-f]+ not found, selecting one more font|^Using font provider|^Loading font file|^Font info:|^Shaper:|^Added subtitle file/i;
+  var FONT_BILGI = /^fontselect: \(.*\) -> |^Glyph 0x[0-9a-f]+ not found, selecting one more font|^Using font provider|^Loading font file|^Font info:|^Shaper:|^Added subtitle file|^Error opening (memory )?font/i;   // gerçek font dosyası hatası FONT_ACILAMADI'yla önce yakalanır
+
+  /*
+   * fontsdir=. ile libass çalışma klasöründeki HER dosyayı font diye dener ve her çizimde (başarıda da) "Error opening
+   * memory font 'altyazi.ass'" (logo.png, parcalar.txt…) yazar: yalnız adı gerçek font dosyası olan satır font hatasıdır.
+   */
+  var FONT_ACILAMADI = /Error opening (memory )?font:? *'?[^'\n]*\.(ttf|otf|ttc|otc|woff2?)'?/i;
 
   function hataSinifi(stderr, kod) {
     var s = String(stderr || "");
@@ -275,10 +281,10 @@
     if (/\[zaman aşımı\]/.test(s)) return "zaman";
     if (/No space left on device|ENOSPC|Disk quota exceeded|not enough space on the disk/i.test(s)) return "disk";
     if (/No such filter: '?(subtitles|ass)'?|Unknown filter '?(subtitles|ass)'?/i.test(s)) return "filtre";
-    if (/Permission denied|EACCES|EPERM|Operation not permitted|Access is denied/i.test(s)) return "izin";
+    if (/Permission denied|EACCES|EPERM|Operation not permitted|Access is denied|Read-only file system|EROFS/i.test(s)) return "izin";
     if (/Invalid (frame |video )?size|Picture size \d+x\d+ is invalid|(width|height) (must be|not) divisible by 2|Unable to parse option value "?\d*x?\d*"? as image size/i.test(s)) return "boyut";
     var son = sonSatir(s);
-    if (/Error opening (memory )?font|No usable fontconfig configuration|Error initializing fontconfig|fontconfig_init failed/i.test(s) ||
+    if (FONT_ACILAMADI.test(s) || /No usable fontconfig configuration|Error initializing fontconfig|fontconfig_init failed/i.test(s) ||
       (/font|glyph/i.test(son) && !FONT_BILGI.test(son))) return "font";
     return "bilinmiyor";
   }
@@ -473,8 +479,20 @@
       c.ilerlet(toplam ? t / toplam : 0);
     }
     try {
+      /*
+       * Bütün parça klasörleri hiçbir ffmpeg başlamadan hazırlanır. Kopyalarken disk dolarsa (uzun transkriptte ASS
+       * onlarca MB, parça başına bir kopya) ham ENOSPC fırlatılmaz: sıradan başarısızlık döner, render tek süreçle
+       * (tek kopya yeter; parça kopyaları finally'de silinir) yeniden dener. Bilerek tekrarlanmaz DEĞİL: yer, tek
+       * sürecin gerektirmediği ek kopyalarda bitti. Tek süreç de sığmazsa hataMetni'nin "disk" metni gelir.
+       */
+      var klasorler;
+      try { klasorler = c.plan.map(function (p, i) { return parcaKlasoru(K, c.dizin, i, c.dosyalar); }); }
+      catch (eK) {
+        var mK = String(eK && eK.message || eK);
+        return { ok: false, r: { code: -1, stderr: mK }, neden: "parça klasörü hazırlanamadı: " + mK };
+      }
       var isler = c.plan.map(function (p, i) {
-        var pd = parcaKlasoru(K, c.dizin, i, c.dosyalar);
+        var pd = klasorler[i];
         var args = parcaArgs({ assName: c.assAd, fontsdir: c.fontsdir, w: c.g, h: c.y, fps: c.fps, bas: p.bas, kare: p.kare,
           logo: c.logo, out: "parca.mov" });
         return K.run(c.ff, args, {

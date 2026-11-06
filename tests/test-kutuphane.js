@@ -187,7 +187,7 @@ async function run() {
     /data-kat="captions"[\s\S]*?Altyazı Şablonları[\s\S]*?class="ky-kilit" data-kilit>PRO<[\s\S]*?id="caption-sayac"/.test(html));
   ok("Stil bolumu gercek Premiere altyazi sablonlariyla acik",
     /class="card stil-katmani-card"/.test(html) &&
-    /17 gerçek altyazı şablonundan birini seç/.test(html) &&
+    /hazır görünümlerden birini seç ya da efekti kendin kur; 17 Premiere şablonu en altta\./.test(html) && !/aşağıdaki 17 gerçek altyazı şablonundan/.test(html) &&
     !/class="card stil-katmani-card" hidden/.test(html));
   var css = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
   ok("MOGRT kartlari buyuk, kirpilmayan profesyonel onizleme kullaniyor",

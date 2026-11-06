@@ -97,5 +97,12 @@ chk("yogun da tekrar korumasini tutar (ayni emoji 3 satirdan once tekrar etmez)"
 chk("tum emojilerin cevrimdisi SVG'si var (yeni kurallarla)", E.emojis().every(function (e) { return esleme[e]; }));
 chk("YOGUNLUKLAR listesi", JSON.stringify(E.YOGUNLUKLAR) === '["seyrek","orta","yogun"]');
 
+// para / ateş / kalp kökleri ilgisiz sözcüklerde ve "kalp krizi"nde emoji vermez; gerçek kullanımlar sürer
+var yanlisPozitif = ["paralel park etti", "paraşütle atladı", "parazit var", "parantez içinde", "her şey paramparça", "ilk paragraf", "bir paradoks", "parametre gir", "paravan şirket", "Ateşkes ilan edildi", "Kalp krizi geçirdi", "kalp krizinden sonra"];
+chk("para / ateş / kalp kökü ilgisiz sözcükte emoji vermez", yanlisPozitif.every(function (t) { return E.pick(t, "tr") === null; }),
+  yanlisPozitif.map(function (t) { return t + "=" + E.pick(t, "tr"); }).join(", "));
+var dogruPozitif = [["para lazım", "💰"], ["paramı aldım", "💰"], ["paraları say", "💰"], ["paralar bitti", "💰"], ["ateş yak", "🔥"], ["ateşe at", "🔥"], ["kalp atışı", "❤️"], ["kalpten teşekkürler", "❤️"], ["Paranteze dikkat edin", "⚠️"]];
+chk("para / ateş / kalp gerçek kullanımları eşleşir", dogruPozitif.every(function (x) { return E.pick(x[0], "tr") === x[1]; }),
+  dogruPozitif.map(function (x) { return x[0] + "=" + E.pick(x[0], "tr"); }).join(", "));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

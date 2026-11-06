@@ -362,10 +362,12 @@ ok("ikiyeBolNoktasi(words, false): eski kural bayt bayt (stil motorunun eski sti
 var trKaynak = fs.readFileSync(path.join(KOK, "js", "tr-kirilim.js"), "utf8");
 ok("index.html: tr-kirilim.js caption-layout.js ve style-engine.js'ten önce yüklenir", sira("tr-kirilim.js") > 0 && sira("tr-kirilim.js") < sira("caption-layout.js") &&
   sira("tr-kirilim.js") < sira("style-engine.js") && /SufloTrKirilim/.test(trKaynak));
-ok("index.html: Satır uzunluğu 'Otomatik (kadraja göre)' (auto) seçeneği; HTML varsayılanı l42 (kayıtlı tercih değeri korunur)",
-  /<option value="auto">Otomatik \(kadraja göre\)<\/option>/.test(html) && /<option value="l42" selected>/.test(html) && (html.match(/ selected>/g) || []).length > 0);
+ok("index.html: Satır uzunluğu kısa 'Otomatik' (auto) seçeneği (dar panelde kesilmez, ayrıntı title'da); HTML varsayılanı l42 (kayıtlı tercih değeri korunur)",
+  /<option value="auto" title="[^"]*9:16[^"]*">Otomatik<\/option>/.test(html) && /<select id="cap-maxlen" title="[^"]*kadraja göre[^"]*">/.test(html) && /<option value="l42" selected>/.test(html) && (html.match(/ selected>/g) || []).length > 0);
 var en = fs.readFileSync(path.join(KOK, "i18n", "en.js"), "utf8");
-ok("i18n/en.js: 'Otomatik (kadraja göre)' İngilizce girdisi", /"Otomatik \(kadraja göre\)": "Automatic \(by frame\)"/.test(en));
+ok("i18n/en.js: 'Otomatik' ve iki açıklama (title) İngilizce girdisi", /"Otomatik": "Auto"/.test(en) &&
+  en.indexOf('"Otomatik: satır bütçesi kadraja göre (sekansın oranından) seçilir": "') !== -1 &&
+  en.indexOf('"Satır bütçesi sekansın oranından: yatay 2 × 42, kare/4:5 2 × 32, 9:16 2 × 24": "') !== -1);
 ok("captions.js: kayıtlı tercih yokken satır uzunluğu auto; kayıtlı tercih kendi değerinde (uzunlukSecimi auto'yu menüden kabul eder)",
   /if \(!p && el\("cap-maxlen"\)\) el\("cap-maxlen"\)\.value = uzunlukSecimi\("auto"\);/.test(govde("function loadPrefs(")) &&
   /if \(p\.maxlen\) el\("cap-maxlen"\)\.value = uzunlukSecimi\(p\.maxlen\);/.test(govde("function loadPrefs(")));
@@ -462,6 +464,40 @@ ok("editTime: başlangıç – bitiş satırı yeniden boyutlar, kelimeler doğr
 toastlar.length = 0;
 zamanDuzenle("00:00:25.000 – 00:00:24.000");
 ok("editTime: bitiş başlangıçtan önceyse uyarır, satıra dokunmaz", ED.get()[0].start === 20 && toastlar.length === 1 && /dd:ss\.mmm – dd:ss\.mmm/.test(toastlar[0]), toastlar[0]);
+
+/* ---------------- unvan / sıra sayısı cümle sonu sayılmaz (satır öbekleri ve birleştirme) ---------------- */
+var unvanW = zamanla("Prof. Dr. Ahmet Bey bugün bizimle.");
+var unvanL = CL.kelimedenSatirlar(unvanW, { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kelimedenSatirlar: 'Prof.' / 'Dr.' kendi cue'su olmaz (unvan addan ayrılmaz)", unvanL.length === 1 && unvanL[0].text === "Prof. Dr. Ahmet Bey bugün bizimle.", metinler(unvanL));
+var siraL = CL.kelimedenSatirlar(zamanla("Takımımız 2. sırada bitirdi."), { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kelimedenSatirlar: '2.' sırada'dan ayrılmaz", siraL.length === 1 && siraL[0].text === "Takımımız 2. sırada bitirdi.", metinler(siraL));
+var mrL = CL.kelimedenSatirlar(zamanla("Mr. Smith is here."), { maxChars: 42, maxLines: 1, dil: "en" });
+ok("kelimedenSatirlar: 'Mr. Smith' tek öbek", mrL.length === 1, metinler(mrL));
+var gercekSon = CL.kelimedenSatirlar(zamanla("Geldik. Sonra gittik."), { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kelimedenSatirlar: gerçek cümle sonu hâlâ öbeği bitirir; '1. Dünya' gibi büyük harfli sürüm de", gercekSon.length === 2 &&
+  CL.kelimedenSatirlar(zamanla("Bitti 1. Dünya savaşı"), { maxChars: 42, maxLines: 1, dil: "tr" }).length === 2, metinler(gercekSon));
+var eskiDil = CL.kelimedenSatirlar(unvanW, { maxChars: 42, maxLines: 1, dil: false });
+ok("kelimedenSatirlar: dil false eski davranış (her nokta cümle sonu)", eskiDil.length === 3, metinler(eskiDil));
+var kbU = CL.kisaBirlestir([{ start: 0, end: 0.3, text: "Dr." }, { start: 0.35, end: 1.5, text: "Ayşe geldi" }], { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kisaBirlestir: unvanla biten parça addan ayrı kalmaz", kbU.length === 1 && kbU[0].text === "Dr. Ayşe geldi", metinler(kbU));
+var kbC = CL.kisaBirlestir([{ start: 0, end: 0.6, text: "Bitti." }, { start: 0.65, end: 1.5, text: "Sonra gittik" }], { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kisaBirlestir: bitmiş cümle hâlâ yapıştırılmaz", kbC.length === 2, metinler(kbC));
+var uctan = CT.segmentleriKur([{ start: 0, end: 3.2, text: "Prof. Dr. Ahmet Bey bugün bizimle.", words: unvanW }], "auto", { dil: "tr", kadraj: { w: 1920, h: 1080 } }).segments;
+ok("segmentleriKur (auto): unvanlar alt saniyelik ayrı cue olmaz", uctan.length === 1 && /^Prof\. Dr\. Ahmet/.test(uctan[0].text), metinler(uctan));
+
+/* ---------------- uzun zamansız cue: kırılım DP'si karakter sınırını da kullanır (panel donmaz) ---------------- */
+(function () {
+  var sozler = ["bugün", "size", "kamerayla", "ilgili", "birkaç", "şey", "anlatacağım", "ve", "sonra", "mi", "2.", "sırada", "50", "TL"];
+  var ws = []; for (var i = 0; i < 2000; i++) ws.push(sozler[i % sozler.length]);
+  var metin = ws.join(" ");
+  var t0 = Date.now(), sar = CL.dengeliSar(metin, 42, 2, "tr"), tSar = Date.now() - t0;
+  t0 = Date.now(); var bol = CL.karakterleBol({ start: 0, end: 600, text: metin }, 42, { maxLines: 2, dil: "tr" }); var tBol = Date.now() - t0;
+  ok("dengeliSar 2000 kelime: < 1,5 sn (eskiden ~5 sn), satırlar 42'yi aşmaz, kelime kaybı yok",
+    tSar < 1500 && satirlar(sar).every(function (x) { return x.length <= 42; }) && sar.replace(/\n/g, " ") === metin, tSar + " ms");
+  ok("karakterleBol 2000 kelime: < 1,5 sn (eskiden ~6 sn), parçalar 2 × 42 bütçede, kelime kaybı yok",
+    tBol < 1500 && bol.every(function (c) { return satirlar(CL.dengeliSar(c.text, 42, 2, "tr")).every(function (x) { return x.length <= 42; }); }) &&
+    bol.map(function (c) { return c.text; }).join(" ") === metin, tBol + " ms, " + bol.length + " parça");
+})();
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

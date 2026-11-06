@@ -56,6 +56,9 @@ ok("adım çubuğu: nav aria-label, üç adım düğmesi aria-controls'lu; etkin
 
 /* ---------------- 3) hareketi azalt ---------------- */
 var css = oku("css/style.css");
+ok("panel CSS'i: adım etiketi sözcük ortasından bölünmez; durum yazısı 479 px'e kadar alt satıra iner (yerleşik panel 360–440 px)",
+  /\.cap-adimlar-oge b \{[^}]*overflow-wrap: break-word;/.test(css) && !/\.cap-adimlar-oge b \{[^}]*anywhere/.test(css) &&
+  /@media \(max-width: 479px\) \{\s*\.cap-adimlar-oge \{ flex-wrap: wrap;[^}]*\}\s*\.cap-adimlar-oge \.cap-adim-durum \{ flex-basis: 100%;/.test(css));
 ok("panel CSS'i: hareketi azaltta adım çubuğu geçişsiz", /@media \(prefers-reduced-motion: reduce\) \{\s*\.cap-adimlar-oge, \.cap-adim-no \{ transition: none; \}/.test(css));
 ok("adım çubuğunun kaydırması hareketi azaltta anında (js/altyazi-akis.js)", /behavior: hareketAzalt\(\) \? "auto" : "smooth"/.test(akis) &&
   /prefers-reduced-motion: reduce/.test(akis));

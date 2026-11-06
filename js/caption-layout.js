@@ -143,6 +143,16 @@
     for (var i = 1; i < words.length; i++) c.push(dil === false || !TK ? 0 : TK.kirilimCezasi(words[i - 1], words[i], dil));
     return c;
   }
+  /*
+   * sol kelimesinden sonra cümle bitiyor mu? Noktalama tek başına yetmez: unvan ("Dr. Ayşe") ve sıra sayısı
+   * ("2. sırada") kırılım kuralında ağırdır (AGIR), noktaları cümle sonu değildir. dil false ya da
+   * tr-kirilim yoksa eski kural (her nokta / ünlem / soru cümle sonu).
+   */
+  function cumleSonuMu(sol, sag, dil) {
+    if (!CUMLE_SONU.test(sol)) return false;
+    if (sag == null || sag === "" || dil === false || !TK) return true;
+    return TK.kirilimCezasi(sol, sag, dil) < AGIR;
+  }
   // [ağır sayısı, toplam ceza, en uzun] sözlük sırasıyla küçük mü
   function dahaIyi(a, b) {
     for (var i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
@@ -158,15 +168,26 @@
   function bolDP(n, k, uz, uygun, cez, ekCeza, C, cezasiz, alt) {
     var f = [[[0, 0, 0]]], geri = [[]];
     for (var z = 1; z <= n; z++) f[0].push(null);
+    /*
+     * lo[b]: b'de biten parçanın en küçük başı: uz(a, b) <= C olan en küçük a (uz a'da azalan, b'de artan: tek
+     * geçişte iki işaretçi) ile alt(b)'nin (kelime / karakter sınırı, uygunBas) büyüğü. Döngü O(k · n · parça boyu).
+     */
+    var lo = [];
+    for (var b0 = 0, a0 = 0; b0 <= n; b0++) {
+      while (a0 < b0 && uz(a0, b0) > C) a0++;
+      lo.push(alt ? Math.max(a0, alt(b0)) : a0);
+    }
     for (var p = 1; p <= k; p++) {
       f.push([]); geri.push([]);
       for (var b = 0; b <= n; b++) {
         var en = null, arg = -1;
-        // alt(b): b'de biten parçanın en küçük başı (kelime sınırı / uygunBas); döngü O(k · n · parça boyu) kalır
-        for (var a = Math.max(p - 1, alt ? alt(b) : 0); a < b; a++) {
+        // geriye doğru: a küçüldükçe parça uzar. cezasiz geçişte parça en iyinin en uzununu aşınca daha küçük a
+        // kazanamaz (dur). Eşitlikte en küçük a (ilk kırılım; eski ileri döngünün seçimi) alınır.
+        for (var a = b - 1; a >= Math.max(p - 1, lo[b]); a--) {
+          var u = uz(a, b);
+          if (cezasiz && en && u > en[2]) break;
           var once = f[p - 1][a];
           if (!once) continue;
-          var u = uz(a, b);
           if (u > C || !uygun(a, b)) continue;
           var aday;
           if (cezasiz) aday = [0, 0, Math.max(once[2], u)];
@@ -174,7 +195,7 @@
             var ek = ekCeza ? ekCeza(a, b) : 0, kc = a > 0 ? cez[a] : 0;
             aday = [once[0] + (kc >= AGIR ? 1 : 0) + (ek >= AGIR ? 1 : 0), once[1] + kc + ek, Math.max(once[2], u)];
           }
-          if (!en || dahaIyi(aday, en)) { en = aday; arg = a; }
+          if (!en || !dahaIyi(en, aday)) { en = aday; arg = a; }
         }
         f[p].push(en);
         geri[p].push(arg);
@@ -240,7 +261,13 @@
     var enCok = Math.floor(Number(o.enCokKelime)) > 0 ? Math.floor(Number(o.enCokKelime)) : 0;
     function uygun(a, b) { return uz(a, b) <= sinir && (!enCok || b - a <= enCok); }
     var ek = typeof o.parcaCezasi === "function" ? function (a, b) { return Number(o.parcaCezasi(a, b, n)) || 0; } : null;
-    return secSkorlu(n, k, uz, uygun, kirilimCezalari(liste, o.dil), ek, enCok ? function (b) { return b - enCok; } : null);
+    // b'de biten parçanın en küçük yasal başı: karakter sınırı (iki işaretçi; uz a'da azalan, b'de artan) ve kelime sınırı
+    var altD = [];
+    for (var b = 0, a0 = 0; b <= n; b++) {
+      while (a0 < b && uz(a0, b) > sinir) a0++;
+      altD.push(enCok ? Math.max(a0, b - enCok) : a0);
+    }
+    return secSkorlu(n, k, uz, uygun, kirilimCezalari(liste, o.dil), ek, function (b) { return altD[b]; });
   }
 
   /*
@@ -381,15 +408,18 @@
     var araKir = sayi(o.araKir, 0.6);
     if (!(araKir >= 0)) araKir = 0.6;
     // 1) öbekler
-    var obekler = [], cur = [];
+    var obekler = [], cur = [], ws = [];
     (dizi(words) ? words : []).forEach(function (w0) {
       if (!w0) return;
       var w = kelime(w0);
       if (!w.text || !isFinite(w.start)) return;
+      ws.push(w);
+    });
+    ws.forEach(function (w, i) {
       var onceki = cur[cur.length - 1];
       if (onceki && w.start - onceki.end > araKir) { obekler.push(cur); cur = []; }
       cur.push(w);
-      if (CUMLE_SONU.test(w.text)) { obekler.push(cur); cur = []; }
+      if (cumleSonuMu(w.text, ws[i + 1] ? ws[i + 1].text : null, o.dil)) { obekler.push(cur); cur = []; }
     });
     if (cur.length) obekler.push(cur);
     // 2) her öbek en az satıra, dengeli
@@ -450,6 +480,8 @@
    * kelime grupları hep yan yana olduğundan ayarı geri alırdı.
    * o: { aralik: 0.2, maxChars: 42, maxLines: 1, maxSure: 6, maxWords: 0 }
    */
+  function sonBelirtec(t) { var b = belirtecler(t); return b.length ? b[b.length - 1] : ""; }
+
   // Raunen: shapeSegments (merge pass)
   function kisaBirlestir(cues, o) {
     o = o || {};
@@ -469,7 +501,7 @@
       if (p && aralik > 0) {
         var bosluk = Number(c.start) - Number(p.end);
         var birlesik = duzMetin(p.text) + " " + duzMetin(c.text);
-        if (bosluk >= 0 && bosluk <= aralik && !CUMLE_SONU.test(duzMetin(p.text)) &&
+        if (bosluk >= 0 && bosluk <= aralik && !cumleSonuMu(sonBelirtec(p.text), belirtecler(c.text)[0], o.dil) &&
             Number(c.end) - Number(p.start) <= maxSure && sigarMi(belirtecler(birlesik), maxChars, maxLines) &&
             (!maxWords || belirtecler(birlesik).filter(icerikli).length <= maxWords)) {
           var np = belirtecler(p.text).length, nc = belirtecler(c.text).length;

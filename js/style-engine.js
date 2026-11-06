@@ -1086,7 +1086,16 @@
   function efektGrupla(cues, limit, olcu, dil) {
     if (!CL || !CL.parcalaCezali) return groupWords(cues, limit);
     var groups = [], kosu = [];
+    // Uzun koşu (duraklamasız, noktalamasız konuşma): DP O(n² / limit) olur ve panel donar. Koşu limit'in
+    // tam katı pencerelere bölünür (kart sayısı aynı kalır); eşiğin altındaki koşu eskisi gibi tek DP.
+    var PENCERE = limit * 16;
     function bol() {
+      if (kosu.length > PENCERE * 1.5) {
+        var hepsi = kosu;
+        for (var w = 0; w < hepsi.length; w += PENCERE) { kosu = hepsi.slice(w, w + PENCERE); bol(); }
+        kosu = [];
+        return;
+      }
       var n = kosu.length, k = Math.ceil(n / limit), bas = [0];
       if (!n) return;
       // kelime 1: her kelime kendi kartı (bölme tek türlü; dinamik programlama gereksiz)
@@ -1102,7 +1111,7 @@
       kosu.push(cue);
       var gap = next ? next.start - cue.end : 99;
       var konusmaciDegisir = next && next.speaker !== cue.speaker;
-      if (gap > 0.7 || cue.lineEnd || /[.!?…]$/.test(cue.text) || konusmaciDegisir) bol();
+      if (gap > 0.7 || cue.lineEnd || /[.!?…。！？؟]$/.test(cue.text) || konusmaciDegisir) bol();
     });
     bol();
     return groups;

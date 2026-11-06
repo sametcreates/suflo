@@ -70,9 +70,24 @@ var ecN = C.emojisizCueler([{ start: 0, end: 1, text: "tamam 👍.", words: [{ t
 ok("emojisizCueler: emojiden sonra yalnız noktalama kalırsa sözcük düşer, nokta öncekine geçer; emojisiz '—' kalır",
   J(ecN.map(function (c) { return c.text; })) === J(["tamam.", "Harika oldu", "Harika — oldu ..."]) && ecN[0].words.length === 1 && ecN[0].words[0].text === "tamam", J(ecN));
 
+// VS16'lı emoji (❤️ ⚠️ ©️ ↔️) ve tuş kapağı (1️⃣): taban sembol de düşer; libass onu yedek fontta tek renk çizerdi
+var ecV = C.emojisizCueler([{ start: 0, end: 1, text: "Sizi çok seviyorum ❤️" }, { start: 1, end: 2, text: "Buna dikkat ⚠️ edin" },
+  { start: 2, end: 3, text: "1️⃣ birinci" }, { start: 3, end: 4, text: "güzel ↔️" }, { start: 4, end: 5, text: "etiket ©️" }, { start: 5, end: 6, text: "nota ♪ ve © işareti" }]);
+ok("emojisizCueler: VS16 emojinin taban sembolü ve tuş kapağı rakamı da düşer; VS16'sız ♪ / © metin glifi kalır",
+  J(ecV.map(function (c) { return c.text; })) === J(["Sizi çok seviyorum", "Buna dikkat edin", "birinci", "güzel", "etiket", "nota ♪ ve © işareti"]) &&
+  ecV.every(function (c) { return !/[\u2764\u26A0\u2194\u00A9\uFE0F\u20E3]/.test(c.text) || c.text === "nota ♪ ve © işareti"; }), J(ecV.map(function (c) { return c.text; })));
+ok("emojiSil: aynı düzeltme (Shorts eklerinin çağrısı)", C.emojiSil("seviyorum ❤️ çok") === "seviyorum çok" && C.emojiSil("2️⃣ adım") === "adım", C.emojiSil("seviyorum ❤️ çok"));
+
 /* ---------------- noktalama (Nizami düzelt) ---------------- */
 function N(t) { return Q.normalizeText(t, "tr"); }
 ok("eksik boşluk: virgül / noktadan sonra harf", N("geldik.Sonra gittik") === "Geldik. Sonra gittik" && N("evet,tamam") === "Evet, tamam");
+ok("eksik boşluk: teknik ad ve dosya adı bölünmez (Node.js, ASP.NET, video.mp4)", N("Node.js kur") === "Node.js kur" && N("Next.js ile") === "Next.js ile" &&
+  N("ASP.NET Core") === "ASP.NET Core" && N("C#.NET dersi") === "C#.NET dersi" && N("bu video.mp4 dosyası") === "Bu video.mp4 dosyası" &&
+  N("aç index.html dosyasını") === "Aç index.html dosyasını" && N("sonra package.json güncelle") === "Sonra package.json güncelle" && N("bu ffmpeg.exe çalışır") === "Bu ffmpeg.exe çalışır" &&
+  N("geldik.Şimdi gidelim") === "Geldik. Şimdi gidelim" && N("geldik.İşte") === "Geldik. İşte" && N("tamam.O zaman") === "Tamam. O zaman",
+  [N("Node.js kur"), N("ASP.NET Core"), N("bu video.mp4 dosyası"), N("aç index.html dosyasını"), N("tamam.O zaman")].join(" | "));
+var afT = Q.autoFix([{ start: 0, end: 2, text: "Node.js kur", words: [{ text: "Node.js", start: 0, end: 1 }, { text: "kur", start: 1, end: 2 }] }], { lang: "tr" });
+ok("Nizami düzelt teknik adı ve kelime zamanlamasını bozmaz", afT[0].text === "Node.js kur" && afT[0].words.length === 2, J(afT));
 ok("sayılara dokunmaz: 3,5 / 1.250 / 12.30 / 12:30 / 16:9", N("tam 3,5 kilo") === "Tam 3,5 kilo" && N("1.250 TL") === "1.250 TL" && N("saat 12.30'da") === "Saat 12.30'da" &&
   N("saat 12:30") === "Saat 12:30" && N("oran 16:9 olsun") === "Oran 16:9 olsun" && N("not:bunu") === "Not: bunu", [N("saat 12:30"), N("not:bunu")].join(" | "));
 ok("URL ve e-postaya dokunmaz (iki nokta kuralı ve büyük harf dahil)", N("https://suflo.app/fiyat") === "https://suflo.app/fiyat" &&
@@ -140,7 +155,8 @@ function capOrtam(o) {
     window: { SufloAutoEmoji: AE, SufloKufurMaske: null, SufloStyleEngine: o.motor || null }
   };
   var kod = [
-    "var segments = SEG, emojiAtlaBirKez = false, emojisizCikti = false, secilenMogrt = null, scope = 'clip', segmentsMode = 'plain', katmanIptal = null;",
+    "var segments = SEG, emojiAtlaBirKez = false, emojisizCikti = false, secilenMogrt = null, scope = 'clip', segmentsMode = 'plain', katmanIptal = null, katmanHazirlaniyor = false;",
+    "function uygulamaIpucunuGuncelle() {}", govde(cap, "function uygulaDurumu("),
     "var ceviriDili = '', algilananDil = 'tr';",
     "function ceviriVar() { return false; } function cevrimdisiEn() { return false; } function arayuzDili() { return 'tr'; }",
     "function styleLocale() { return 'tr-TR'; } function styleText(t) { return t; } function motorCueTuru() { return 'lines'; }",

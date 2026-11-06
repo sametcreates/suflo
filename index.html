@@ -336,11 +336,12 @@
             </div>
             <div class="field">
               <label for="cap-maxlen">Satır uzunluğu</label>
-              <select id="cap-maxlen">
+              <select id="cap-maxlen" title="Otomatik: satır bütçesi kadraja göre (sekansın oranından) seçilir">
                 <optgroup label="Satır">
                   <!-- Kalite motoru (parti 1): sekansın oranından 2 × 42 (yatay) / 2 × 32 (kare, 4:5) / 2 × 24 (9:16);
                        kayıtlı tercihi olmayan ilk açılışın varsayılanı (captions.js loadPrefs), caption-layout.js otomatikUzunluk -->
-                  <option value="auto">Otomatik (kadraja göre)</option>
+                  <!-- Etiket kısa: iki sütunlu alanda 320–400 px'te kesilmesin; ayrıntı title'da -->
+                  <option value="auto" title="Satır bütçesi sekansın oranından: yatay 2 × 42, kare/4:5 2 × 32, 9:16 2 × 24">Otomatik</option>
                   <option value="w2">2 kelime</option>
                   <option value="w3">3 kelime</option>
                   <option value="w4">4 kelime</option>
@@ -772,7 +773,7 @@
         <h3 class="cap-adim-bas" id="cap-adim-stil-baslik" tabindex="-1"><span class="cap-adim-no" aria-hidden="true">2</span>Stil seç</h3>
         <div class="card stil-katmani-card">
           <div class="card-title">Stil <span class="card-title-meta">ALTYAZI EFEKTLERİ · PREMIERE ŞABLONLARI</span> <span class="pro-inline">PRO</span></div>
-          <p class="stil-aciklama">Altyazı efektini kendin kur ya da aşağıdaki 17 gerçek altyazı şablonundan birini seç. Önizleme ücretsiz; timeline'a eklemek Pro (3 deneme hakkı).</p>
+          <p class="stil-aciklama">Aşağıdaki hazır görünümlerden birini seç ya da efekti kendin kur; 17 Premiere şablonu en altta. Önizleme ücretsiz; timeline'a eklemek Pro (3 deneme hakkı).</p>
 
           <div class="stil-ust-satir">
             <span class="marka-kiti-cip" id="cap-marka-kiti-cip" hidden title="Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon Altyazı Efektlerine uygulanır">Marka kiti açık</span>
@@ -1116,6 +1117,7 @@
           <span class="btn-label"><span id="cap-uygula-tek-metin">Timeline'a uygula</span><em id="cap-uygula-tek-alt"></em></span>
         </button>
         <button type="button" id="cap-uygula-iptal" class="btn outline big iptal-btn" hidden title="Katman çizimini durdurur: yarım dosya silinir, timeline'a dokunulmaz, deneme hakkı düşmez.">İptal</button>
+        <div id="cap-uygula-durum" class="inline-status" aria-live="polite"></div>
         <div class="cap-uygula-ek" id="cap-uygula-ek" hidden>
           <!-- Özgün düğmeler DOM'da kalır (onaylar, MCP, rehber ve testler onları kullanır); görünür denetim tek düğmede -->
           <div class="caption-apply-actions cap-uygula-asil" hidden aria-label="Altyazıyı sekansa ekleme biçimi" data-yalniz-premiere>

@@ -158,6 +158,15 @@ function ortam() {
   await bekle(480);
   ok("sakinlikten sonra tek çizim", e.run.length === 1, e.run.length);
 
+  /* ---- 3c) çizim sürerken kaydırıcı değişti (onizlemeDurdur'dan geçmeden): eski ayarlı ffmpeg öldürülür ---- */
+  var f = ortam();
+  f.api.tazele(true); await bekle(230);   // çizim sürüyor
+  ok("3c ön koşul: çizim sürüyor", f.run.length === 1 && f.api.durum().calisiyor === true, f.run.length);
+  f.api.tazele(); await bekle(480);       // kaydırıcı değişikliği, 450 ms sakinlikten sonra
+  ok("çizim sürerken ayar değişti: eski ffmpeg öldürülür (sonuna kadar çizilmez)", f.run[0].olduruldu === true, f.run.length);
+  await bekle(230);
+  ok("yeni ayarla tek çizim; iki ffmpeg aynı anda yok", f.run.length === 2 && f.eszamanli.enCok === 1, f.run.length + " / " + f.eszamanli.enCok);
+
   /* ---- 4) stil kodu uygulama süren çizimi "Durdur" saymaz ---- */
   var sk = govde("function stilKoduUygula(");
   ok("stilKoduUygula önizlemeyi efektOnizlemeTazele(true) ile ister (onizlemeOynat değil)", /efektOnizlemeTazele\(true\);\s*return true;/.test(sk) && sk.indexOf("onizlemeOynat()") === -1);

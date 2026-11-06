@@ -34,11 +34,12 @@
   var KURALLAR = {
     tr: [
       ["🏆", ["kazanan", "şampiyon"]],
-      ["💰", ["para", "kazan", "zengin", "maaş", "gelir", "bütçe", "dolar", "euro", "lira"]],
+      ["💰", ["para", "kazan", "zengin", "maaş", "gelir", "bütçe", "dolar", "euro", "lira"],
+        { haric: ["paralel", "paraşüt", "parazit", "parantez", "paramparça", "paragraf", "paradoks", "parametre", "paravan"] }],
       ["💸", ["harca", "masraf", "borç", "pahalı", "ödeme", "zarar"], { fiil: ["harca"] }],
       ["📈", ["büyüme", "büyüyor", "büyüdü", "artış", "artıyor", "arttı", "yüksel", "grafik", "istatistik", "satış"]],
       ["🚀", ["hızlı", "roket", "uçuyor", "uçtu", "lansman"], { fiil: ["başla", "fırla", "patla"] }],
-      ["🔥", ["ateş", "sıcak", "efsane", "harika", "muhteşem", "çılgın", "viral", "trend"]],
+      ["🔥", ["ateş", "sıcak", "efsane", "harika", "muhteşem", "çılgın", "viral", "trend"], { haric: ["ateşkes"] }],
       ["💡", ["fikir", "ipucu", "tüyo", "öneri", "püf", "akıl", "çözüm"], { haric: ["akıl almaz"] }],
       ["⚠️", ["dikkat", "uyarı", "tehlike", "sakın", "hata", "yanlış"], { haric: ["hatay ", "hatasız", "sakınca", "dikkate değer", "dikkat çekici"] }],
       ["✅", ["başar", "bitir", "hallet", "kesinlikle"], { haric: ["başarısız"] }],
@@ -49,7 +50,7 @@
       ["😂", ["güldü", "gülme", "komik", "espri", "şaka", "kahkaha"]],
       ["😱", ["korku", "kork", "şok", "inanılmaz", "inanamad"]],
       ["😍", ["aşk", "aşığ", "bayıl", "sevgi", "güzel"]],
-      ["❤️", ["seviyorum", "sevdim", "seviyor", "kalp", "teşekkür", "minnet"]],
+      ["❤️", ["seviyorum", "sevdim", "seviyor", "kalp", "teşekkür", "minnet"], { haric: ["kalp kriz"] }],
       ["🙏", ["lütfen", "rica ", "dua ", "dualar", "şükür"]],
       ["💪", ["güçlü", "spor", "antrenman", "kaslar", "pes etme", "azim"]],
       ["🏆", ["ödül", "birinci", "zafer", "rekor"]],
