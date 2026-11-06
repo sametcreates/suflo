@@ -3782,13 +3782,13 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-cip-ornek-yalin { text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
 .efekt-cip-ornek-kit { box-shadow: 0 0 0 1px var(--accent); }
 .efekt-cip-anim { margin-left: 3px; font-style: normal; font-weight: 600; font-size: 9px; font-family: var(--mono, monospace); color: var(--faint); text-shadow: none; }
-.efekt-ipucu {
+.efekt-galeri-ipucu {
   position: absolute; left: 0; right: 0; z-index: 5; padding: 6px 9px; border: 1px solid var(--line2); border-radius: 9px;
   background: var(--bg2, #15171f); color: var(--dim); font-size: 10.5px; line-height: 1.35; box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
   pointer-events: none; word-wrap: break-word;
 }
-.efekt-ipucu[hidden] { display: none; }
-.efekt-ipucu b { display: block; color: var(--text); font-size: 11px; font-weight: 650; margin-bottom: 2px; }
+.efekt-galeri-ipucu[hidden] { display: none; }
+.efekt-galeri-ipucu b { display: block; color: var(--text); font-size: 11px; font-weight: 650; margin-bottom: 2px; }
 /* Büyük canlı önizleme */
 .efekt .onizleme-sahne { max-height: 240px; }
 .efekt .onizleme-sahne.dikey { max-height: 380px; }

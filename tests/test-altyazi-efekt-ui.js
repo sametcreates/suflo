@@ -938,7 +938,24 @@ ok("index.html: sekmeler çiplerin üstünde, ipucu altında; stil-galeri.js cap
 var css = fs.readFileSync(path.join(KOK, "css", "style.css"), "utf8");
 ok("CSS: gizli çip gerçekten gizli (display: inline-flex [hidden]'ı ezmesin), dar panelde taşmaz (sekmeler kırılır, ipucu galeri genişliğinde)",
   /\.efekt-cip\[hidden\]\s*\{\s*display:\s*none;?\s*\}/.test(css) && /\.efekt-kategoriler\s*\{[^}]*flex-wrap:\s*wrap/.test(css) &&
-  /\.efekt-ipucu\s*\{[^}]*left:\s*0;\s*right:\s*0/.test(css) && /\.efekt-ipucu\[hidden\]\s*\{\s*display:\s*none/.test(css) && /\.efekt-cip\s*\{\s*max-width:\s*calc\(100% - 6px\)/.test(css));
+  /\.efekt-galeri-ipucu\s*\{[^}]*left:\s*0;\s*right:\s*0/.test(css) && /\.efekt-galeri-ipucu\[hidden\]\s*\{\s*display:\s*none/.test(css) && /\.efekt-cip\s*\{\s*max-width:\s*calc\(100% - 6px\)/.test(css));
+/*
+ * Doğrulama (parti 3): galerinin ipucu kutusu önceden var olan ".efekt-ipucu" sınıfını (konum sürükleme ipucu
+ * paragrafı, "İpucu: önizlemede yazıyı sürükleyerek…") paylaşıyordu: yeni position: absolute / çerçeve / zemin kuralı o
+ * paragrafa da işleyip onu önizlemenin üstünde yüzen bir kutuya çeviriyordu. Galeri ipucunun sınıfı kendine ait olmalı.
+ */
+var galeriIpucuEtiketi = (html.match(/<div[^>]*id="cap-efekt-ipucu"[^>]*>/) || [""])[0];
+var galeriIpucuSinifi = ((galeriIpucuEtiketi.match(/class="([^"]*)"/) || [, ""])[1]).split(/\s+/).filter(Boolean);
+var htmlSiniflari = (html.match(/class="[^"]*"/g) || []).map(function (c) { return c.slice(7, -1).split(/\s+/); });
+ok("galeri ipucunun sınıfları index.html'de başka hiçbir öğede yok (sürükleme ipucu paragrafı yüzen kutuya dönmez)",
+  galeriIpucuSinifi.length > 0 && galeriIpucuSinifi.every(function (k) {
+    return htmlSiniflari.filter(function (l) { return l.indexOf(k) !== -1; }).length === 1;
+  }), galeriIpucuSinifi.join(" "));
+var suruklemeIpucu = (html.match(/<p class="([^"]*)">İpucu: önizlemede yazıyı sürükleyerek/) || [, ""])[1];
+var yuzenKurallar = (css.match(/[^{}]+\{[^}]*position:\s*absolute[^}]*\}/g) || []).filter(function (r) {
+  return suruklemeIpucu && r.split("{")[0].split(",").some(function (sec) { return new RegExp("\\." + suruklemeIpucu + "(?![\\w-])").test(sec); });
+});
+ok("sürükleme ipucu paragrafı (.efekt-ipucu) konumlanmış kutu değil", suruklemeIpucu === "efekt-ipucu" && yuzenKurallar.length === 0, yuzenKurallar.join(" | "));
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);
