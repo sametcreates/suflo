@@ -1976,7 +1976,9 @@ window.KCaptions = (function () {
       golge: a.golge ? JSON.parse(JSON.stringify(a.golge)) : null, kutuRenk: a.kutuRenk, kutuOpak: a.kutuOpak,
       konumX: a.konumX === undefined ? null : a.konumX, konumY: a.konumY === undefined ? null : a.konumY,
       // Animasyon motoru v2: yazı animasyonu ("" klasik)
-      anim: typeof a.anim === "string" ? a.anim : "" };
+      anim: typeof a.anim === "string" ? a.anim : "",
+      // Parti 5: vurgu kutusu rengi ve ikinci vurgu rengi (null = türetilir)
+      vurguKutuRenk: typeof a.vurguKutuRenk === "string" ? a.vurguKutuRenk : null, vurguRenk2: typeof a.vurguRenk2 === "string" ? a.vurguRenk2 : null };
   }
 
   // stil() → oluşturucu ayarı (yazım biçimi ve noktalama Altyazı ayarlarından)
@@ -1988,7 +1990,8 @@ window.KCaptions = (function () {
       punct: el("cap-punct") ? !!el("cap-punct").checked : true,
       golge: st.golge || null, kutu: st.kutu === true, kutuRenk: st.kutuRenk, kutuOpak: st.kutuOpak,
       konumX: st.konumX === undefined ? null : st.konumX, konumY: st.konumY === undefined ? null : st.konumY,
-      anim: typeof st.anim === "string" ? st.anim : "" };
+      anim: typeof st.anim === "string" ? st.anim : "",
+      vurguKutuRenk: typeof st.vurguKutuRenk === "string" ? st.vurguKutuRenk : null, vurguRenk2: typeof st.vurguRenk2 === "string" ? st.vurguRenk2 : null };
   }
 
   // Seçimi Altyazı Efektleri'ne al (görünen kontrol değerlerine dokunmaz; gizli hareket şiddeti Dengeli)
@@ -2614,7 +2617,10 @@ window.KCaptions = (function () {
       konumX: serbestKonumDegeri("cap-konum-x"),
       konumY: serbestKonumDegeri("cap-konum-y"),
       // Animasyon motoru v2: yazı animasyonu (seçicide; katalogda olmayan değer "" = klasik)
-      anim: window.SufloYaziAnimasyon ? window.SufloYaziAnimasyon.dogrula(d("cap-efekt-anim", "")) : ""
+      anim: window.SufloYaziAnimasyon ? window.SufloYaziAnimasyon.dogrula(d("cap-efekt-anim", "")) : "",
+      // Parti 5: elle seçilmiş vurgu kutusu / ikinci vurgu rengi; seçilmediyse (data-oto) null: vurgu renginden türetilir
+      vurguKutuRenk: animRengi("cap-efekt-vurgu-kutusu"),
+      vurguRenk2: animRengi("cap-efekt-vurgu2")
     };
   }
 
@@ -2651,6 +2657,9 @@ window.KCaptions = (function () {
       o.konumX = typeof st.konumX === "number" ? st.konumX : null; o.konumY = typeof st.konumY === "number" ? st.konumY : null;
       // Yazı animasyonu yalnız seçiliyse (klasikte alan yok: katman, önizleme, Shorts paketi, kod eskisi gibi)
       if (typeof st.anim === "string" && st.anim) o.anim = st.anim;
+      // Parti 5 renkleri yalnız elle seçildiyse (null: alan yok, motor türetir; klasik çıktı / kod aynı)
+      if (typeof st.vurguKutuRenk === "string" && st.vurguKutuRenk) o.vurguKutuRenk = st.vurguKutuRenk;
+      if (typeof st.vurguRenk2 === "string" && st.vurguRenk2) o.vurguRenk2 = st.vurguRenk2;
     }
     return o;
   }
@@ -2812,6 +2821,10 @@ window.KCaptions = (function () {
       if (Object.prototype.hasOwnProperty.call(st, "anim")) el("cap-efekt-anim").value = window.SufloYaziAnimasyon ? window.SufloYaziAnimasyon.dogrula(st.anim) : "";
       else if (typeof st.aile === "string") el("cap-efekt-anim").value = "";
     }
+    // Parti 5 renkleri aynı kuralla: verilmişse o (null / bozuk: türetilir), tam kayıtta yoksa türetilir, kısmi kayıt dokunmaz
+    Object.keys(ANIM_RENKLERI).forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(st, k) || typeof st.aile === "string") animRengiYaz(ANIM_RENKLERI[k], st[k]);
+    });
     ["vurgu", "kalin", "italik"].forEach(function (k) {
       if (el("cap-efekt-" + k) && typeof st[k] === "boolean") el("cap-efekt-" + k).checked = st[k];
     });
@@ -2844,6 +2857,20 @@ window.KCaptions = (function () {
     var animAcik = !!(window.SufloYaziAnimasyon && el("cap-efekt-anim") && window.SufloYaziAnimasyon.dogrula(el("cap-efekt-anim").value));
     ["cap-efekt-giris", "cap-efekt-aktif"].forEach(function (id) { if (el(id)) el(id).disabled = animAcik; });
     if (el("cap-efekt-anim-ipucu")) el("cap-efekt-anim-ipucu").hidden = !animAcik;
+    /*
+     * Parti 5: animasyonun ek renk seçicileri yalnız onu kullanan animasyonda (vurgu kutusu → kutu rengi; iki ton,
+     * yumuşak kromatik → ikinci vurgu). Elle seçilmemiş seçici türetilmiş rengi gösterir (vurgu rengi değişince izler).
+     */
+    if (AE && AE.renkAlanlari) {
+      var ea = efektAyari(), alanlar = AE.renkAlanlari(ea), gecerli = AE.gecerliRenkler(ea), biri = false;
+      Object.keys(ANIM_RENKLERI).forEach(function (k) {
+        var e = el(ANIM_RENKLERI[k]), sar = el(ANIM_RENKLERI[k] + "-sar"), gor = alanlar.indexOf(k) !== -1;
+        if (sar) sar.hidden = !gor;
+        if (gor) biri = true;
+        if (e && e.getAttribute("data-oto") === "1") e.value = gecerli[k];
+      });
+      if (el("cap-efekt-anim-renkler")) el("cap-efekt-anim-renkler").hidden = !biri;
+    }
     var golgeAcik = !!(el("cap-efekt-golge") && el("cap-efekt-golge").checked);
     ["cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak"].forEach(function (id) { if (el(id)) el(id).disabled = !golgeAcik; });
     var g = el("cap-efekt-golge-ayar");
@@ -7256,7 +7283,9 @@ window.KCaptions = (function () {
     "cap-guvenli-yerlesim",
     // 3.3 adım 17: gölge ve arka plan kutusu
     "cap-efekt-golge", "cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak",
-    "cap-kutu", "cap-kutu-renk", "cap-kutu-opak"];
+    "cap-kutu", "cap-kutu-renk", "cap-kutu-opak",
+    // Parti 5: animasyonun ek renkleri
+    "cap-efekt-vurgu-kutusu", "cap-efekt-vurgu2"];
   var EFEKT_ISARETLERI = ["cap-efekt-vurgu", "cap-efekt-kalin", "cap-efekt-italik", "cap-efekt-golge"];
   /*
    * Altyazı Efektleri kontrolleri: her değişiklik efekti seçer (Premiere şablonu seçiliyse bırakır),
@@ -7328,6 +7357,8 @@ window.KCaptions = (function () {
         if (id === "cap-efekt-kelime") e.value = String(efektKelimeSayisi());
         // Gölge / kutu sayı kutuları aralığa (boşsa varsayılana) döner: kutuda görünen = çizilen
         if (EFEKT_SAYILARI[id]) e.value = String(efektSayi(id, EFEKT_SAYILARI[id][0], EFEKT_SAYILARI[id][1], EFEKT_SAYILARI[id][2]));
+        // Parti 5 renk seçicisi elle değişti: artık türetilmez
+        if (id === "cap-efekt-vurgu-kutusu" || id === "cap-efekt-vurgu2") e.removeAttribute("data-oto");
         // Hazır konum seçildi: serbest (sürüklenmiş) konum bırakılır
         if (id === "cap-konum") { if (el("cap-konum-x")) el("cap-konum-x").value = ""; if (el("cap-konum-y")) el("cap-konum-y").value = ""; }
         efekteGec();
@@ -7338,11 +7369,28 @@ window.KCaptions = (function () {
       });
     });
   }
+  /*
+   * Parti 5 renk seçicileri: data-oto="1" iken renk elle seçilmemiştir (null; motor vurgu renginden türetir, seçici
+   * türetilmiş rengi gösterir). Kullanıcı rengi değiştirince işaret kalkar; kayıt / kod / görünüm null verirse geri gelir.
+   */
+  var ANIM_RENKLERI = { vurguKutuRenk: "cap-efekt-vurgu-kutusu", vurguRenk2: "cap-efekt-vurgu2" };
+  function animRengi(id) {
+    var e = el(id);
+    if (!e || e.getAttribute("data-oto") === "1") return null;
+    var v = String(e.value || "").toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(v) ? v : null;
+  }
+  function animRengiYaz(id, v) {
+    var e = el(id);
+    if (!e) return;
+    if (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v)) { e.removeAttribute("data-oto"); e.value = v.toLowerCase(); }
+    else e.setAttribute("data-oto", "1");
+  }
   var STIL_ALANLARI = ["cap-preset", "cap-maxlen", "cap-case", "cap-style-family", "cap-yogunluk", "cap-font",
     "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu", "cap-kontur", "cap-konum", "cap-animasyon",
     "cap-efekt-anim", "cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-satir", "cap-efekt-kelime",
     "cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak", "cap-kutu-renk", "cap-kutu-opak",
-    "cap-konum-x", "cap-konum-y"];
+    "cap-konum-x", "cap-konum-y", "cap-efekt-vurgu-kutusu", "cap-efekt-vurgu2"];
   function stilYedegi() {
     var y = {
       alan: {},
@@ -7355,6 +7403,9 @@ window.KCaptions = (function () {
     };
     STIL_ALANLARI.forEach(function (id) { var e = el(id); if (e) y.alan[id] = e.value; });
     EFEKT_ISARETLERI.forEach(function (id) { var e = el(id); if (e) y.isaret[id] = !!e.checked; });
+    // Parti 5 renk seçicilerinin "türetilir" işareti
+    y.oto = {};
+    Object.keys(ANIM_RENKLERI).forEach(function (k) { var e = el(ANIM_RENKLERI[k]); if (e) y.oto[ANIM_RENKLERI[k]] = e.getAttribute("data-oto") === "1"; });
     return y;
   }
   function stilYedeginiYukle(y) {
@@ -7367,6 +7418,10 @@ window.KCaptions = (function () {
     if (el("cap-punct")) el("cap-punct").checked = y.punct;
     if (el("cap-kutu")) el("cap-kutu").checked = y.kutu;
     if (y.isaret) EFEKT_ISARETLERI.forEach(function (id) { if (el(id) && typeof y.isaret[id] === "boolean") el(id).checked = y.isaret[id]; });
+    if (y.oto) Object.keys(y.oto).forEach(function (id) {
+      if (!el(id)) return;
+      if (y.oto[id]) el(id).setAttribute("data-oto", "1"); else el(id).removeAttribute("data-oto");
+    });
     secilenMotorStili = y.motor || "";
     secilenMogrt = y.mogrt || null;
     bekleyenMogrtYolu = y.bekleyen || "";

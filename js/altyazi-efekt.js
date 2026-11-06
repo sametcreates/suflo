@@ -93,27 +93,27 @@
     { id: "temiz", ad: "Temiz", kategori: "minimal", aciklama: "Beyaz yazı, ince siyah kontur, sarı vurgu: her videoya uyan sade başlangıç.", ayar: {
       giris: "fade", aktif: "yok", vurgu: true, vurguRenk: "#ffd23f", renk: "#ffffff", font: "Montserrat",
       kalin: true, italik: false, boyut: 76, kontur: 5, konturRenk: "#000000", konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
     { id: "vurucu", ad: "Vurucu", kategori: "viral", aciklama: "Büyük harf, kalın kontur ve sert gölge; konuşulan kelime zıplar.", ayar: {
       giris: "pop", aktif: "zipla", vurgu: true, vurguRenk: "#ffe600", renk: "#ffffff", font: "Anton",
       kalin: true, italik: false, boyut: 112, kontur: 8, konturRenk: "#000000", konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false,
-      golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
+      golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
     { id: "canli", ad: "Canlı", kategori: "viral", aciklama: "Kalın harfler, pembe vurgu, zıplayarak gelen kelimeler.", ayar: {
       giris: "zipla", aktif: "zipla", vurgu: true, vurguRenk: "#ff5fa2", renk: "#ffffff", font: "Archivo Black",
       kalin: true, italik: false, boyut: 92, kontur: 6, konturRenk: "#16121f", konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
     { id: "zarif", ad: "Zarif", kategori: "sinematik", aciklama: "Serif yazı, altın vurgu ve yumuşak gölge; aşağıdan süzülür.", ayar: {
       giris: "yukari", aktif: "yok", vurgu: true, vurguRenk: "#e3c27a", renk: "#f7f3ea", font: "Lora",
       kalin: false, italik: false, boyut: 70, kontur: 2, konturRenk: "#0b0b0d", konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true,
-      golge: { renk: "#000000", opak: 60, mesafe: 3, yumusak: 10 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } },
+      golge: { renk: "#000000", opak: 60, mesafe: 3, yumusak: 10 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
     { id: "kutulu", ad: "Kutulu", kategori: "podcast", aciklama: "Yarı saydam koyu kutuda kontursuz yazı; uzun konuşmada rahat okunur.", ayar: {
       giris: "fade", aktif: "yok", vurgu: true, vurguRenk: "#ffd23f", renk: "#ffffff", font: "Montserrat",
       kalin: true, italik: false, boyut: 64, kontur: 0, konturRenk: "#000000", konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true,
-      golge: null, kutu: true, kutuRenk: "#000000", kutuOpak: 65, konumX: null, konumY: null, anim: "" } },
+      golge: null, kutu: true, kutuRenk: "#000000", kutuOpak: 65, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
     { id: "glitch", ad: "Glitch", kategori: "viral", aciklama: "Tek satır dar harfler, camgöbeği vurgu ve glitch titreşimi.", ayar: {
       giris: "asagi", aktif: "glitch", vurgu: true, vurguRenk: "#2af5ff", renk: "#ffffff", font: "Bebas Neue",
       kalin: true, italik: false, boyut: 118, kontur: 3, konturRenk: "#0b1020", konum: 5, satir: 1, kelime: 3, kase: "upper", punct: false,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" } }
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } }
   ];
 
   /*
@@ -140,8 +140,9 @@
   ];
   // Kütüphane kaydı → tam ayar (VARSAYILAN alan sırasıyla; verilmeyen alan: gölge yok, kutu kapalı, serbest konum yok, klasik)
   var AYAR_SIRASI = ["giris", "aktif", "vurgu", "vurguRenk", "renk", "font", "kalin", "italik", "boyut", "kontur", "konturRenk", "konum",
-    "satir", "kelime", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY", "anim"];
-  var KUTUPHANE_TABAN = { vurgu: true, italik: false, golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "" };
+    "satir", "kelime", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY", "anim", "vurguKutuRenk", "vurguRenk2"];
+  var KUTUPHANE_TABAN = { vurgu: true, italik: false, golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "",
+    vurguKutuRenk: null, vurguRenk2: null };
   function kutuphaneKaydi(id, ad, kategori, aciklama, a, ek) {
     var ayar = {};
     AYAR_SIRASI.forEach(function (k) { ayar[k] = Object.prototype.hasOwnProperty.call(a, k) ? a[k] : KUTUPHANE_TABAN[k]; });
@@ -200,9 +201,10 @@
     kutuphaneKaydi("tebesir", "Tebeşir", "egitim", "Yeşil tahta kutusu, tebeşir beyazı ve pembe vurgu; kelimeler harf harf yazılır.", {
       giris: "fade", aktif: "yok", vurguRenk: "#ff9ec4", renk: "#f4f1e8", font: "Nunito", kalin: true, boyut: 62, kontur: 0, konturRenk: "#000000",
       konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true, kutu: true, kutuRenk: "#1f3d2b", kutuOpak: 88, anim: "daktilo" }),
+    // Parti 5: konuşulan kelime fosforlu kalemle işaretlenmiş gibi (vurgu kutusu; kutudaki yazı kontrast renginde siyah)
     kutuphaneKaydi("vurgu-kalemi", "Vurgu Kalemi", "egitim", "Beyaz yazı, fosforlu limon vurgu: önemli kelime işaretlenmiş gibi.", {
-      giris: "yukari", aktif: "yok", vurguRenk: "#d4ff3a", renk: "#ffffff", font: "Inter", kalin: true, boyut: 68, kontur: 5, konturRenk: "#111111",
-      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true }),
+      giris: "yok", aktif: "yok", vurguRenk: "#d4ff3a", renk: "#ffffff", font: "Inter", kalin: true, boyut: 68, kontur: 5, konturRenk: "#111111",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true, anim: "vurgu-kutusu" }),
     kutuphaneKaydi("formul", "Formül", "egitim", "Teknik harfler, koyu kutu ve turkuaz vurgu; kart netleşerek belirir.", {
       giris: "fade", aktif: "yok", vurguRenk: "#5eead4", renk: "#e8f1ff", font: "Chakra Petch", kalin: true, boyut: 58, kontur: 0, konturRenk: "#000000",
       konum: 2, satir: 2, kelime: 7, kase: "normal", punct: true, kutu: true, kutuRenk: "#101828", kutuOpak: 80, anim: "netles" }),
@@ -275,6 +277,10 @@
     if (own(a, "aktif") && idler(AKTIFLER).indexOf(a.aktif) !== -1) out.aktif = a.aktif;
     // Yazı animasyonu: katalog kimliği ya da "" (klasik); bilinmeyen kimlik tabanda kalır
     if (own(a, "anim") && (a.anim === "" || animKaydi(a.anim))) out.anim = a.anim;
+    // Parti 5: vurgu kutusu rengi ve ikinci vurgu rengi: null (türetilir) ya da #rrggbb; bozuk değer tabanda kalır
+    ["vurguKutuRenk", "vurguRenk2"].forEach(function (k) {
+      if (own(a, k) && (a[k] === null || (typeof a[k] === "string" && RENK.test(a[k])))) out[k] = a[k] === null ? null : a[k].toLowerCase();
+    });
     ["vurgu", "kalin", "italik"].forEach(function (k) { if (own(a, k) && typeof a[k] === "boolean") out[k] = a[k]; });
     ["vurguRenk", "renk", "konturRenk"].forEach(function (k) { if (own(a, k) && typeof a[k] === "string" && RENK.test(a[k])) out[k] = a[k].toLowerCase(); });
     if (own(a, "font") && FONTLAR.indexOf(a.font) !== -1) out.font = a.font;
@@ -327,7 +333,24 @@
     };
     // Yazı animasyonu yalnız seçiliyse (klasikte alan hiç yok: stil motoru / SFL1 / Shorts paketi çıktısı aynı)
     if (n.anim) o.anim = n.anim;
+    // Parti 5 renkleri yalnız elle seçildiyse (null = türetilir; alan yok, eski çıktı / kod aynı)
+    if (n.vurguKutuRenk) o.vurguKutuRenk = n.vurguKutuRenk;
+    if (n.vurguRenk2) o.vurguRenk2 = n.vurguRenk2;
     return o;
+  }
+
+  /*
+   * Parti 5: animasyonun kullandığı ek renk alanları (panel renk seçicilerini yalnız bunlar için gösterir) ve geçerli
+   * renkleri: vurguKutuRenk boşsa vurgu rengi, vurguRenk2 boşsa vurgu renginin karşıtı (yazi-animasyonlari ikinciVurgu).
+   */
+  function renkAlanlari(ayar) {
+    var n = normalize(ayar);
+    return n.anim && YA && YA.renkAlanlari ? YA.renkAlanlari(n.anim) : [];
+  }
+  function gecerliRenkler(ayar) {
+    var n = normalize(ayar);
+    return { vurguKutuRenk: n.vurguKutuRenk || n.vurguRenk,
+      vurguRenk2: n.vurguRenk2 || (YA && YA.ikinciVurgu ? YA.ikinciVurgu(n.vurguRenk) : n.vurguRenk) };
   }
 
   /*
@@ -378,6 +401,9 @@
     delete n.kase;
     delete n.punct;
     if (!n.kutu) { delete n.kutuRenk; delete n.kutuOpak; }
+    // Parti 5 renkleri yalnız onları kullanan animasyonda görünür
+    var ra = renkAlanlari(n);
+    ["vurguKutuRenk", "vurguRenk2"].forEach(function (k) { if (ra.indexOf(k) === -1) delete n[k]; });
     return JSON.stringify(n).toLowerCase();
   }
   function gorunumuBul(ayar) {
@@ -591,6 +617,8 @@
     gorunumuBul: gorunumuBul,
     klasikAyar: klasikAyar,
     animasyonu: animasyonu,
+    renkAlanlari: renkAlanlari,
+    gecerliRenkler: gecerliRenkler,
     KONUM_NOKTALARI: kopya(KONUM_NOKTALARI),
     YAPISMA: YAPISMA,
     konumNoktasi: konumNoktasi,

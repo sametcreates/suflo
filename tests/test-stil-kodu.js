@@ -5,6 +5,7 @@
 //  - 3.2.0 çözücüsü (tests/fixtures) yeni kodda fırlatmaz; efekt stilini eskisi gibi "bu sürümde yok" diye reddeder
 //  - kötü niyetli "ek" (bilinmeyen kimlik, __proto__, iç içe nesne, 10 KB metin) güvenle atılır
 //  - eski kodlar (animasyonsuz) bayt bayt aynı kodlanır ve aynı çözülür
+//  - parti 5: vurguKutuRenk / vurguRenk2 "ek"te gidip gelir, eski çözücü klasik karşılığı görür, kötü renk atılır
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var KOK = path.join(__dirname, "..");
 var SS = require(path.join(KOK, "js", "style-share.js"));
@@ -107,6 +108,39 @@ ok("eski stil kimliği + ek.anim: animasyon atılır (yalnız Altyazı Efektleri
 })());
 ok("ek.anim \"\": uyarısız klasik", (function () { var x = SK.decode(ekli({ anim: "" }), izin); return x.ok && x.recipe.overrides.anim === undefined && x.warnings.length === 0; })());
 ok("bozuk kod: SS.decode'un hatası aynen", J(SK.decode("SFL1.bozuk!!", izin)) === J(SS.decode("SFL1.bozuk!!", izin)) && SK.decode(null).ok === false && SK.decode(undefined).ok === false);
+
+/* ---------------- 4b) parti 5: vurgu kutusu rengi ve ikinci vurgu rengi ---------------- */
+var renkTarif = { styleId: "efekt", overrides: Object.assign(AE.overrides(AE.gorunum("temiz").ayar), { anim: "vurgu-kutusu", vurguKutuRenk: "#FF00AA", vurguRenk2: "#00cc88" }) };
+var rk = SK.encode(renkTarif), rj = ham(rk);
+ok("parti 5 encode: renkler overrides'ta yok, ek'te (küçük harf); anim yanında", !("vurguKutuRenk" in rj.overrides) && !("vurguRenk2" in rj.overrides) &&
+  J(rj.ek) === J({ anim: "vurgu-kutusu", vurguKutuRenk: "#ff00aa", vurguRenk2: "#00cc88" }), J(rj.ek));
+var rd = SK.decode(rk, izin);
+ok("parti 5 decode: renkler gidip gelir (overrides + recipe.ek), uyarı yok", rd.ok && rd.recipe.overrides.vurguKutuRenk === "#ff00aa" &&
+  rd.recipe.overrides.vurguRenk2 === "#00cc88" && rd.recipe.overrides.anim === "vurgu-kutusu" && rd.warnings.length === 0, J(rd.warnings));
+var yalnizRenk = SK.decode(SK.encode({ styleId: "efekt", overrides: { vurguRenk2: "#123456" } }), izin);
+ok("parti 5: animasyonsuz kodda da renk taşınır (klasikte kullanılmaz)", yalnizRenk.ok && yalnizRenk.recipe.overrides.vurguRenk2 === "#123456" &&
+  yalnizRenk.recipe.overrides.anim === undefined && yalnizRenk.warnings.length === 0);
+var eskiRk = SS.decode(rk, izin);
+ok("parti 5, eski çözücü (SS.decode): kabul eder, renkleri görmez, klasik çift (yalnız 'ek' uyarısı)", eskiRk.ok && !("vurguKutuRenk" in eskiRk.recipe.overrides) &&
+  !("vurguRenk2" in eskiRk.recipe.overrides) && eskiRk.recipe.overrides.giris === YA.klasik("vurgu-kutusu").giris && J(eskiRk.warnings) === J(["ek"]), J(eskiRk));
+var e32r = Eski32.decode(rk);
+ok("parti 5, 3.2.0 çözücüsü: fırlatmaz", e32r && typeof e32r.ok === "boolean");
+ok("parti 5: renk null / geçersizse koda girmez", J(ham(SK.encode({ styleId: "efekt", overrides: { vurguRenk2: null, vurguKutuRenk: "kırmızı" } })).ek) === undefined &&
+  SK.encode({ styleId: "efekt", overrides: { vurguRenk2: null } }) === SS.encode({ styleId: "efekt", overrides: {} }) &&
+  ham(SK.encode({ styleId: "hormozi", overrides: { vurguRenk2: "#123456" } })).ek === undefined);
+[["#abc (kısa)", { vurguRenk2: "#abc" }, ["ek.vurguRenk2"]], ["sayı", { vurguKutuRenk: 5 }, ["ek.vurguKutuRenk"]],
+  ["enjeksiyon", { vurguKutuRenk: "#fff}{\\pos(0,0)" }, ["ek.vurguKutuRenk"]], ["iç içe", { vurguRenk2: { r: 1 } }, ["ek.vurguRenk2"]]].forEach(function (k) {
+  var x = SK.decode(ekli(k[1]), izin);
+  ok("kötü parti 5 rengi (" + k[0] + "): atılır, uyarı " + J(k[2]), x.ok && x.recipe.overrides.vurguRenk2 === undefined && x.recipe.overrides.vurguKutuRenk === undefined &&
+    J(x.warnings) === J(k[2]), J(x));
+});
+ok("parti 5: eski stil kimliği + ek renkleri atılır", (function () {
+  var o = ham(SS.encode({ styleId: "neon", overrides: { renk: "#ff0000" } })); o.ek = { vurguRenk2: "#123456" };
+  var x = SK.decode(elle(o), izin);
+  return x.ok && x.recipe.overrides.vurguRenk2 === undefined && x.recipe.ek === undefined && J(x.warnings) === J(["ek.vurguRenk2"]);
+})());
+var rc = SE.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "Merhaba" }, { start: 1, end: 2, text: "dünya" }], cueKind: "words", overrides: rd.recipe.overrides });
+ok("parti 5: çözülen kodun kutu rengi motorda çizilir", rc.style.vurguKutuRenk === "#ff00aa" && /SufloKutu,[^\n]*\\3c&H00AA00FF/.test(rc.ass));
 
 /* ---------------- 5) eski kodlar ---------------- */
 var eskiKodlar = [

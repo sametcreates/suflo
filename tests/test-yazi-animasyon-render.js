@@ -4,6 +4,10 @@
 //  - hareket bittikten sonraki kare, aynı andaki klasik durağan Altyazı Efektleri karesiyle (giriş yok, vurgu yok)
 //    piksel piksel aynı ya da farkı ≤ %0,5 (son kare yerinde; 16:9 ve 9:16 + "Platform arayüzünden kaçın")
 //  - yazı kadrajın içinde (alfa kutusu kenarlara değmez)
+// Parti 5: son kare kipleri (renk: yalnız alfa aynı; süs: süs katmanı çıkarılınca metin alfası aynı, süs de çizilmiş;
+// kendi: büyüyen vurgu durağan iri kelimesiyle, hareket bitince kare değişmez), vurgu kutusu yalnız etkin kelimenin
+// arkasında (iki kelime × iki an, alfa sütun aralıkları), karaoke dolgusu tekdüze ilerler (kelimenin %25 / %50 / %75'inde
+// vurgu renkli piksel sayısı artar), kutu ve çizgi 9:16 + "Platform arayüzünden kaçın"da kadraj içinde
 var fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process");
 var KOK = path.join(__dirname, "..");
 var SE = require(path.join(KOK, "js", "style-engine.js"));
@@ -22,10 +26,20 @@ if (ff.error || ff.status !== 0 || !/\ssubtitles\s/.test(String(ff.stdout || "")
 var tmp = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-yazi-anim-"));
 // Üç kelime, her biri 0,8 sn (kart 0,2 - 2,6 sn); vurgu açık (etkin kelime vurgu renginde)
 var CUES = ["Bunu", "gören", "herkes"].map(function (w, i) { return { start: 0.2 + i * 0.8, end: 1.0 + i * 0.8, text: w }; });
-var SON = 2.5;
+var SON = 2.55;
 var KADRAJ = [{ ad: "16:9", w: 960, h: 540, guvenli: false }, { ad: "9:16 güvenli", w: 540, h: 960, guvenli: true }];
 // Hareketin sürdüğü iki an (sn): kart / ilk kelime 0,2'de başlar
-var ANLAR = { "daktilo": [0.24, 0.42] };
+var ANLAR = { "daktilo": [0.24, 0.42], "buyuyen-vurgu": [1.84, 1.92], "nefes": [0.3, 0.75] };
+var SON_KIP = { "karaoke-birikimli": "renk", "iki-ton": "renk", "vurgu-kutusu": "sus", "vurgu-cizgi": "sus", "parlama": "sus", "buyuyen-vurgu": "kendi" };
+// Süs katmanı (gölge / kutu yokken 0) olaylarını çıkar
+function sussuz(r) { return Object.assign({}, r, { ass: r.ass.split("\n").filter(function (l) { return !/^Dialogue: 0,/.test(l); }).join("\n") }); }
+// Yalnız alfa kanalı farkı (renk tasarımın parçasıyken)
+function alfaFark(a, b) {
+  if (a.length !== b.length || !a.length) return { oran: 1, n: 0, gorunur: 0 };
+  var n = 0, gorunur = 0;
+  for (var i = 3; i < a.length; i += 4) { if (a[i] > 8 || b[i] > 8) gorunur++; if (Math.abs(a[i] - b[i]) > 8) n++; }
+  return { oran: n / (a.length / 4), n: n, gorunur: gorunur };
+}
 
 function derle(ov, k) {
   return SE.compile({ styleId: "efekt", cues: CUES, cueKind: "words", width: k.w, height: k.h, overrides: Object.assign({ guvenli: k.guvenli }, ov) });
@@ -69,8 +83,15 @@ try {
         ok(id + ": hareket sürerken iki an farklı (" + an.join(" / ") + " sn)", d1.n > 30 && (d1.gorunur > 0), d1.n + " piksel");
         ok(id + ": hareket sürerken yazı kadrajın içinde", icinde(kutu(a2, k), k), JSON.stringify(kutu(a2, k)));
       }
-      var son = kare(r, SON, k), sabit = kare(duragan, SON, k), d2 = fark(son, sabit);
-      ok(id + " [" + k.ad + "]: hareket bitince kare klasik durağan kareyle aynı (fark ≤ %0,5)", sabit.length > 0 && d2.gorunur > 200 && d2.oran <= 0.005,
+      var son = kare(r, SON, k), sabit = kare(duragan, SON, k), kip = SON_KIP[id] || "ayni", d2;
+      if (kip === "ayni") d2 = fark(son, sabit);
+      else if (kip === "renk") d2 = alfaFark(son, sabit);
+      else if (kip === "sus") {
+        d2 = alfaFark(kare(sussuz(r), SON, k), sabit);
+        var susFark = fark(son, sabit);
+        ok(id + " [" + k.ad + "]: süs (kutu / çizgi / ışıltı) son karede çizili", susFark.n > 30, susFark.n + " piksel");
+      } else d2 = fark(son, kare(r, SON - 0.4, k));
+      ok(id + " [" + k.ad + "]: hareket bitince kare klasik durağan kareyle aynı (fark ≤ %0,5; kip " + kip + ")", sabit.length > 0 && d2.gorunur > 200 && d2.oran <= 0.005,
         (d2.oran * 100).toFixed(3) + "% · " + d2.n + " piksel / görünür " + d2.gorunur);
       ok(id + " [" + k.ad + "]: son karede yazı kadrajın içinde", icinde(kutu(son, k), k), JSON.stringify(kutu(son, k)));
     });
@@ -89,6 +110,54 @@ try {
   var kayma = Math.abs((tepe.sol + tepe.sag) / 2 - (sabitK.sol + sabitK.sag) / 2);
   ok("olcek-darbe: tepe anında yazı büyür, kart ortası yerinde (≤ 6 px)", tepe.sag - tepe.sol > sabitK.sag - sabitK.sol && kayma <= 6,
     "genişlik " + (tepe.sag - tepe.sol) + " / " + (sabitK.sag - sabitK.sol) + " · kayma " + kayma);
+
+  /* ---------------- parti 5 ---------------- */
+  // Durağan karenin kelime sütun aralıkları (alfa sütunlarında boşlukla ayrılmış koşular)
+  function sutunlar(b, k) {
+    var dolu = [];
+    for (var x = 0; x < k.w; x++) { var v = false; for (var y = 0; y < k.h && !v; y++) if (b[(y * k.w + x) * 4 + 3] > 40) v = true; dolu.push(v); }
+    var out = [], bas = -1;
+    dolu.forEach(function (v, x) { if (v && bas < 0) bas = x; if (!v && bas >= 0) { out.push([bas, x - 1]); bas = -1; } });
+    if (bas >= 0) out.push([bas, k.w - 1]);
+    return out;
+  }
+  function kesisir(a, b) { return a[0] <= b[1] && b[0] <= a[1]; }
+  function kapsar(a, b) { return a[0] <= b[0] && a[1] >= b[1]; }
+  var vk = derle(Object.assign({}, taban, { anim: "vurgu-kutusu" }), k0);
+  var yalnizKutu = Object.assign({}, vk, { ass: vk.ass.split("\n").filter(function (l) { return !/^Dialogue/.test(l) || /,SufloKutu,/.test(l); }).join("\n") });
+  var kelSut = sutunlar(kare(derle(Object.assign({}, taban, { giris: "yok", aktif: "yok" }), k0), 0.6, k0), k0);
+  var k1 = sutunlar(kare(yalnizKutu, 0.6, k0), k0), k2 = sutunlar(kare(yalnizKutu, 1.4, k0), k0);
+  ok("vurgu-kutusu: kutu yalnız etkin kelimenin arkasında (0,6 sn: 1. kelime, 1,4 sn: 2. kelime; alfa sütun aralıkları)",
+    kelSut.length === 3 && k1.length === 1 && k2.length === 1 && kapsar(k1[0], kelSut[0]) && !kesisir(k1[0], kelSut[1]) &&
+    kapsar(k2[0], kelSut[1]) && !kesisir(k2[0], kelSut[0]) && !kesisir(k2[0], kelSut[2]),
+    "kelimeler " + JSON.stringify(kelSut) + " · kutu " + JSON.stringify(k1) + " / " + JSON.stringify(k2));
+  // Kutudaki yazı: kutunun içinde yazı rengi (siyah) pikselleri var, vurgu (sarı) yazı yok
+  var vkKare = kare(vk, 1.4, k0), siyah = 0, kutuSari = 0;
+  for (var y2 = 0; y2 < k0.h; y2++) for (var x2 = k2[0][0]; x2 <= k2[0][1]; x2++) {
+    var q = (y2 * k0.w + x2) * 4;
+    if (vkKare[q + 3] > 200 && vkKare[q] < 40 && vkKare[q + 1] < 40 && vkKare[q + 2] < 40) siyah++;
+    if (vkKare[q + 3] > 200 && vkKare[q] > 230 && vkKare[q + 1] > 190 && vkKare[q + 2] < 110) kutuSari++;
+  }
+  ok("vurgu-kutusu: kutu sarı, üstündeki yazı kontrast renginde (siyah)", siyah > 150 && kutuSari > 300, "siyah " + siyah + " · sarı " + kutuSari);
+  // Karaoke dolgu: 2. kelime (1,0 - 1,8 sn) %25 / %50 / %75'inde vurgu renkli piksel sayısı
+  var kd = derle(Object.assign({}, taban, { anim: "karaoke-dolgu" }), k0);
+  var dolgu = [1.2, 1.4, 1.6].map(function (t) {
+    var b = kare(kd, t, k0), n = 0;
+    for (var y = 0; y < k0.h; y++) for (var x = kelSut[1][0]; x <= kelSut[1][1]; x++) {
+      var i = (y * k0.w + x) * 4;
+      if (b[i + 3] > 200 && b[i] > 225 && b[i + 1] > 180 && b[i + 1] < 235 && b[i + 2] < 110) n++;
+    }
+    return n;
+  });
+  ok("karaoke-dolgu: dolgu tekdüze ilerler (kelimenin %25 < %50 < %75'i vurgu renginde)", dolgu[0] > 20 && dolgu[1] > dolgu[0] * 1.3 && dolgu[2] > dolgu[1] * 1.15, dolgu.join(" < "));
+  // Kutu ve çizgi 9:16 + "Platform arayüzünden kaçın"da kadraj içinde, ikon sütununun solunda
+  var k9 = KADRAJ[1];
+  ["vurgu-kutusu", "vurgu-cizgi", "buyuyen-vurgu"].forEach(function (id) {
+    var uzun = [{ start: 0.2, end: 1.0, text: "Gerçekten" }, { start: 1.0, end: 1.8, text: "harika" }, { start: 1.8, end: 2.6, text: "oldu" }];
+    var r9 = SE.compile({ styleId: "efekt", cues: uzun, cueKind: "words", width: k9.w, height: k9.h, overrides: Object.assign({ guvenli: true }, taban, { anim: id }) });
+    var tum = [0.6, 1.4, 2.2].map(function (t) { return kutu(kare(r9, t, k9), k9); });
+    ok(id + " [9:16 güvenli]: kutu / çizgi / iri kelime kadraj içinde ve sağ ikon sütununun solunda", tum.every(function (o) { return icinde(o, k9) && o.sag < k9.w * 0.85; }), JSON.stringify(tum));
+  });
 } finally {
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
 }

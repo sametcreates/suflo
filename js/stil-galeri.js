@@ -34,7 +34,10 @@
   // Minik animasyon glifleri (çeviriden muaf, aria-hidden): yazı animasyonu ya da klasik giriş + vurgu
   var ANIM_GLIF = {
     "kelime-pop": "•", "yukari-suzul": "↑", "dalga": "~", "zipla-gel": "↓", "daktilo": "|", "harf-belir": "…",
-    "netles": "°", "yandan-kay": "»", "aralik-acil": "↔", "olcek-darbe": "+", "renk-gecis": "*", "sallanma": "≈"
+    "netles": "°", "yandan-kay": "»", "aralik-acil": "↔", "olcek-darbe": "+", "renk-gecis": "*", "sallanma": "≈",
+    // Parti 5
+    "karaoke-dolgu": "▸", "karaoke-birikimli": "≫", "vurgu-kutusu": "■", "vurgu-cizgi": "_", "parlama": "✧", "iki-ton": "◐",
+    "kromatik-yumusak": "≋", "buyuyen-vurgu": "⊕", "dusus": "⇣", "kapak-cevir": "⌒", "donerek": "↻", "perde": "▴", "nefes": "○"
   };
   var GIRIS_GLIF = { yok: "", pop: "•", fade: "°", yukari: "↑", asagi: "↓", zipla: "^" };
   var AKTIF_GLIF = { yok: "", zipla: "^", titre: "≈", glitch: "×" };

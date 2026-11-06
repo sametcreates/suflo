@@ -127,7 +127,9 @@
         giris: "fade", aktif: "yok", vurgu: true, kalin: true, italik: false, satir: 2, kelime: 5,
         golge: null, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null,
         // Animasyon motoru v2: yazı animasyonu ("" = klasik giriş + vurgu; js/yazi-animasyonlari.js kimlikleri)
-        anim: "" }
+        anim: "",
+        // Parti 5: vurgu kutusu rengi (null = vurgu rengi) ve ikinci vurgu rengi (null = vurgu renginden türetilir)
+        vurguKutuRenk: null, vurguRenk2: null }
     }
   };
 
@@ -435,7 +437,8 @@
 
   function header(style, id, width, height) {
     var stiller = [styleLine(style, id, height)];
-    if (efektKutusu(style, id)) stiller.push(styleLine(style, id, height, KUTU_STILI, 3));
+    // Vurgu kutusu animasyonu (parti 5) kelime kutusunu aynı "SufloKutu" stiliyle çizer (arka plan kutusu kapalıyken de)
+    if (efektKutusu(style, id) || (id === "efekt" && animKutuStili(style))) stiller.push(styleLine(style, id, height, KUTU_STILI, 3));
     return [
       "[Script Info]", "; Suflo Stil Motoru v3", "ScriptType: v4.00+", "WrapStyle: 2",
       "ScaledBorderAndShadow: yes", "YCbCr Matrix: None", "PlayResX: " + width, "PlayResY: " + height, "",
@@ -991,6 +994,13 @@
   // Opaklık (0-100) → ASS alfası (00 opak, FF saydam), iki hane
   function alfa(opak) { return ("0" + Math.round(255 * (1 - opak / 100)).toString(16)).slice(-2).toUpperCase(); }
   function ondalik(v) { return Math.round(v * 10) / 10; }
+  // #rrggbb (parti 5 alanları yalnız bunu kabul eder) ve #rgb'nin #rrggbb'si
+  var HEX6 = /^#[0-9a-f]{6}$/i;
+  function hex6(v) {
+    var h = String(v || "").toLowerCase();
+    if (/^#[0-9a-f]{3}$/.test(h)) return "#" + h[1] + h[1] + h[2] + h[2] + h[3] + h[3];
+    return HEX6.test(h) ? h : "#ffffff";
+  }
 
   /*
    * Serbest konumda kartın tahmini kutusu (efektSigdir'in genişlik tahmini, satır ≈ 1,3 punto) kadraja
@@ -1313,8 +1323,47 @@
     } },
     "olcek-darbe": { tur: "darbe", kare: function () { return { s: [[0, 100], [0.45, 122], [1, 100]] }; } },
     "sallanma": { tur: "darbe", kare: function () { return { frz: [[0, 0], [0.125, 5], [0.375, -5], [0.625, 5], [0.875, -5], [1, 0]] }; } },
-    "renk-gecis": { tur: "renk" }
+    "renk-gecis": { tur: "renk" },
+    /*
+     * Parti 5. Karaoke ve vurgu ailesi (kelimenin ölçülen zamanına bağlı; taban satır klasik durağanla aynı yerde):
+     *   dolgu     etkin kelime \kf ile soldan sağa vurgu rengine dolar (libass glif glif tam ilerleme); dolgu kelimenin
+     *             söylenişinin %90'ında biter, sonra durağan; önceki kelime D ms'de normale döner
+     *   renk +birikimli  söylenen kelimeler vurgu renginde kalır (ilerleme boyası)
+     *   renk +ikiTon     etkin ve *anahtar* kelimeler sırayla vurguRenk / vurguRenk2
+     *   kutu      etkin kelimenin arkasında dolu kutu ("SufloKutu" BorderStyle 3, glife oturan teknik: kelime-yalnız
+     *             olay, öbür kelimeler saydam), kutu rengi vurguKutuRenk (boşsa vurgu rengi), yazı kontrast renginde
+     *   cizgi     etkin kelimenin altında vurgu renginde ince çubuk ("SufloKutu" \fscy1 koşusu); aynı satırda önceki kelimeden kayar
+     *   parlama   etkin kelimenin çevresinde süs katmanında yumuşak ışıltı (\3c vurgu, geniş \bord, \blur), periyot
+     *             D ≥ 0,67 sn (≤ 1,5 Hz) nabız
+     *   kromatik  etkin kelimenin iki renkli kopyası (vurguRenk2, vurgunun 90° tonu) kontur dışında ±scaled(5) kayıktan D ms'de
+     *             kelimeye kayar ve söner; titreme / rastgele sıçrama yok (glitch'in yumuşak karşılığı)
+     * Hareket ailesi:
+     *   buyuyen   *anahtar* kelime (kartta yoksa en uzun kelime) satır içi durağan %120 (sığmazsa sığan en büyük) ve
+     *             söylendiğinde 0 → %135 → %120 patlayarak gelir; öbür kelimeler kart boyunca durağan
+     *   nefes     kart %100 ↔ %103 sürekli, ~D periyotla; kart sonundan önce %100'de durur
+     *   kart: kapak-cevir (\frx 70 → 0, \org kartın ortası), donerek (\frz -12 → 0 ve %85 → %100), perde (alttan
+     *   yükselen \clip dikdörtgeni + hafif yükselme); dalga: dusus (sırayla yukarıdan düşüş, iki sönümlü sekme)
+     */
+    "karaoke-dolgu": { tur: "dolgu" },
+    "karaoke-birikimli": { tur: "renk", birikimli: true },
+    "iki-ton": { tur: "renk", ikiTon: true },
+    // susle: süs katmanı (L.glitch) kullanır: kutu, çizgi, ışıltı, kromatik kopyalar
+    "vurgu-kutusu": { tur: "kutu", susle: true },
+    "vurgu-cizgi": { tur: "cizgi", susle: true },
+    "parlama": { tur: "parlama", susle: true },
+    "kromatik-yumusak": { tur: "kromatik", susle: true },
+    "buyuyen-vurgu": { tur: "buyuyen", kare: function () { return { s: [[0, 0], [0.6, 135], [1, 120]] }; } },
+    "nefes": { tur: "nefes" },
+    "dusus": { tur: "dalga", kademe: 70, kare: function (h) {
+      var d = scaled(80, h);
+      return { y: [[0, -d], [0.42, 0], [0.6, -Math.round(d * 0.24)], [0.78, 0], [0.9, -Math.round(d * 0.07)], [1, 0]], a: [[0, 0], [0.42, 1]] };
+    } },
+    "kapak-cevir": { tur: "kart", kare: function () { return { frx: [[0, 70], [0.5, 12], [1, 0]], a: [[0, 0], [0.4, 1]] }; } },
+    "donerek": { tur: "kart", kare: function () { return { frz: [[0, -12], [0.5, -2.5], [1, 0]], s: [[0, 85], [0.5, 98], [1, 100]], a: [[0, 0], [0.35, 1]] }; } },
+    "perde": { tur: "kart", kare: function (h) { return { perde: [[0, 0], [0.6, 0.85], [1, 1]], y: [[0, scaled(14, h)], [0.6, scaled(3, h)], [1, 0]] }; } }
   };
+  // Kelime kutusu "SufloKutu" stilini ister (ASS başlığına kutu kapalıyken de girer)
+  function animKutuStili(style) { return typeof style.anim === "string" && sahip(ANIM, style.anim) && (ANIM[style.anim].tur === "kutu" || ANIM[style.anim].tur === "cizgi") && animGecerli(style.anim); }
   // Geçerli: katalogda VE motorda olan kimlik (katalog yüklenmediyse hiçbiri; anim hep klasik)
   function animGecerli(id) { return typeof id === "string" && sahip(ANIM, id) && !!(YA && YA.bul && YA.bul(id)); }
 
@@ -1356,9 +1405,17 @@
    *   yatay: yalnız alt sol (satır sola dayalı): kelimenin sol kenarı sabit, ortası gen (s − 1) / 2 kayar
    */
   var CIKINTI_FARKI = 0.55;
+  /*
+   * Parti 5 (büyüyen vurgu): kelimenin durağan ölçeği %100'den büyük olabilir. m.dinlenme (kelimenin durağan ölçeği,
+   * yoksa 1), m.satirOlcegi (taban satırın ölçeği: satırdaki en büyük durağan ölçek), m.diger (hareketli satırda öbür
+   * kelimelerin en büyük ölçeği). Hareketli satırın ölçeği Lh = yalnızsa s, değilse en büyük(s, diger); kayma tabana göre:
+   *   dikey: k · fs (Lh − Lb) / 2 + ÇT · fs (s − Lh) / 2 − aynısının s = dinlenme değeri (durağanda kayma 0)
+   * Alanlar yoksa (parti 2 animasyonları) formül eskisiyle aynıdır.
+   */
   function olcekKaymasi(m, s) {
-    var s2 = m.yalniz ? s : Math.max(s, 1), k = m.an === 8 ? -1 : (m.an === 5 ? 0 : 1);
-    return { x: m.an === 1 ? -m.gen * (s - 1) / 2 : 0, y: k * m.fs * (s2 - 1) / 2 + CIKINTI_FARKI * m.fs * (s - s2) / 2 };
+    var r = m.dinlenme || 1, Lb = m.satirOlcegi || 1, dg = m.diger || 1, k = m.an === 8 ? -1 : (m.an === 5 ? 0 : 1);
+    function dikey(v) { var Lh = m.yalniz ? v : Math.max(v, dg); return k * m.fs * (Lh - Lb) / 2 + CIKINTI_FARKI * m.fs * (v - Lh) / 2; }
+    return { x: m.an === 1 ? -m.gen * (s - r) / 2 : 0, y: r === 1 && Lb === 1 && dg === 1 ? dikey(s) : dikey(s) - dikey(r) };
   }
   function onaltilik(v) { return ("0" + Math.max(0, Math.min(255, Math.round(v))).toString(16)).slice(-2).toUpperCase(); }
 
@@ -1392,7 +1449,13 @@
    * Döner: { konum, ek, golgeEk, olcek } (golgeEk: gölge kopyasında bulanıklık gölgenin kendi yumuşaklığının altına inmez;
    * olcek: kelimenin önüne konacak satır içi ölçek etiketleri ya da "")
    */
-  function parcaEtiketi(kare, a, b, x0, y0, m, sx, golgeYumusak) {
+  /*
+   * Parti 5, kart: kartın tahmini dikey kutusu ve ortası (kartTahmini): { cx, cy, ust, alt, W, H, pay } — kartın tamamı
+   * dönerken (\frx, \frz) \org kartın ortası; perde (kesir 0 → 1) \clip dikdörtgeninin üst kenarını kartın altından
+   * (alt + pay) üstüne (ust − pay − bir punto payı) taşır, alt kenar kadrajın altı. Tahmin yalnız hareket sürerken
+   * görünür (son kareler etiketsiz durağan olaylardır).
+   */
+  function parcaEtiketi(kare, a, b, x0, y0, m, sx, golgeYumusak, kart) {
     var ms = (b - a) * 10;
     var v = function (p, t, yedek) { var d = kareDeger(kare[p], t); return d === null ? yedek : d; };
     var nokta = function (t) {
@@ -1414,8 +1477,19 @@
       var f0 = ondalik(v("fsp", a, 0)), f1 = ondalik(v("fsp", b, 0));
       ek += "\\fsp" + f0 + (f1 !== f0 ? "\\t(0," + ms + ",\\fsp" + f1 + ")" : "");
     }
-    if (kare.frz && m) {
-      ek += "\\org(" + Math.round(x0 + m.x) + "," + Math.round(y0 + m.y) + ")\\frz" + ondalik(v("frz", a, 0));
+    if ((kare.frz || kare.frx) && !m && kart) ek += "\\org(" + kart.cx + "," + kart.cy + ")";
+    if (kare.frx && kart) {
+      var r0 = ondalik(v("frx", a, 0)), r1 = ondalik(v("frx", b, 0));
+      ek += "\\frx" + r0 + (r1 !== r0 ? "\\t(0," + ms + ",\\frx" + r1 + ")" : "");
+    }
+    if (kare.perde && kart) {
+      var py0 = kart.alt + kart.pay, py1 = kart.ust - kart.pay;
+      var clip = function (t) { return "\\clip(0," + Math.round(py0 + (py1 - py0) * v("perde", t, 1)) + "," + kart.W + "," + kart.H + ")"; };
+      var c0 = clip(a), c1 = clip(b);
+      ek += c0 + (c1 !== c0 ? "\\t(0," + ms + "," + c1 + ")" : "");
+    }
+    if (kare.frz && (m || kart)) {
+      ek += (m ? "\\org(" + Math.round(x0 + m.x) + "," + Math.round(y0 + m.y) + ")" : "") + "\\frz" + ondalik(v("frz", a, 0));
       var z = kare.frz;
       for (var i = 1; i < z.length; i++) {
         var t1 = Math.max(0, z[i - 1][0] - a) * 10, u = Math.min(z[i][0], b), t2 = (u - a) * 10;
@@ -1431,6 +1505,22 @@
     return { konum: konumYaz(p0[0], p0[1], p1[0], p1[1], ms), ek: ek + bulanik, golgeEk: ek + golgeBulanik, olcek: olcek };
   }
 
+  /*
+   * Kartın tahmini kutusu (parti 5; kart dönüşü ve perde): satır kutusu bir punto (kelimeMerkezleri ile aynı varsayım),
+   * an 8 üstten, 5 ortadan, 1 / 2 alttan; alt solda yatay orta en uzun satırın yarısı. pay: kontur + scaled(6) + 0,3 punto
+   * (perde başta kartın tamamını, sonda Türkçe şapka / nokta / çengel dahil hiçbirini kesmez).
+   */
+  function kartTahmini(c) {
+    var sinir = [0].concat(c.kir, [c.group.length]), satir = sinir.length - 1, fs = c.fs, an = c.ka.an, ust, alt, enUzun = 1;
+    for (var i = 0; i + 1 < sinir.length; i++) enUzun = Math.max(enUzun, parcaUzunlugu(c.group, sinir[i], sinir[i + 1]));
+    if (an === 8) { ust = c.ka.y; alt = c.ka.y + satir * fs; }
+    else if (an === 5) { ust = c.ka.y - satir * fs / 2; alt = c.ka.y + satir * fs / 2; }
+    else { alt = c.ka.y; ust = c.ka.y - satir * fs; }
+    var cx = an === 1 ? c.ka.x + Math.round(enUzun * fs * (KARAKTER_GENISLIK[c.font] || .62) * 0.8 * (c.sx > 0 && c.sx < 100 ? c.sx / 100 : 1) / 2) : c.ka.x;
+    return { cx: cx, cy: Math.round((ust + alt) / 2), ust: Math.round(ust), alt: Math.round(alt), W: c.width, H: c.height,
+      pay: (c.outline || 0) + scaled(6, c.height) + Math.round(fs * 0.3) };
+  }
+
   // Metnin harfleri (vekil çiftleri bölünmez)
   function harfleri(t) { return String(t).match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) || []; }
 
@@ -1438,6 +1528,9 @@
    * Yazı animasyonlu kart (renderEfekt'ten). c: { anim, group, kir, fs, sx, ka, kartBas, kartSon (sn), L (katmanlar),
    * yaz (renderEfekt'in olay yazıcısı: gölge kopyası dahil), kutuYaz (kutu açıksa), normal, vurgu (ASS renkleri),
    * vurguAcik, width, height, factor (hareket şiddeti), olcek, font, golgeYumusak }
+   * Parti 5: vurgu2 (ikinci vurgu, ASS), kutuHex (vurgu kutusu rengi), renkHex (yazı rengi), outline (kontur px),
+   * susYaz (süs katmanı L.glitch, gölge kopyasız), kutuOlay (süs katmanında "SufloKutu" olayı), maxW / genK (kartın
+   * kullanılabilir genişliği ve fontun katsayısı: büyüyen vurgunun sığma sınırı)
    */
   function animKarti(c) {
     var g = c.group, n = g.length, tanim = ANIM[c.anim], tur = tanim.tur, kayit = YA.bul(c.anim);
@@ -1462,18 +1555,38 @@
       return out;
     }
     function etkinAdim(t) { var e = 0; for (var k = 0; k < n; k++) if (adim[k].bas <= t) e = k; return e; }
-    // Kartın satırı: etkin kelime ve *anahtar kelime* vurgu renginde (klasik metin(k, "tum") ile aynı), gor(i) false saydam,
-    // ozel(i) kelimenin harf harf işaretlemesi (null: düz)
-    function metin(etkin, gor, ozel) {
+    // Uzun kelime kartının yatay sıkıştırması ölçeğe çarpılır; satır içi ölçekten sonra kartın ölçeğine dönülür
+    var sxV = c.sx > 0 && c.sx < 100 ? c.sx : 0;
+    function sxCarp(v) { return sxV ? ondalik(v * sxV / 100) : v; }
+    var olcekDonus = "{\\fscx" + (sxV || 100) + "\\fscy100}";
+    // Büyüyen vurgu: kelimenin satır içi durağan ölçeği (%; 100 / yok: düz)
+    var kwOlcek = [];
+    function olcekSar(i, w) { var r = kwOlcek[i]; return r && r !== 100 ? "{\\fscx" + sxCarp(r) + "\\fscy" + r + "}" + w + olcekDonus : w; }
+    /*
+     * Kartın satırı: etkin kelime ve *anahtar kelime* vurgu renginde (klasik metin(k, "tum") ile aynı), gor(i) false saydam,
+     * ozel(i) kelimenin harf harf işaretlemesi (null: düz), renkFn(i, etkin) (isteğe bağlı) kelimenin rengi ya da null
+     */
+    function metin(etkin, gor, ozel, renkFn) {
       return efektBirlestir(g.map(function (cue, i) {
-        var o = ozel ? ozel(i) : null, w = o !== null ? o : esc(cue.text);
-        var r = i === etkin ? (c.vurguAcik || cue.vurgu ? c.vurgu : null) : (cue.vurgu ? c.vurgu : null);
-        if (r) w = "{\\1c" + r + "}" + w + "{\\1c" + c.normal + "}";
+        var o = ozel ? ozel(i) : null, w = o !== null ? o : olcekSar(i, esc(cue.text));
+        var r = renkFn ? renkFn(i, etkin) : (i === etkin ? (c.vurguAcik || cue.vurgu ? c.vurgu : null) : (cue.vurgu ? c.vurgu : null));
+        // Renk kontur da taşıyabilir (vurgu kutusunda kelimenin konturu kutu renginde): sonrası kartın konturuna döner
+        if (r) w = "{\\1c" + r + "}" + w + "{\\1c" + c.normal + (r.indexOf("\\3c") !== -1 ? "\\3c" + c.kontur : "") + "}";
         if (!gor(i)) w = "{\\alpha&HFF&}" + w + "{\\alpha&H00&}";
         return w;
       }), c.kir);
     }
     function hepsi() { return true; }
+    // Karaoke ve vurgu ailesinde etkin kelime animasyonun kendisidir: kelime vurgusu kapalıyken de vurgu renginde
+    function etkinVurgulu(i, e) { return i === e || g[i].vurgu ? c.vurgu : null; }
+    // Süs olayının metni: yalnız etkin kelime görünür (onEk: kelimenin önüne, \alpha&H00&'dan sonra), öbürleri saydam
+    function yalnizMetin(k, onEk, sonEk) {
+      return "{\\alpha&HFF&}" + efektBirlestir(g.map(function (cue, i) {
+        return i === k ? "{\\alpha&H00&" + onEk + "}" + esc(cue.text) + "{\\alpha&HFF&" + (sonEk || "") + "}" : esc(cue.text);
+      }), c.kir);
+    }
+    // Süs: etkin kelimenin süresine sığan hareket (cs; kelimenin %80'i, en çok D)
+    function sigan(ad) { return Math.max(1, Math.min(D, Math.round((ad.son - ad.bas) * 0.8))); }
 
     // Arka plan kutusu kartın tamamı boyunca; kayan kartla kayar (ölçeklenmez, solmaz: klasik kural)
     if (c.kutuYaz) {
@@ -1486,18 +1599,154 @@
     }
 
     if (tur === "renk") {
-      // Etkin kelime normal renkten vurgu rengine D ms'de geçer; önceki kelime kendi bitişinde (bu adımın başı) geri döner
-      var tms = D * 10;
+      /*
+       * Etkin kelime normal renkten vurgu rengine D ms'de geçer; önceki kelime kendi bitişinde (bu adımın başı) geri döner.
+       * Biriken vurgu: söylenen kelimeler vurguda kalır. İki ton: çift sıradaki kelime vurguRenk, tek sıradaki vurguRenk2.
+       */
+      var tms = D * 10, yeni = tanim.birikimli || tanim.ikiTon;
       adim.forEach(function (ad, k) {
         if (ad.son - ad.bas < 1) return;
+        // gecis false: geçiş bitmiş hâli (parti 5 türleri geçişi D'de bitirip adımın kalanını durağan olay yapar)
+        var icerik = function (gecis) {
+          return efektBirlestir(g.map(function (cue, i) {
+            var w = esc(cue.text), hedef = tanim.ikiTon && i % 2 === 1 ? c.vurgu2 : c.vurgu;
+            if (cue.vurgu) return "{\\1c" + hedef + "}" + w + "{\\1c" + c.normal + "}";
+            if (i === k) return (gecis ? "{\\1c" + c.normal + "\\t(0," + tms + ",\\1c" + hedef + ")}" : "{\\1c" + hedef + "}") + w + "{\\1c" + c.normal + "}";
+            if (tanim.birikimli) return i < k ? "{\\1c" + hedef + "}" + w + "{\\1c" + c.normal + "}" : w;
+            if (i === k - 1 && gecis) return "{\\1c" + hedef + "\\t(0," + tms + ",\\1c" + c.normal + ")}" + w + "{\\1c" + c.normal + "}";
+            return w;
+          }), c.kir);
+        };
+        if (yeni && ad.son - ad.bas > D) {
+          c.yaz(c.L.taban, sn(ad.bas), sn(ad.bas + D), pos, "", "", icerik(true));
+          c.yaz(c.L.taban, sn(ad.bas + D), sn(ad.son), pos, "", "", icerik(false));
+        } else c.yaz(c.L.taban, sn(ad.bas), sn(ad.son), pos, "", "", icerik(true));
+      });
+      return;
+    }
+
+    if (tur === "dolgu") {
+      /*
+       * Karaoke dolgu: etkin kelime \kf ile (ikincil renk normal → birincil vurgu) soldan sağa dolar; libass dolguyu
+       * gliflerin gerçek genişliğinde ilerletir. Dolgu kelimenin söylenişinin (adımın içinde) %90'ında biter, kalan
+       * adım durağan olaydır (son kare klasik durağanla aynı). Sonraki kelimeler yeni bir \k0 hecesinde, birincil = ikincil
+       * renkle (renkleri değişmez). Önceki kelime en çok D ms'de (dolgudan kısa) normale döner. Gölge kopyası dolgusuz.
+       */
+      adim.forEach(function (ad, k) {
+        var L = ad.son - ad.bas;
+        if (L < 1) return;
+        var konus = Math.min(Math.round(g[k].end * 100), ad.son) - ad.bas;
+        var F = Math.min(L - 1, Math.max(1, Math.round(konus * 0.9)));
+        var duragan = metin(k, hepsi, null, etkinVurgulu);
+        if (L < 2 || g[k].vurgu) { c.yaz(c.L.taban, sn(ad.bas), sn(ad.son), pos, "", "", duragan); return; }
+        var geri = Math.min(D, F) * 10;
         var icerik = efektBirlestir(g.map(function (cue, i) {
           var w = esc(cue.text);
-          if (cue.vurgu) return "{\\1c" + c.vurgu + "}" + w + "{\\1c" + c.normal + "}";
-          if (i === k) return "{\\1c" + c.normal + "\\t(0," + tms + ",\\1c" + c.vurgu + ")}" + w + "{\\1c" + c.normal + "}";
-          if (i === k - 1) return "{\\1c" + c.vurgu + "\\t(0," + tms + ",\\1c" + c.normal + ")}" + w + "{\\1c" + c.normal + "}";
+          if (i === k) return "{\\1c" + c.vurgu + "\\2c" + c.normal + "\\kf" + F + "}" + w + "{\\1c" + c.normal + "\\2c" + c.normal + "\\k0}";
+          if (cue.vurgu) return i < k ? "{\\1c" + c.vurgu + "}" + w + "{\\1c" + c.normal + "}" : "{\\1c" + c.vurgu + "\\2c" + c.vurgu + "}" + w + "{\\1c" + c.normal + "\\2c" + c.normal + "}";
+          if (i === k - 1) return "{\\1c" + c.vurgu + "\\t(0," + geri + ",\\1c" + c.normal + ")}" + w + "{\\1c" + c.normal + "}";
           return w;
         }), c.kir);
-        c.yaz(c.L.taban, sn(ad.bas), sn(ad.son), pos, "", "", icerik);
+        c.yaz(c.L.taban, sn(ad.bas), sn(ad.bas + F), pos, "", "", icerik, undefined, metin(k, hepsi));
+        c.yaz(c.L.taban, sn(ad.bas + F), sn(ad.son), pos, "", "", duragan);
+      });
+      return;
+    }
+
+    if (tur === "kutu" || tur === "cizgi" || tur === "parlama" || tur === "kromatik") {
+      /*
+       * Süslü vurgu: taban satır her adımda klasik durağan yerinde (etkin kelime vurgu renginde; kutuda kutuya göre
+       * kontrast renginde), süs olayı L.glitch katmanında (metnin altında, gölgesiz) yalnız etkin kelimeyle.
+       */
+      // Kutudaki kelime: yazı kutuya göre kontrast renginde, konturu kutu renginde (koyu kontur kutuda harfleri boğmasın)
+      var kutuYazi = tur === "kutu" ? assColor(YA.kontrastRengi(c.kutuHex, c.renkHex)) + "\\3c" + assColor(c.kutuHex) : null;
+      var tabanRenk = tur === "kutu" ? function (i, e) { return i === e ? kutuYazi : (g[i].vurgu ? c.vurgu : null); }
+        : (tur === "kromatik" ? null : etkinVurgulu);
+      var P = Math.max(67, D), yarim = Math.round(P / 2);
+      var merkezC = tur === "cizgi" ? kelimeMerkezleri(g, c.kir, c.fs, c.sx, c.ka.an, KARAKTER_GENISLIK[c.font] || .62) : null;
+      adim.forEach(function (ad, k) {
+        var L = ad.son - ad.bas;
+        if (L < 1) return;
+        c.yaz(c.L.taban, sn(ad.bas), sn(ad.son), pos, "", "", metin(k, hepsi, null, tabanRenk || undefined));
+        var S = sigan(ad);
+        if (tur === "kutu") {
+          /*
+           * Kutu: glife oturan "SufloKutu" koşusu, yumuşak köşe (\blur), S cs'de belirir. Yatay pay 0,1 punto: kelime
+           * arası boşluk ~0,24 punto (glif kenarından) olduğundan komşu kelimenin konturuna değmez (kelimenin kendi konturu kutu renginde)
+           */
+          c.kutuOlay(sn(ad.bas), sn(ad.son), pos, "\\shad0\\xbord" + Math.max(scaled(3, c.height), Math.round(c.fs * 0.1)) + "\\ybord" + scaled(2, c.height) +
+            "\\3c" + assColor(c.kutuHex) + "\\blur" + ondalik(scaled(2, c.height) * 0.75),
+            "{\\1a&HFF&\\3a&HFF&}" + efektBirlestir(g.map(function (cue, i) {
+              return i === k ? "{\\3a&H60&\\t(0," + S * 10 + ",\\3a&H00&)}" + esc(cue.text) + "{\\3a&HFF&}" : esc(cue.text);
+            }), c.kir));
+        } else if (tur === "cizgi") {
+          /*
+           * Çizgi: "SufloKutu" koşusu kelimenin kendisiyle, ama \fscy1 (glif taban çizgisine basık): kutu kelimenin gerçek
+           * genişliğinde ince bir çubuk olur. libass kutunun dikey payını da \fscy ile ölçekler: \ybord 5,5 punto → çubuk
+           * ≈ 0,11 punto kalınlıkta, harf biçiminden bağımsız düz; yatay pay scaled(4) glifler arası boşluğu kapatır. Olay
+           * 0,36 punto aşağıda (ç / ş çengeli ve g / y kuyruğu altı). Öbür
+           * kelimeler saydam ama tam boyda (satır yüksekliği metninkiyle aynı); satırında yalnızsa iki yanına saydam \h.
+           * Aynı satırda önceki kelime varsa çubuk S cs'de onun tahmini ortasından kayarak gelir; yoksa belirir.
+           */
+          var ay = c.ka.y + Math.round(c.fs * 0.36), sinirC = [0].concat(c.kir, [n]), yalnizC = false;
+          for (var l2 = 0; l2 + 1 < sinirC.length; l2++) if (sinirC[l2] === k && sinirC[l2 + 1] === k + 1) yalnizC = true;
+          var kay = k > 0 && c.kir.indexOf(k) === -1 ? Math.round(merkezC[k - 1].x - merkezC[k].x) : 0;
+          var bos = yalnizC ? "{\\fscy100\\3a&HFF&}\\h" : "";
+          c.kutuOlay(sn(ad.bas), sn(ad.son), konumYaz(c.ka.x + kay, ay, c.ka.x, ay, S * 10),
+            "\\shad0\\xbord" + scaled(4, c.height) + "\\ybord" + Math.round(c.fs * 5.5) + "\\3c" + c.vurgu,
+            "{\\1a&HFF&\\3a&HFF&}" + efektBirlestir(g.map(function (cue, i) {
+              if (i !== k) return esc(cue.text);
+              var gir = kay ? "\\3a&H00&" : "\\3a&H60&\\t(0," + S * 10 + ",\\3a&H00&)";
+              return (c.ka.an === 1 ? "" : bos) + "{\\fscy1" + gir + "}" + esc(cue.text) + "{\\fscy100\\3a&HFF&}" + (bos ? "\\h" : "");
+            }), c.kir));
+        } else if (tur === "parlama") {
+          // Işıltı: geniş kontur vurgu renginde, bulanık; P/4'te belirir, sonra P periyotla (≤ 1,5 Hz) yumuşakça nabız atar
+          var ilk = Math.max(1, Math.min(Math.round(P / 4), Math.round(L / 2))), zincir = "\\3a&HFF&\\t(0," + ilk * 10 + ",\\3a&H50&)";
+          for (var t = ilk, ust = true, adet = 0; t < L && adet < 24; t += yarim, ust = !ust, adet++) {
+            zincir += "\\t(" + t * 10 + "," + (t + yarim) * 10 + ",\\3a&H" + (ust ? "B0" : "50") + "&)";
+          }
+          c.susYaz(sn(ad.bas), sn(ad.son), pos, "\\3c" + c.vurgu + "\\bord" + (c.outline + scaled(7, c.height)) + "\\blur" + scaled(6, c.height) + "\\shad0",
+            yalnizMetin(k, "\\1a&HFF&" + zincir));
+        } else {
+          /*
+           * Kromatik: iki renkli kopya (ikinci vurgu ve vurgunun 90° kaydırılmış tonu: ikisi de etkin kelimenin renginden
+           * ayrı; kontur dahil aynı siluet) çaprazda ±scaled(5) kayıktan S cs'de kelimeye kayar ve %81 opaktan söner
+           */
+          var dx = scaled(5, c.height), ms = S * 10;
+          [[c.vurgu2, -dx, dx], [c.vurgu3, dx, -dx]].forEach(function (x) {
+            c.susYaz(sn(ad.bas), sn(ad.bas + S), konumYaz(c.ka.x + x[1], c.ka.y + x[2], c.ka.x, c.ka.y, ms),
+              "\\3c" + x[0] + "\\shad0\\1c" + x[0] + "\\fade(48,255,255,0," + ms + "," + ms + "," + ms + ")", yalnizMetin(k, ""));
+          });
+        }
+      });
+      return;
+    }
+
+    if (tur === "nefes") {
+      /*
+       * Nefes: kart %100 → %103 → %100, periyot P = D (şiddete bölünmüş); kartın son 0,15 sn'si (ve P'nin %60'ından kısa
+       * kart) durağan. Periyot kartı tam sayıda nefese bölecek kadar esner (en az 0,7 sn). Ölçek olay başına \t zinciri.
+       */
+      var kuyruk = 15, sureN = ks - kb - kuyruk, adetN = sureN >= Math.round(D * 0.6) && sureN >= 70 ? Math.max(1, Math.round(sureN / D)) : 0;
+      while (adetN > 1 && sureN / adetN < 70) adetN--;
+      var Pe = adetN ? sureN / adetN : 0, nefesSon = kb + Math.round(adetN * Pe);
+      var nk = [];
+      for (var j = 0; j < adetN; j++) nk.push([Math.round(j * Pe), 100], [Math.round((j + 0.5) * Pe), 103]);
+      nk.push([Math.round(adetN * Pe), 100]);
+      var olcekEk = function (o0, o1) {
+        var v0 = ondalik(kareDeger(nk, o0)), out = "\\fscx" + sxCarp(v0) + "\\fscy" + v0;
+        for (var i = 1; i < nk.length; i++) {
+          if (nk[i][0] <= o0 || nk[i - 1][0] >= o1) continue;
+          var u = Math.min(nk[i][0], o1), vu = ondalik(kareDeger(nk, u));
+          out += "\\t(" + (Math.max(nk[i - 1][0], o0) - o0) * 10 + "," + (u - o0) * 10 + ",\\fscx" + sxCarp(vu) + "\\fscy" + vu + ")";
+        }
+        return out;
+      };
+      adim.forEach(function (ad, k) {
+        kes(ad.bas, ad.son, adetN ? [nefesSon] : []).forEach(function (p) {
+          if (!adetN || p[0] >= nefesSon) { c.yaz(c.L.taban, sn(p[0]), sn(p[1]), pos, "", "", metin(k, hepsi)); return; }
+          c.yaz(c.L.taban, sn(p[0]), sn(p[1]), pos, olcekEk(p[0] - kb, p[1] - kb), "", metin(k, hepsi));
+        });
       });
       return;
     }
@@ -1520,13 +1769,14 @@
           return etiket ? out + "{\\alpha&H00&}" : out;
         };
       };
+      var kartGeo = kartTahmini(c);
       var kesitler = kz.concat([D]).map(function (z) { return kb + z; });
       adim.forEach(function (ad, k) {
         kes(ad.bas, ad.son, kesitler).forEach(function (p) {
           var o0 = p[0] - kb, o1 = p[1] - kb;
           if (o0 >= D) { c.yaz(c.L.taban, sn(p[0]), sn(p[1]), pos, "", "", metin(k, hepsi)); return; }
           if (tur === "harf-kart") { c.yaz(c.L.taban, sn(p[0]), sn(p[1]), pos, "", "", metin(k, hepsi, harfOzel(o0))); return; }
-          var e = parcaEtiketi(kare, o0, o1, c.ka.x, c.ka.y, null, c.sx, c.golgeYumusak);
+          var e = parcaEtiketi(kare, o0, o1, c.ka.x, c.ka.y, null, c.sx, c.golgeYumusak, kartGeo);
           c.yaz(c.L.taban, sn(p[0]), sn(p[1]), e.konum, e.ek, "", metin(k, hepsi), e.golgeEk);
         });
       });
@@ -1538,6 +1788,50 @@
      * kelime penceresinden önce saydam, pencerede üst katmanda, sonra tabanda; darbede pencere dışında hep tabanda.
      */
     var girisli = tur !== "darbe";
+    var merkez = kelimeMerkezleri(g, c.kir, c.fs, c.sx, c.ka.an, KARAKTER_GENISLIK[c.font] || .62);
+    var kareI = function () { return kare; }, kzI = function () { return kz; }, anahtar = [];
+    if (tur === "buyuyen") {
+      /*
+       * Büyüyen vurgu: *anahtar* kelimeler (kartta yoksa en uzun kelime) satır içi durağan R% (satırı kullanılabilir
+       * genişliğe sığan en büyük, en çok 120; 105'in altı 100). Yalnız onlar söylendiklerinde 0 → R·1,125 → R girer;
+       * öbür kelimeler kart başından tabanda. Ölçek kayması anahtar kelimenin durağan ölçeğine göre (olcekKaymasi).
+       */
+      g.forEach(function (cue, i) { if (cue.vurgu) anahtar.push(i); });
+      if (!anahtar.length) {
+        var enU = 0;
+        g.forEach(function (cue, i) { if (harfleri(cue.text).length > harfleri(g[enU].text).length) enU = i; });
+        anahtar.push(enU);
+      }
+      /*
+       * Sığma: satırın genişlik tahmini harf başına punto × fontun katsayısı; katsayı büyük harfe göredir, küçük harf ve
+       * noktalama %80'iyle sayılır (kelimeMerkezleri gibi), boşluk %80. Anahtar kelimeler R ile çarpılır.
+       */
+      var sinirB = [0].concat(c.kir, [n]), cwB = c.fs * (c.genK || KARAKTER_GENISLIK[c.font] || .62) * (sxV ? sxV / 100 : 1);
+      var harfG = function (t) { return harfleri(t).reduce(function (a, h) { return a + (h !== h.toLowerCase() ? 1 : 0.8); }, 0); };
+      for (var l = 0; l + 1 < sinirB.length; l++) {
+        var Nl = 0.8 * (sinirB[l + 1] - sinirB[l] - 1), kwL = 0, kwSay = 0;
+        for (var i0 = sinirB[l]; i0 < sinirB[l + 1]; i0++) {
+          Nl += harfG(g[i0].text);
+          if (anahtar.indexOf(i0) !== -1) { kwL += harfG(g[i0].text); kwSay++; }
+        }
+        if (!kwL) continue;
+        var R = Math.min(120, Math.floor(100 * (1 + ((c.maxW > 0 ? c.maxW : c.width * 0.88) / cwB - Nl) / kwL)));
+        if (!(R >= 105)) R = 100;
+        for (var i1 = sinirB[l]; i1 < sinirB[l + 1]; i1++) {
+          if (anahtar.indexOf(i1) === -1) continue;
+          kwOlcek[i1] = R;
+          merkez[i1].dinlenme = R / 100; merkez[i1].satirOlcegi = R / 100; merkez[i1].diger = kwSay > 1 ? R / 100 : 1;
+        }
+      }
+      var kareler = [], kzler = [];
+      anahtar.forEach(function (i) {
+        var R2 = kwOlcek[i];
+        kareler[i] = kareCs({ s: [[0, 0], [0.6, Math.round(R2 * 1.125)], [1, R2]] }, D);
+        kzler[i] = kareZamanlari(kareler[i]);
+      });
+      kareI = function (i) { return kareler[i] || kare; };
+      kzI = function (i) { return kzler[i] || kz; };
+    }
     var kademe = 0;
     if (tur === "dalga") {
       // Kart kısaysa kademe daralır: son kelime kartın ilk yarısında girmeye başlar
@@ -1549,6 +1843,7 @@
      * %80'inde biter; kelime kart bitmeden yerine oturur, son kareler klasik durağan çıktıyla aynı olur.
      */
     var pen = g.map(function (cue, i) {
+      if (tur === "buyuyen" && anahtar.indexOf(i) === -1) return { bas: kb, son: kb };
       var w0 = Math.max(kb, Math.min(ks, tur === "dalga" ? kb + i * kademe : adim[i].bas));
       var sinir = tur === "darbe" || tur === "daktilo" ? Math.min(ks, adim[i].son) : ks;
       var w1 = w0 + Math.max(1, Math.min(D, Math.round((sinir - w0) * 0.8)));
@@ -1564,7 +1859,6 @@
         if (biri) c.yaz(c.L.taban, sn(p[0]), sn(p[1]), pos, "", "", metin(k, gor));
       });
     });
-    var merkez = kelimeMerkezleri(g, c.kir, c.fs, c.sx, c.ka.an, KARAKTER_GENISLIK[c.font] || .62);
     var adimBaslari = adim.map(function (ad) { return ad.bas; });
     // Daktilo: harf j kelime penceresinin j / harf sayısı anında belirir (bir kez; yanıp sönme yok)
     function daktiloOzel(i, o) {
@@ -1579,13 +1873,13 @@
     }
     pen.forEach(function (p, i) {
       if (p.son - p.bas < 1) return;
-      kes(p.bas, p.son, adimBaslari.concat(kz.map(function (z) { return p.bas + z; }))).forEach(function (q) {
+      kes(p.bas, p.son, adimBaslari.concat(kzI(i).map(function (z) { return p.bas + z; }))).forEach(function (q) {
         var o0 = q[0] - p.bas, o1 = q[1] - p.bas;
-        var e = parcaEtiketi(kare, o0, o1, c.ka.x, c.ka.y, merkez[i], c.sx, c.golgeYumusak);
+        var e = parcaEtiketi(kareI(i), o0, o1, c.ka.x, c.ka.y, merkez[i], c.sx, c.golgeYumusak);
         var ozel = null;
         if (tur === "daktilo") ozel = function (j) { return j === i ? daktiloOzel(i, o0) : null; };
         // Satır içi ölçek yalnız bu kelimeye; sonrası kartın ölçeğine (uzun kelime kartında \fscx sıkıştırması) döner
-        else if (e.olcek) ozel = function (j) { return j === i ? "{" + e.olcek + "}" + esc(g[i].text) + "{\\fscx" + (c.sx > 0 && c.sx < 100 ? c.sx : 100) + "\\fscy100}" : null; };
+        else if (e.olcek) ozel = function (j) { return j === i ? "{" + e.olcek + "}" + esc(g[i].text) + olcekDonus : null; };
         c.yaz(c.L.hareket, sn(q[0]), sn(q[1]), e.konum, e.ek, "", metin(etkinAdim(q[0]), function (j) { return j === i; }, ozel), e.golgeEk);
       });
     });
@@ -1602,6 +1896,8 @@
     var fs0 = scaled(style.boyut, height);
     var outline = Number(style.kontur) > 0 ? scaled(style.kontur, height) : 0;
     var normal = assColor(style.renk), vurgu = assColor(style.vurguRenk), kontur = assColor(style.konturRenk);
+    // Parti 5 animasyonlarının renk türetmesi #rrggbb ister (efekt stili #rgb de kabul eder)
+    var vurguHex6 = hex6(style.vurguRenk);
     var T = Math.max(1, Math.round(300 / factor)), kayma = scaled(50, height);
     var gir = efektGirisi(giris, kayma, T);
     // Glitch kopyaları konturun dışına taşsın: görünen renkli saçak scaled(6) genişliğinde
@@ -1671,10 +1967,11 @@
         return (gorunur === "yalniz" ? "{\\alpha&HFF&}" : "") + efektBirlestir(parts, kir);
       }
       // golgeEki (isteğe bağlı, yazı animasyonları): gölge kopyasının ek etiketleri metninkinden farklıysa (Netleş'in bulanıklığı)
-      function yaz(katman, bas, son, konum, ek, govdeEk, icerik, golgeEki) {
+      // golgeIcerigi (isteğe bağlı, parti 5): gölge kopyasının metni farklıysa (karaoke dolgusu gölgede yok)
+      function yaz(katman, bas, son, konum, ek, govdeEk, icerik, golgeEki, golgeIcerigi) {
         var on = "{\\an" + ka.an + konum + govde;
         // Gölge kopyası metinle aynı konum / giriş / zamanla (glitch kopyalarının gölgesi yok)
-        if (golge && katman !== L.glitch) events.push(dialogue(L.golge, bas, son, on + golgeEk + (golgeEki !== undefined ? golgeEki : ek) + "}" + golgeMetni(icerik)));
+        if (golge && katman !== L.glitch) events.push(dialogue(L.golge, bas, son, on + golgeEk + (golgeEki !== undefined ? golgeEki : ek) + "}" + golgeMetni(golgeIcerigi !== undefined ? golgeIcerigi : icerik)));
         events.push(dialogue(katman, bas, son, on + (govdeEk || "") + ek + "}" + icerik));
       }
       /*
@@ -1723,7 +2020,18 @@
       if (anim) {
         animKarti({ anim: anim, group: group, kir: kir, fs: fs, sx: sx, ka: ka, kartBas: kartBas, kartSon: kartSon, L: L,
           yaz: yaz, kutuYaz: kutuAcik ? kutuYaz : null, normal: normal, vurgu: vurgu, vurguAcik: vurguAcik,
-          width: width, height: height, factor: factor, olcek: olcek, font: style.font, golgeYumusak: golge ? ondalik(golge.yumusak * olcek / 2) : 0 });
+          width: width, height: height, factor: factor, olcek: olcek, font: style.font, golgeYumusak: golge ? ondalik(golge.yumusak * olcek / 2) : 0,
+          // Parti 5: ikinci vurgu ve vurgu kutusu renkleri (boşsa türetilir), süs katmanı yazıcıları, sığma ölçüsü
+          vurgu2: assColor(HEX6.test(style.vurguRenk2) ? style.vurguRenk2 : YA.ikinciVurgu(vurguHex6)),
+          vurgu3: assColor(YA.tonKaydir(vurguHex6, 90)),
+          kutuHex: HEX6.test(style.vurguKutuRenk) ? style.vurguKutuRenk.toLowerCase() : vurguHex6,
+          renkHex: hex6(style.renk), kontur: kontur, outline: outline, maxW: olcu.maxW, genK: olcu.k,
+          susYaz: function (bas, son, konum, ek, icerik) {
+            events.push(dialogue(L.glitch, bas, son, "{\\an" + ka.an + konum + govde + ek + "}" + icerik));
+          },
+          kutuOlay: function (bas, son, konum, ek, icerik) {
+            events.push(dialogue(L.glitch, bas, son, "{\\an" + ka.an + konum + "\\fs" + fs + sxEk + "\\q2" + ek + "}" + icerik, KUTU_STILI));
+          } });
         return;
       }
 
@@ -1819,6 +2127,8 @@
       if (k === "aktif") { if (v !== "" && AKTIFLER.indexOf(v) !== -1) style.aktif = v; return; }
       // Yazı animasyonu: yalnız katalogda olan ve motorun çizdiği kimlik; başka her şey "" (klasik)
       if (k === "anim") { style.anim = animGecerli(v) ? v : ""; return; }
+      // Parti 5: vurgu kutusu rengi ve ikinci vurgu rengi: null (türetilir) ya da #rrggbb; bozuk değer stilin kendisi
+      if (k === "vurguKutuRenk" || k === "vurguRenk2") { if (v === null || (typeof v === "string" && HEX6.test(v))) style[k] = v === null ? null : v.toLowerCase(); return; }
       if (k === "vurgu" || k === "kalin" || k === "italik") { if (typeof v === "boolean") style[k] = v; return; }
       if (k === "satir" || k === "kelime") {
         var aralik = k === "satir" ? EFEKT_SATIR : EFEKT_KELIME;

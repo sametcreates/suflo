@@ -5,6 +5,8 @@
 //  - seçim hazır görünüm çipini kaldırır, gerçek önizlemeyi tazeler, tercihe yazılır
 //  - tercih (savePrefs / loadPrefs) ve ★ Şablonum gidip gelir; anim'siz eski kayıt klasik açılır
 //  - stil kodu (SufloStilKodu) gidip gelir; hazır görünüm animasyonu bırakır; Marka Kiti animasyon taşımaz
+//  - parti 5: vurgu kutusu / ikinci vurgu renk seçicileri yalnız onları kullanan animasyonda görünür, türetilmiş rengi
+//    gösterir; tercih, Şablonum, stil kodu, rehber yedeği renkleri taşır; eski kayıt / kod türetilmiş renkle açılır
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var KOK = path.join(__dirname, "..");
 var gecen = 0, toplam = 0;
@@ -105,8 +107,15 @@ function ortam(o) {
     "cap-render-onizleme": dugum("video", { hidden: true }),
     "cap-apply-style": dugum("button"), "cap-apply-hint": dugum("p"),
     // Animasyon motoru v2: "Animasyon" seçicisi (ilk seçenek index.html'de: Klasik) ve ipucu
-    "cap-efekt-anim": animSecici(), "cap-efekt-anim-ipucu": dugum("p", { hidden: true })
+    "cap-efekt-anim": animSecici(), "cap-efekt-anim-ipucu": dugum("p", { hidden: true }),
+    // Parti 5: animasyonun ek renk seçicileri (data-oto: türetilir) ve sarmalayıcıları
+    "cap-efekt-vurgu-kutusu": dugum("input", { type: "color", value: "#ffd23f" }), "cap-efekt-vurgu2": dugum("input", { type: "color", value: "#3f6cff" }),
+    "cap-efekt-vurgu-kutusu-sar": dugum("label", { hidden: true }), "cap-efekt-vurgu2-sar": dugum("label", { hidden: true }),
+    "cap-efekt-anim-renkler": dugum("div", { hidden: true })
   };
+  dom["cap-efekt-vurgu-kutusu"].setAttribute("data-oto", "1");
+  dom["cap-efekt-vurgu2"].setAttribute("data-oto", "1");
+  if (o.renksiz) ["cap-efekt-vurgu-kutusu", "cap-efekt-vurgu2", "cap-efekt-vurgu-kutusu-sar", "cap-efekt-vurgu2-sar", "cap-efekt-anim-renkler"].forEach(function (x) { delete dom[x]; });
   dom["cap-efekt-arti"].appendChild(dugum("i", { className: "efekt-arti-dikey" }));
   dom["cap-efekt-arti"].appendChild(dugum("i", { className: "efekt-arti-yatay" }));
   // 400 × 225 px sahne (16:9) sayfanın (100, 50) noktasında
@@ -290,6 +299,92 @@ mk.api.efektAnimSeciminiDoldur();
 mk.api.gorunumUygula("glitch");
 ok("Marka Kiti animasyon taşımaz (kit şeması değişmedi)", mk.dom["cap-font"].value === "Lora" && mk.dom["cap-efekt-anim"].value === "" &&
   !("anim" in MK.normalize({ on: true, stil: { overrides: { anim: "dalga" } } }).kit.stil.overrides));
+
+/* ---------------- 7) parti 5: vurgu kutusu rengi ve ikinci vurgu rengi ---------------- */
+function renkDegistir(e, id, v) { e.dom[id].value = v; (e.dom[id].dinle.input || []).forEach(function (f) { f({ target: e.dom[id] }); }); }
+var rr = ortam();
+rr.api.efektAnimSeciminiDoldur();
+rr.api.gorunumleriCiz();
+rr.api.efektKontrolleriniBagla();
+rr.api.gorunumUygula("temiz");
+var sar = function (x) { return rr.dom["cap-efekt-" + x + "-sar"].hidden; };
+ok("parti 5: seçici yeni animasyonları kategorisinde gösterir (karaoke ailesi 'Konuşulan kelime', nefes 'Sürekli')", (function () {
+  var g = rr.dom["cap-efekt-anim"].childNodes.filter(function (c) { return c.tagName === "OPTGROUP"; });
+  function grupta(gid, id) { return g.some(function (x) { return x.getAttribute("data-anim") === gid && x.childNodes.some(function (o) { return o.value === id; }); }); }
+  return grupta("karaoke", "vurgu-kutusu") && grupta("karaoke", "karaoke-dolgu") && grupta("surekli", "nefes") && grupta("kart", "perde") && grupta("kelime", "dusus");
+})());
+ok("parti 5: klasik / renk kullanmayan animasyonda iki renk seçicisi de gizli", sar("vurgu-kutusu") && sar("vurgu2") && rr.dom["cap-efekt-anim-renkler"].hidden === true);
+degistir(rr, "cap-efekt-anim", "vurgu-kutusu");
+ok("parti 5: Vurgu kutusu seçilince yalnız kutu rengi görünür, türetilmiş renk (vurgu rengi) gösterilir", !sar("vurgu-kutusu") && sar("vurgu2") &&
+  rr.dom["cap-efekt-anim-renkler"].hidden === false && rr.dom["cap-efekt-vurgu-kutusu"].value === "#ffd23f" && rr.api.stil().vurguKutuRenk === null &&
+  !("vurguKutuRenk" in rr.api.motorAyarlari(rr.api.stil())));
+degistir(rr, "cap-efekt-anim", "iki-ton");
+ok("parti 5: İki ton seçilince yalnız ikinci vurgu rengi görünür (vurgu renginin karşıtı)", sar("vurgu-kutusu") && !sar("vurgu2") &&
+  rr.dom["cap-efekt-vurgu2"].value === YA.ikinciVurgu("#ffd23f"));
+renkDegistir(rr, "cap-renk-vurgu", "#ff5fa2");
+ok("parti 5: elle seçilmemiş ikinci renk vurgu rengini izler", rr.dom["cap-efekt-vurgu2"].value === YA.ikinciVurgu("#ff5fa2") && rr.api.stil().vurguRenk2 === null);
+renkDegistir(rr, "cap-efekt-vurgu2", "#00aa55");
+var rov = rr.api.motorAyarlari(rr.api.stil());
+ok("parti 5: elle seçilen ikinci renk motora, tercihe gider; vurgu rengi değişince kalır", rov.vurguRenk2 === "#00aa55" && rr.ayar.capPrefs.stil.vurguRenk2 === "#00aa55" &&
+  (renkDegistir(rr, "cap-renk-vurgu", "#ffd23f"), rr.dom["cap-efekt-vurgu2"].value === "#00aa55") &&
+  /\\1c&H0055AA00/.test(ciz(rr.api.motorAyarlari(rr.api.stil())).ass), J(rov));
+degistir(rr, "cap-efekt-anim", "vurgu-kutusu");
+renkDegistir(rr, "cap-efekt-vurgu-kutusu", "#1b1f2a");
+ok("parti 5: kutu rengi seçimi motora gider (kutu \\3c, kutudaki yazı kontrast)", rr.api.motorAyarlari(rr.api.stil()).vurguKutuRenk === "#1b1f2a" &&
+  /SufloKutu,[^\n]*\\3c&H002A1F1B/.test(ciz(rr.api.motorAyarlari(rr.api.stil())).ass));
+// tercih gidip gelir
+var rk = JSON.parse(J(rr.ayar.capPrefs));
+var ry = ortam({ ayar: { capPrefs: rk } });
+ry.api.efektAnimSeciminiDoldur();
+ry.api.loadPrefs();
+ry.api.efektBagimliDurum();
+ok("parti 5: tercih renkleri geri getirir (elle seçilenler elle, işaret yok)", ry.api.stil().vurguKutuRenk === "#1b1f2a" && ry.api.stil().vurguRenk2 === "#00aa55" &&
+  ry.dom["cap-efekt-vurgu-kutusu"].getAttribute("data-oto") === null && ry.dom["cap-efekt-vurgu-kutusu-sar"].hidden === false, J(rk.stil));
+var rEski = JSON.parse(J(rk)); delete rEski.stil.vurguKutuRenk; delete rEski.stil.vurguRenk2;
+var rz = ortam({ ayar: { capPrefs: rEski } });
+rz.api.efektAnimSeciminiDoldur();
+rz.dom["cap-efekt-vurgu2"].removeAttribute("data-oto"); rz.dom["cap-efekt-vurgu2"].value = "#123456";
+rz.api.loadPrefs();
+ok("parti 5: alanlardan önceki kayıt (renk alanı yok) türetilmiş renkle açılır", rz.api.stil().vurguKutuRenk === null && rz.api.stil().vurguRenk2 === null &&
+  rz.dom["cap-efekt-vurgu2"].getAttribute("data-oto") === "1");
+// Şablonum
+rr.api.saveUserPreset();
+rr.api.gorunumUygula("temiz");
+ok("parti 5: hazır görünüm renkleri türetilmişe döndürür", rr.api.stil().vurguKutuRenk === null && rr.api.stil().vurguRenk2 === null && rr.dom["cap-efekt-anim"].value === "");
+rr.api.sablonumUygula();
+ok("parti 5: ★ Şablonum renkleri saklar ve geri getirir", rr.ayar.userPreset.stil.vurguKutuRenk === "#1b1f2a" && rr.api.stil().vurguKutuRenk === "#1b1f2a" &&
+  rr.api.stil().vurguRenk2 === "#00aa55" && rr.dom["cap-efekt-anim"].value === "vurgu-kutusu");
+// stil kodu
+var rkod = rr.api.stilKodu().kod;
+var rAl = ortam();
+rAl.api.efektAnimSeciminiDoldur();
+ok("parti 5: stil kodu renkleri taşır (ek), uygulanınca uyarısız gelir", rAl.api.stilKoduUygula(rkod) === true && rAl.api.stil().vurguKutuRenk === "#1b1f2a" &&
+  rAl.api.stil().vurguRenk2 === "#00aa55" && rAl.toastlar.some(function (t) { return /^Stil kodu uygulandı/.test(t) && !/geçersiz ayar/.test(t); }), rAl.toastlar.join(" | "));
+ok("parti 5: eski çözücü aynı kodu klasik karşılıkla açar (renkler yok)", (function () {
+  var b = SS.decode(rkod, function (id) { return SE.has(id); });
+  return b.ok && !("vurguKutuRenk" in b.recipe.overrides) && b.recipe.overrides.giris === "yok" && J(b.warnings) === J(["ek"]);
+})());
+var rAl2 = ortam();
+rAl2.api.efektAnimSeciminiDoldur();
+rAl2.dom["cap-efekt-vurgu2"].removeAttribute("data-oto");
+rAl2.api.stilKoduUygula(SS.encode({ styleId: "efekt", overrides: AE.overrides(AE.gorunum("vurucu").ayar) }));
+ok("parti 5: renksiz (eski) kod renkleri türetilmişe döndürür", rAl2.api.stil().vurguRenk2 === null);
+// rehber yedeği
+var yd = rr.api.stilYedegi();
+rr.api.gorunumUygula("temiz");
+rr.api.stilYedeginiYukle(yd);
+ok("parti 5: rehber yedeği renkleri ve türetilir işaretini geri yükler", rr.api.stil().vurguKutuRenk === "#1b1f2a" && rr.dom["cap-efekt-vurgu-kutusu"].getAttribute("data-oto") === null &&
+  J(yd.oto) === J({ "cap-efekt-vurgu-kutusu": false, "cap-efekt-vurgu2": false }));
+// Marka Kiti taşımaz
+ok("parti 5: Marka Kiti renk alanlarını taşımaz (kit şeması değişmedi)", !("vurguRenk2" in MK.normalize({ on: true, stil: { overrides: { vurguRenk2: "#123456" } } }).kit.stil.overrides));
+var rs = ortam({ renksiz: true });
+rs.api.efektAnimSeciminiDoldur();
+rs.api.gorunumUygula("temiz");
+ok("parti 5: seçiciler yoksa (eski index.html) renkler null, hata yok", rs.api.stil().vurguKutuRenk === null && rs.api.stil().vurguRenk2 === null);
+ok("index.html: renk seçicileri Özelleştir'in renk alanında, gizli başlar, data-oto", /id="cap-efekt-anim-renkler" hidden>/.test(html) &&
+  /id="cap-efekt-vurgu-kutusu-sar"[^>]*hidden>\s*<input type="color" id="cap-efekt-vurgu-kutusu" value="#ffd23f" data-oto="1">/.test(html) &&
+  /id="cap-efekt-vurgu2-sar"[^>]*hidden>\s*<input type="color" id="cap-efekt-vurgu2" value="#3f6cff" data-oto="1">/.test(html) &&
+  html.indexOf('id="cap-efekt-vurgu-kutusu"') > html.indexOf('id="cap-ozellestir"') && html.indexOf('id="cap-efekt-vurgu-kutusu"') < html.indexOf('id="cap-font"'));
 
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

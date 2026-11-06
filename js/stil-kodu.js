@@ -13,6 +13,9 @@
  * decode(code, izinliStiller): SS.decode; ardından "ek" burada doğrulanır (beyaz liste, katalog kimliği, tür, boyut
  *   sınırı; __proto__ ve iç içe nesneler yok sayılır). Geçerli anim recipe.overrides.anim'e (yalnız "efekt") ve
  *   recipe.ek'e girer; "ek" uyarı listesinden düşer, geçersiz alt alan "ek.<alan>" uyarısı olur. Asla fırlatmaz.
+ * Parti 5: vurguKutuRenk ve vurguRenk2 (#rrggbb; yalnız "efekt") da "ek"te taşınır: encode overrides'tan çıkarır, decode
+ *   doğrulayıp overrides'a geri koyar. Eski çözücü bunları görmez (alanlar boşken animasyon renkleri türetilir; klasik
+ *   görünümde hiç kullanılmazlar).
  *
  * Saf, ES5, UMD (Node 12 / CEF 74). index.html'de style-share.js ve yazi-animasyonlari.js'ten SONRA yüklenir.
  */
@@ -29,7 +32,9 @@
 
   var EK = "ek";
   // "ek"in tanınan alanları (sonraki partiler buraya ekler) ve JSON boyut sınırı (kodun tamamı zaten 2048 karakter)
-  var EK_ALANLARI = ["anim"];
+  var EK_ALANLARI = ["anim", "vurguKutuRenk", "vurguRenk2"];
+  var RENK_ALANLARI = ["vurguKutuRenk", "vurguRenk2"];
+  var RENK6 = /^#[0-9a-f]{6}$/i;
   var EK_EN_UZUN = 512;
   var EFEKT = "efekt";
 
@@ -41,10 +46,13 @@
     r = r || {};
     var ov = r.overrides && typeof r.overrides === "object" ? r.overrides : {};
     var anim = r.styleId === EFEKT && own(ov, "anim") && animGecerli(ov.anim) ? ov.anim : "";
+    var ekNesne = {};
+    if (anim) ekNesne.anim = anim;
+    RENK_ALANLARI.forEach(function (k) { if (r.styleId === EFEKT && own(ov, k) && typeof ov[k] === "string" && RENK6.test(ov[k])) ekNesne[k] = ov[k].toLowerCase(); });
     var kopya = {};
     Object.keys(r).forEach(function (k) { kopya[k] = r[k]; });
     var temiz = {};
-    Object.keys(ov).forEach(function (k) { if (k !== "anim") temiz[k] = ov[k]; });
+    Object.keys(ov).forEach(function (k) { if (k !== "anim" && RENK_ALANLARI.indexOf(k) === -1) temiz[k] = ov[k]; });
     if (anim) {
       var k = YA.klasik(anim);
       temiz.giris = k.giris;
@@ -52,9 +60,9 @@
     }
     kopya.overrides = temiz;
     var kod = SS.encode(kopya);
-    if (!anim) return kod;
+    if (!Object.keys(ekNesne).length) return kod;
     var obj = JSON.parse(SS.b64urlDecode(kod.slice(SS.PREFIX.length)));
-    obj[EK] = { anim: anim };
+    obj[EK] = ekNesne;
     return SS.PREFIX + SS.b64urlEncode(JSON.stringify(obj));
   }
 
@@ -95,6 +103,10 @@
             if (animGecerli(ek.anim)) temiz.anim = ek.anim;
             else if (ek.anim !== "") uyarilar.push(alanAdi(k));
           }
+          if (RENK_ALANLARI.indexOf(k) !== -1) {
+            if (typeof ek[k] === "string" && RENK6.test(ek[k])) temiz[k] = ek[k].toLowerCase();
+            else uyarilar.push(alanAdi(k));
+          }
         });
       }
       var recipe = d.recipe;
@@ -104,6 +116,13 @@
         if (recipe.styleId === EFEKT) recipe.overrides.anim = temiz.anim;
         else { delete recipe.ek; uyarilar.push(alanAdi("anim")); }
       }
+      // Parti 5 renkleri de yalnız Altyazı Efektleri'nde
+      RENK_ALANLARI.forEach(function (k) {
+        if (!temiz[k]) return;
+        if (recipe.styleId === EFEKT) recipe.overrides[k] = temiz[k];
+        else { if (recipe.ek) delete recipe.ek[k]; uyarilar.push(alanAdi(k)); }
+      });
+      if (recipe.ek && !Object.keys(recipe.ek).length) delete recipe.ek;
       return { ok: true, recipe: recipe, warnings: uyarilar };
     } catch (e) {
       return d;

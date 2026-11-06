@@ -854,6 +854,18 @@
                       <span>Kontur rengi</span>
                     </label>
                   </div>
+                  <!-- Parti 5: yalnız onları kullanan yazı animasyonu seçiliyken görünür (captions.js efektBagimliDurum);
+                       data-oto="1": elle seçilmedi, renk vurgu renginden türetilir -->
+                  <div class="renk-satir efekt-anim-renkler" id="cap-efekt-anim-renkler" hidden>
+                    <label class="renk-kutu" id="cap-efekt-vurgu-kutusu-sar" title="Konuşulan kelimenin arkasındaki kutunun rengi (boşsa vurgu rengi). Kutudaki yazı okunur kalacak renge kendiliğinden geçer." hidden>
+                      <input type="color" id="cap-efekt-vurgu-kutusu" value="#ffd23f" data-oto="1">
+                      <span>Vurgu kutusu rengi</span>
+                    </label>
+                    <label class="renk-kutu" id="cap-efekt-vurgu2-sar" title="İki ton ve Yumuşak kromatik'in ikinci rengi (boşsa vurgu renginin karşıtı)." hidden>
+                      <input type="color" id="cap-efekt-vurgu2" value="#3f6cff" data-oto="1">
+                      <span>İkinci vurgu rengi</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div class="field">

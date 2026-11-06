@@ -3804,6 +3804,9 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-renkler .renk-satir { margin-bottom: 6px; flex: 1 1 100%; }
 .efekt-renkler .renk-kutu { min-width: 0; }
 .efekt-renkler .renk-kutu span { text-align: center; line-height: 1.2; }
+/* Parti 5: animasyonun ek renkleri (vurgu kutusu, ikinci vurgu) yalnız o animasyonda; hidden display kuralını yener */
+.efekt-renkler .efekt-anim-renkler[hidden], .efekt-anim-renkler .renk-kutu[hidden] { display: none; }
+.efekt-anim-renkler .renk-kutu { flex: 0 1 50%; }
 /* Dar panelde (320 px) yazı tipi adı kesilmesin: kalın / italik düğmeleri birlikte alt satıra iner (flex gap'siz, CEF 74) */
 .efekt-font { flex-wrap: wrap; }
 .efekt-font select { flex: 1 1 150px; min-width: 150px; }
