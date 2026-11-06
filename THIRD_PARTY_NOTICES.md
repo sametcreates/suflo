@@ -228,6 +228,13 @@ SOFTWARE.
 - Emoji images in `emoji/` come from Twemoji (https://github.com/jdecked/twemoji),
   Copyright Twitter, Inc and other contributors, licensed under CC-BY 4.0
   (SPDX: `CC-BY-4.0`); see `emoji/LISANS.txt`.
+- Previews `assets/pro-mogrt-showcase/previews/243-*` … `247-*` (Highlighted Text, Money Text Pro,
+  Cinematic Duo, Comment Your Word, Apple Selection) are made from the thumbnails of five MOGRT title
+  templates by ClashiVFX (AutoCaptions bonus titles), included in Suflo Pro with the author's permission.
+  The `.mogrt` files themselves are Pro cloud content and are not in this repository or the public package.
+  The templates name fonts (SF Pro, Apple Garamond, Akira Expanded, Tempting, Ocean Delight, Inter) that
+  are not bundled; Premiere substitutes missing fonts and the user can pick another font in Essential Graphics.
+  Kaynak: ClashiVFX'in beş MOGRT başlık şablonu, yazarın izniyle Suflo Pro içeriğinde; önizlemeler küçük resimlerinden.
 - `js/CSInterface.js` is Suflo's own minimal wrapper around Adobe's CEP runtime; Adobe CEP
   itself is provided by the host application under Adobe's terms.
 

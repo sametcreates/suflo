@@ -628,7 +628,7 @@
     var isSfx = feature === 'sfx';
     var isPreset = feature === 'presets';
     var title = isCaption ? 'Altyazın hazır. Şimdi videon gibi görünsün.' :
-      (isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 262 animasyon ve grafik' :
+      (isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 267 animasyon ve grafik' :
       (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' :
       (isPreset ? '290 preset doğrudan Suflo panelinde' : label)));
     var desc = isCaption ? 'Creator Punch, Karaoke, Glitch, Typewriter ve 13 stil daha. Birini seç; Suflo tüm altyazı satırlarına ve sekans oranına kendisi uygulasın.' :
@@ -661,10 +661,10 @@
     }
     var proof = isCaption
       ? '<div class="pro-upsell-proof"><i><b>17</b> gerçek stil</i><i><b>3</b> video oranı</i><i><b>51</b> MOGRT</i></div>'
-      : '<div class="pro-upsell-proof"><i><b>262</b> animasyon</i><i><b>290</b> preset</i><i><b>1.076</b> SFX</i></div>';
+      : '<div class="pro-upsell-proof"><i><b>267</b> animasyon</i><i><b>290</b> preset</i><i><b>1.076</b> SFX</i></div>';
     var benefits = isCaption
       ? '<ul class="pro-upsell-liste"><li>Reels, YouTube ve kare video için otomatik oran</li><li>Bir seçimle tüm altyazı satırlarına uygula</li><li>Lisansı gir; dosyalar ve yenileri otomatik gelsin</li></ul>'
-      : '<ul class="pro-upsell-liste"><li>Otomatik sessizlik kesimi + ritim marker</li><li>17 altyazı stili + 262 animasyon + 290 preset + 1.076 SFX</li><li>Lisansı bir kez gir; yeni içerikler otomatik gelsin</li></ul>';
+      : '<ul class="pro-upsell-liste"><li>Otomatik sessizlik kesimi + ritim marker</li><li>17 altyazı stili + 267 animasyon + 290 preset + 1.076 SFX</li><li>Lisansı bir kez gir; yeni içerikler otomatik gelsin</li></ul>';
     var buyText = isCaption ? '17 Stili ve Tüm Pro\'yu Aç \u2192' : 'Suflo Pro\'yu Al \u2192';
     ensureUpsellCss();
     var old = document.getElementById('pro-upsell');

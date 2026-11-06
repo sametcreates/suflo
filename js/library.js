@@ -436,7 +436,7 @@ window.KLib = (function () {
         cta: "CTA butonlarını aç — 749 TL"
       },
       fav: {
-        fallback: 262, title: "262 animasyon ve grafik",
+        fallback: 267, title: "267 animasyon ve grafik",
         description: "Beğendiklerini favorile; Pro açıldığında hazır seçkini doğrudan timeline'da kullan.",
         cta: "Tüm Pro kütüphanesini aç — 749 TL"
       }
