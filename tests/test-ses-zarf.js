@@ -146,6 +146,10 @@ function sahteK(secenek) {
     Z.anahtar("/v/klip.mp4", 3, 10).indexOf("klip") === -1);
   var c4 = await Z.sesZarfiCikar({ K: sahteK(), media: "/v/klip.mp4", inPoint: 3, dur: g.sure, onbellek: false });
   ok("onbellek: false → önbellek atlanır", !c4.onbellekten && cagri.length === 4);
+  // geçici ses (Oluştur'un motor sesi, finally siler) önbelleğe de YAZILMAZ: 6 girdilik önbellekte gerçek klipleri düşürmesin
+  var c4b = await Z.sesZarfiCikar({ K: sahteK(), media: "/v/gecici.wav", inPoint: 0, dur: g.sure, onbellek: false });
+  var c4c = await Z.sesZarfiCikar({ K: sahteK(), media: "/v/gecici.wav", inPoint: 0, dur: g.sure });
+  ok("onbellek: false → sonuç önbelleğe yazılmaz (geçici dosya gerçek klipleri düşürmez)", c4b.analiz && !c4c.onbellekten && cagri.length === 6, cagri.length);
 
   var j1 = jeton();
   var once = cagri.length;

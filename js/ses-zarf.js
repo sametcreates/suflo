@@ -555,7 +555,7 @@
   }
 
   /*
-   * o: { K, media, inPoint, dur, iptal, onIlerleme(oran 0..1), onbellek: false (atla) }
+   * o: { K, media, inPoint, dur, iptal, onIlerleme(oran 0..1), onbellek: false (okuma da yazma da yok) }
    * Döner: { analiz, onbellekten } | { iptal: true } | { neden: "ffmpeg" | "kopru" | "kod ..." | "ses yok" }
    * analiz.t0 = 0: klibin inPoint'i. Çağıran sekans zamanına çevirirken klibin timeline başını t0'a yazar.
    */
@@ -593,7 +593,8 @@
         }
         var analiz = an.bitir();
         if (!analiz.n) return { neden: "ses yok" };
-        onbellek.koy(k, analiz);
+        // onbellek: false (geçici ses dosyası) önbelleğe yazılmaz: sınırlı önbellekte gerçek kliplerin analizini düşürmesin
+        if (o.onbellek !== false) onbellek.koy(k, analiz);
         if (K.log) K.log("[senkron] zarf: " + analiz.n + " pencere, kontrast " + analiz.kontrast.toFixed(1) + " dB, " +
           analiz.onsetler.length + " başlangıç, konuşma %" + Math.round(analiz.konusmaOrani * 100));
         return { analiz: analiz, onbellekten: false, anahtar: k };

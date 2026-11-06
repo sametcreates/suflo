@@ -4,7 +4,8 @@
  * js/ses-zarf.js'in ses analizini ve js/senkron.js'in hizalamasını altyazı akışına bağlar. Saf işlevler (Node testleri
  * doğrudan çalıştırır) ve Caption Editor'daki ses dalgası şeridinin ince DOM bağlayıcısı:
  *
- *   kaynak(analiz, t0, belge)          -> { analiz, t0, bas, son, belge }  (analiz ekseni 0 = sekansta t0)
+ *   kaynak(analiz, t0, belge, sinir?)  -> { analiz, t0, bas, son, belge, sinir }  (analiz ekseni 0 = sekansta t0; sinir:
+ *                                         sesin timeline'daki gerçek sonu, verilmezse t0 + analiz süresi)
  *   kaynakBul(kaynaklar, belge, t)     -> kaynak | null  (o belgenin, t'yi kapsayan sesi)
  *   hepsiniYasla(segs, kaynaklar, o)   -> { segments, rapor, islenen }  (her kaynağın aralığındaki kartlar o sesle
  *                                         hizalanır; girdi DEĞİŞMEZ; sorunlu kartlar s.senkronUyari ile işaretlenir)
@@ -51,10 +52,16 @@
 
   /* ---------------- Kaynaklar (belgenin sesi) ---------------- */
 
-  function kaynak(analiz, t0, belge) {
+  /*
+   * Analizin süresi 10 ms penceresine yukarı yuvarlanır: son, sesin gerçek sonunu birkaç ms aşabilir (bitişik toplu
+   * kliplerde aralıklar kesişir). sinir: kart çıkışının geçmeyeceği sınır (klibin / dışa aktarılan sesin timeline sonu).
+   */
+  function kaynak(analiz, t0, belge, sinir) {
     if (!analiz || !(analiz.n > 0)) return null;
     var b = num(t0, 0);
-    return { analiz: analiz, t0: b, bas: b, son: b + num(analiz.sure, analiz.n * (analiz.hop || 0.01)), belge: belge };
+    var son = b + num(analiz.sure, analiz.n * (analiz.hop || 0.01));
+    var sn = num(sinir, NaN);
+    return { analiz: analiz, t0: b, bas: b, son: son, belge: belge, sinir: isFinite(sn) && sn > b ? sn : son };
   }
   function kaynakBul(kaynaklar, belge, t) {
     var en = null, enD = Infinity;
@@ -74,8 +81,29 @@
   }
 
   /*
+   * Yaslama kart çıkışını uzatabilir (kuyruk, en kısa ekran süresi); sesin sonunu (k.sinir) geçmesin: satır kurucu son
+   * satırı orada keser, yoksa altyazı sonraki (altyazısız) klibin üstüne taşar. Kart kurucunun verdiği çıkıştan daha
+   * kısa kesilmez, son kelimeyi kesmez; kare hızı biliniyorsa sınır aşağı kareye oturur.
+   */
+  function sinirdaKes(c, eski, k, fps) {
+    var sinir = num(k && k.sinir, NaN);
+    if (!gecerli(c) || !isFinite(sinir) || !(Number(c.end) > sinir)) return c;
+    if (fps > 0 && SN && SN.kareyeYuvarla) sinir = SN.kareyeYuvarla(sinir, fps, "asagi");
+    else sinir = ms3(sinir);
+    var eskiSon = gecerli(eski) ? Number(eski.end) : -Infinity;
+    if (fps > 0 && SN && SN.kareyeYuvarla && isFinite(eskiSon)) eskiSon = SN.kareyeYuvarla(eskiSon, fps, "yakin");
+    var tavan = Math.max(sinir, eskiSon);
+    var ws = c.words || [], sonK = -Infinity;
+    for (var j = 0; j < ws.length; j++) if (gecerli(ws[j]) && Number(ws[j].end) > sonK) sonK = Number(ws[j].end);
+    if (!(Number(c.end) > tavan) || tavan < sonK - 1e-9 || !(tavan > Number(c.start))) return c;
+    c.end = tavan;
+    return c;
+  }
+
+  /*
    * o: { fps, belge, ayar (senkron.js seçenekleri) }. Kaynakların aralıkları ayrık varsayılır (toplu klip, tek klip ya da
-   * sekans sesi); kartın başı hangi kaynağın aralığındaysa (±50 ms) o sesle hizalanır. Hiçbir kaynağa düşmeyen kart aynen kalır.
+   * sekans sesi; bitişik kliplerde birkaç ms kesişebilir); kartın başı hangi kaynağın aralığındaysa (−50 ms tolerans, birden
+   * çoksa en geç başlayan) o sesle hizalanır, çıkışı o sesin sınırını geçmez. Hiçbir kaynağa düşmeyen kart aynen kalır.
    */
   function hepsiniYasla(segs, kaynaklar, o) {
     o = o || {};
@@ -84,14 +112,20 @@
     if (!SN || !SN.hizala) { rapor.atlandi = "analizYok"; return { segments: out, rapor: rapor, islenen: 0 }; }
     var liste = (kaynaklar || []).filter(function (k) { return k && k.analiz && (o.belge === undefined || k.belge === o.belge); })
       .sort(function (a, b) { return a.bas - b.bas; });
-    var atandi = out.map(function () { return false; });
+    /*
+     * Her kart, başını kapsayan (−50 ms toleransla) kaynaklardan EN GEÇ başlayana atanır: bitişik toplu kliplerde önceki
+     * klibin analizi sonrakinin ilk birkaç ms'ini kapsar, motor da sonraki klibin ilk kartını çoğu zaman 0,00'dan başlatır.
+     */
+    var secim = out.map(function (s) {
+      if (!gecerli(s)) return -1;
+      var t = Number(s.start), en = -1;
+      for (var j = 0; j < liste.length; j++) if (t >= liste[j].bas - 0.05 && t < liste[j].son) en = j;
+      return en;
+    });
     var onceTop = 0, sonraTop = 0, olcuSay = 0, nedenler = [], enBuyukKayma = null, islenen = 0;
-    liste.forEach(function (k) {
+    liste.forEach(function (k, ki) {
       var idx = [];
-      out.forEach(function (s, i) {
-        if (atandi[i] || !gecerli(s)) return;
-        if (Number(s.start) >= k.bas - 0.05 && Number(s.start) < k.son) { idx.push(i); atandi[i] = true; }
-      });
+      out.forEach(function (s, i) { if (secim[i] === ki) idx.push(i); });
       if (!idx.length) return;
       rapor.kaynak++;
       var ayar = {};
@@ -108,7 +142,7 @@
       if (rr.atlandi) nedenler.push(rr.atlandi);
       else {
         nedenler.push(null);
-        r.kartlar.forEach(function (c, j) { out[idx[j]] = c; });
+        r.kartlar.forEach(function (c, j) { out[idx[j]] = sinirdaKes(c, segs[idx[j]], k, num(o.fps, 0)); });
         rapor.duzeltilen += rr.duzeltilen || 0;
         var w = Math.max(1, rr.kelime || idx.length);
         onceTop += (rr.ortalamaOnceMs || 0) * w; sonraTop += (rr.ortalamaSonraMs || 0) * w; olcuSay += w;

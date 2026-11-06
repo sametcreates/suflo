@@ -3666,12 +3666,25 @@ window.KCaptions = (function () {
     try { var m = Number(K.settings().altyaziMinSure); if (isFinite(m) && m >= 0) v = m; } catch (e) {}
     return { minKartMs: Math.max(1, Math.round(v * 1000)) };
   }
+  /*
+   * Aynı belgenin aynı aralığı yeniden analiz edildiyse eskisi düşer. "Aynı aralık": kesişim kısa olanın yarısından
+   * fazla — bitişik toplu kliplerde analiz süresi 10 ms'ye yukarı yuvarlandığından aralıklar birkaç ms kesişir, o
+   * klipler birbirini silmez. Sınır (6) yalnız BAŞKA belgelerin seslerine uygulanır (en eskisi önce düşer): toplu işte
+   * 20 klip seçildiyse belgenin 20 sesi de kalır, yoksa Hepsini sese yasla / şerit ilk kliplerde "ses yok" derdi.
+   */
   function senkronKaynakEkle(k) {
     if (!k) return;
-    // aynı belgenin aynı aralığı yeniden analiz edildiyse eskisi düşer
-    senkronKaynaklar = senkronKaynaklar.filter(function (x) { return !(x.belge === k.belge && x.bas < k.son && k.bas < x.son); });
+    senkronKaynaklar = senkronKaynaklar.filter(function (x) {
+      if (x.belge !== k.belge) return true;
+      var kesisim = Math.min(x.son, k.son) - Math.max(x.bas, k.bas);
+      return !(kesisim > 0.5 * Math.min(x.son - x.bas, k.son - k.bas));
+    });
     senkronKaynaklar.push(k);
-    if (senkronKaynaklar.length > 6) senkronKaynaklar = senkronKaynaklar.slice(-6);
+    for (var i = 0; senkronKaynaklar.length > 6 && i < senkronKaynaklar.length;) {
+      var x = senkronKaynaklar[i];
+      if (x.belge !== senkronBelgeNo && x.belge !== k.belge) senkronKaynaklar.splice(i, 1);
+      else i++;
+    }
   }
   function senkronBelgeKaynaklari() {
     return senkronKaynaklar.filter(function (k) { return k.belge === senkronBelgeNo; });
@@ -3692,7 +3705,8 @@ window.KCaptions = (function () {
       if (ozgun && ozgun.media && SZ.anahtar && SZ.onbellek) {
         try { SZ.onbellek.koy(SZ.anahtar(ozgun.media, ozgun.inPoint, ozgun.dur, K.fs.statSync(String(ozgun.media))), r.analiz); } catch (eO) {}
       }
-      return SUI.kaynak(r.analiz, Number(t0) || 0, 0);
+      // sınır: sesin timeline sonu (klip sonu / dışa aktarılan sesin sonu); yaslanan kart çıkışı onu geçmez
+      return SUI.kaynak(r.analiz, Number(t0) || 0, 0, (Number(t0) || 0) + (Number(sure) || 0));
     } catch (e) {
       K.log("[senkron] ses analizi hatası: " + (e && e.message ? e.message : e));
       return null;
@@ -3792,7 +3806,7 @@ window.KCaptions = (function () {
         return null;
       }
       if (belge !== senkronBelgeNo) return null;   // analiz sürerken belge değişti
-      var k = SUI.kaynak(r.analiz, Number(c.clipStart) || 0, belge);
+      var k = SUI.kaynak(r.analiz, Number(c.clipStart) || 0, belge, Number(c.clipEnd));
       senkronKaynakEkle(k);
       return k;
     } catch (e) {

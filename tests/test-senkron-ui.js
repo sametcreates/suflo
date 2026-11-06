@@ -2,6 +2,7 @@
 // bağlantısı (gerçek işlevler imzayla kesilip sahte ortamda çalışır):
 //  - hepsiniYasla: sekans ekseninde (+t0) kaymış transkript düzelir (< 20 ms), kareye oturur, girdi değişmez, sessizliğe düşen
 //    kelimenin kartı işaretlenir; gürültüde zamanlara ve işaretlere dokunulmaz; toplu klip (iki kaynak), başka belgenin sesi yok sayılır
+//    bitişik kliplerde (birkaç ms kesişen aralık) kart en geç başlayan sese atanır; kart çıkışı sesin / klibin sonunu geçmez
 //  - raporMetni: tek satır Türkçe rapor ve İngilizce karşılığı (i18n/en.js)
 //  - sinirlar / sinirTasi: ortak sınır, komşu kart ve kelime sınırları, en kısa süre, kart kelimeyi izler, uyarı silinir
 //  - tusAdimi (←/→ 10 ms, Shift 1 kare), zarfSutunlari, gorunum
@@ -9,6 +10,7 @@
 //    ses yokken "analiz et", After Effects'te Dinle kapalı
 //  - captions.js: Oluştur sonrası doğrulama + rapordaki Geri al (tek geri al yığını), belge değişince rapor / ses düşer,
 //    iptal ve hata transkripti bozmaz, ayar (varsayılan açık), go() sırası (geçici ses silinmeden), HTML / CSS / AE
+//    toplu işte bitişik ya da 6'dan çok klibin sesi belgede kalır (sınır yalnız başka belgelerin sesine)
 var fs = require("fs");
 var path = require("path");
 var KOK = path.join(__dirname, "..");
@@ -111,6 +113,45 @@ var rb = U.hepsiniYasla(hepsi, [U.kaynak(a, T0, 9)], { belge: 1 });
 ok("belgenin sesi yoksa: hiçbir şey değişmez, atlandı = analizYok", rb.rapor.atlandi === "analizYok" && J(rb.segments) === J(hepsi));
 ok("kaynakBul: belgenin t'yi kapsayan sesi (0,5 sn tolerans), başka belge yok", U.kaynakBul([U.kaynak(a, T0, 1), U.kaynak(a2, T1, 1)], 1, T1 + 3).t0 === T1 &&
   U.kaynakBul([U.kaynak(a, T0, 1)], 1, T0 - 0.3).t0 === T0 && U.kaynakBul([U.kaynak(a, T0, 1)], 1, T0 - 2) === null && U.kaynakBul([U.kaynak(a, T0, 2)], 1, T0 + 1) === null);
+
+// Bitişik toplu klipler: analizin süresi 10 ms penceresine yukarı yuvarlanır (kaynak.son klibin sonunu birkaç ms aşar).
+// Sonraki klibin ilk kartı (motor çoğu zaman 0,00'dan başlatır) önceki klibin sesine değil kendi sesine gider.
+(function () {
+  var gB = G.uret({ tohum: 31, kelime: 16, basSn: 0.1 });
+  var aB = Z.analizEt(gB.pcm);
+  var kayA = U.kaynak(a, T0, 1);
+  var kayB = U.kaynak(aB, kayA.son - 0.006, 1);   // klip 2 timeline'da klip 1'in gerçek sonunda başlar
+  var kB = kaydir(G.kartla(gB.kelimeler, 4), kayB.t0);
+  kB[0].start = kayB.t0 + 0.003; kB[0].words[0].start = kB[0].start;   // motor ilk kelimeyi 0,00'a koydu (gerçeği 100 ms)
+  var kA = kaydir(G.kartla(g.kelimeler, 4), T0);
+  var rB = U.hepsiniYasla(kA.concat(kB), [kayA, kayB], { belge: 1 });
+  var w0 = rB.segments[kA.length].words[0];
+  ok("bitişik toplu klip: aralıkların kesiştiği birkaç ms'de kart sonraki klibin (en geç başlayan) sesine atanır", rB.rapor.kaynak === 2 &&
+    Math.abs(w0.start - (gB.kelimeler[0].start + kayB.t0)) < 0.02, J([w0.start, gB.kelimeler[0].start + kayB.t0, rB.rapor.kaynak]));
+})();
+
+// Kart çıkışı klibin (sesin) sonunu geçmez: satır kurucu son satırı sonSinir'de keser; yaslama onu en kısa ekran süresine
+// ya da kuyruğa uzatıp sonraki (altyazısız) klibin üstüne taşımasın. Kaynağın sınırı verilmezse analiz süresi.
+(function () {
+  var gS = G.uret({ tohum: 41, kelime: 12 });
+  var aS = Z.analizEt(gS.pcm);
+  var sonW = gS.kelimeler[gS.kelimeler.length - 1];
+  var klipSonu = Math.round((sonW.end + 0.12) * 25) / 25;   // ses son kelimeden 120 ms sonra kesiliyor (kare sınırı)
+  var kS = G.kartla(gS.kelimeler, 1).map(function (c) { return { start: c.start + 5, end: Math.min(c.end + 5, klipSonu + 5), text: c.text, words: c.words.map(function (w) { return { start: w.start + 5, end: w.end + 5, text: w.text }; }) }; });
+  var rS = U.hepsiniYasla(kS, [U.kaynak(aS, 5, 1, 5 + klipSonu)], { belge: 1, fps: 25, ayar: { minKartMs: 800 } });
+  var son = rS.segments[rS.segments.length - 1];
+  ok("son kart klibin sonunu geçmez (en kısa ekran süresi / kuyruk uzatmaz), kareye oturur, son kelime içinde", son.end <= 5 + klipSonu + 1e-6 &&
+    Math.abs(son.end * 25 - Math.round(son.end * 25)) < 1e-6 && son.end >= son.words[son.words.length - 1].end - 1e-9 && rS.rapor.atlandi === null,
+    J([son.start, son.end, 5 + klipSonu]));
+  var rS2 = U.hepsiniYasla(kS, [U.kaynak(aS, 5, 1)], { belge: 1, ayar: { minKartMs: 800 } });
+  var son2 = rS2.segments[rS2.segments.length - 1];
+  ok("sınır verilmezse kart analiz edilen sesin sonunu geçmez", son2.end <= 5 + aS.sure + 1e-6 || son2.end <= kS[kS.length - 1].end + 1e-6, J([son2.end, 5 + aS.sure]));
+  var orta = rS.segments.slice(0, -1);
+  ok("klip içindeki kartlar sınırdan etkilenmez (en kısa ekran süresi korunur, kare yuvarlaması en çok 1 kare)", orta.every(function (c, i) {
+    var sonraki = rS.segments[i + 1].start;
+    return c.end - c.start >= 0.8 - 1 / 25 - 1e-6 || Math.abs(c.end - sonraki) < 1e-6;
+  }));
+})();
 
 /* ---------------- 2) rapor metni ---------------- */
 var RM = U.raporMetni;
@@ -332,7 +373,7 @@ function ortamKur(o) {
     "  yukle: function (s, sekans) { segments = JSON.parse(JSON.stringify(s)); belgeBagla(sekans || 'S', 0, null); },",
     "  iptal: function (j) { aktifIptal = j; }, metinDuzenle: function () { undoStack.push({ segs: JSON.stringify(segments), etiket: 'metin düzenleme' }); refreshUndoUI(); },",
     "  senkronSesiAnaliz: senkronSesiAnaliz, senkronIsSonu: senkronIsSonu, senkronGeriAl: senkronGeriAl, senkronHepsiniYasla: senkronHepsiniYasla,",
-    "  senkronSinirDegisti: senkronSinirDegisti, senkronDogrulaAcik: senkronDogrulaAcik, senkronAyari: senkronAyari, senkronFps: senkronFps, undo: undo, redo: redo, belgeBagla: belgeBagla };"
+    "  senkronKaynakEkle: senkronKaynakEkle, senkronSinirDegisti: senkronSinirDegisti, senkronDogrulaAcik: senkronDogrulaAcik, senkronAyari: senkronAyari, senkronFps: senkronFps, undo: undo, redo: redo, belgeBagla: belgeBagla };"
   ].join("\n");
   var api = new Function("el", "K", "KApp", "SZ", "SUI", "document", "kayit", kod)(function (id) { return dom[id] || null; }, K, KApp, SZsahte, U, belgeSahte, kayit);
   return { api: api, dom: dom, toastlar: toastlar, kayit: kayit, ayar: ayar };
@@ -400,6 +441,28 @@ function ortamKur(o) {
   var o6 = ortamKur({ SZ: { sesZarfiCikar: function () { return Promise.resolve({ iptal: true }); } } });
   var k6 = await o6.api.senkronSesiAnaliz("/x.wav", 0, 3, null);
   ok("senkronSesiAnaliz hiç fırlatmaz: hata ve iptal null", k5 === null && k6 === null);
+  // kaynak sınırı: kart çıkışı sesin timeline sonunu (t0 + süre) geçmez
+  var kSinir = await ortamKur().api.senkronSesiAnaliz("/gecici/cap_2.wav", T0, 7.5, null);
+  ok("senkronSesiAnaliz: kaynağın sınırı sesin timeline sonu (t0 + süre)", kSinir && Math.abs(kSinir.sinir - (T0 + 7.5)) < 1e-9, kSinir && kSinir.sinir);
+  // toplu klip: bitişik klipler (analiz süresi birkaç ms taşar) ve 6'dan çok klip — her klibin sesi belgede kalır
+  var oT = ortamKur();
+  oT.api.yukle(ham, "S1");
+  var bitisikK = [0, 1, 2].map(function (i) { return U.kaynak(a, T0 + i * (a.sure - 0.006), 0); });
+  oT.api.senkronIsSonu(bitisikK, "");
+  ok("toplu klip: bitişik kliplerin (aralıkları birkaç ms kesişen) hepsinin sesi kalır", oT.api.durum().kaynak.length === 3, oT.api.durum().kaynak.length);
+  oT.api.yukle(ham, "S1");
+  var cokK = [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { return U.kaynak(a, T0 + i * 100, 0); });
+  oT.api.senkronIsSonu(cokK, "");
+  var bNo = oT.api.durum().belge;
+  ok("toplu klip: 8 klibin sesi de belgede (6 sınırı yalnız başka belgelerin sesine)", oT.api.durum().kaynak.filter(function (k) { return k.belge === bNo; }).length === 8,
+    oT.api.durum().kaynak.length);
+  oT.api.senkronKaynakEkle(U.kaynak(a, T0 + 300.2, bNo));
+  ok("aynı aralık yeniden analiz edilince eskisi düşer", oT.api.durum().kaynak.length === 8 && oT.api.durum().kaynak.filter(function (k) { return k.t0 === T0 + 300.2; }).length === 1);
+  oT.api.yukle(ham, "S2");
+  oT.api.senkronIsSonu([U.kaynak(a, T0, 0)], "");
+  var yeniNo = oT.api.durum().belge;
+  ok("yeni belge: önce başka belgelerin en eski sesleri düşer (en çok 6), yeni belgenin sesi kalır", oT.api.durum().kaynak.length === 6 &&
+    oT.api.durum().kaynak.filter(function (k) { return k.belge === yeniNo; }).length === 1 && oT.api.durum().kaynak[0].t0 !== T0, J(oT.api.durum().kaynak.map(function (k) { return k.belge + "@" + k.t0; })));
   // şeritten sınır taşıma: tek anlık görüntü, liste ertelenmiş yenilenir
   var o7 = ortamKur();
   o7.api.yukle(segs, "S1");
