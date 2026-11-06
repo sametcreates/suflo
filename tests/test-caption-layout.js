@@ -305,7 +305,7 @@ ok("captions.js: menü eşlemesi (c32/c42 → l32/l42) tercih, şablon, stil kod
 ok("captions.js: kalite denetimi satır modunun satır sayısını bilir (c42x2 → 2)", /maxLines: mc && mc\[2\] \? Number\(mc\[2\]\) : 1,/.test(cap));
 ok("captions.js: dışa aktarma — SRT cue içi CRLF, boş satır yok, çift dilde her dil tek satır, TXT tek satır",
   /out\.push\(c\.text\.split\("\\n"\)\.join\("\\r\\n"\)\);/.test(govde("function buildSrt(")) && /satirlariTopla\(styleText/.test(govde("function cueler(")) &&
-  /CL\.duzMetin\(styleText\(CT\.stripEmphasis\(s\.text\)\)\)/.test(cap));
+  /CL\.duzMetin\(styleText\(kufurMaskele\(CT\.stripEmphasis\(s\.text\)\)\)\)/.test(cap));
 ok("captions.js: ASS karaoke satır modunda gerçek kelime zamanlarıyla, kaydırılmış katmanda kelimeler de kayar",
   /cs\.forEach\(function \(c\) \{ olay\(c\.start, c\.end, assSatirKaraoke\(c, skTag, skDil\)\); \}\);/.test(cap) &&
   /if \(s\.words\) s\.words = WW\.kelimeleriKaydir\(s\.words, -offset\);/.test(govde("function buildAssKaydirilmis(")));

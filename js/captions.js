@@ -1332,6 +1332,7 @@ window.KCaptions = (function () {
       birlestir: s.kisaBirlestir !== false,
       minSure: s.altyaziMinSure,
       maxSure: s.altyaziMaxSure,
+      dolguSil: s.dolguSil === true,
       sonSinir: Number(sonSinir) > 0 ? Number(sonSinir) : undefined,
       dil: kirilimDili(),
       kadraj: kadrajBoyutu()
@@ -3987,18 +3988,65 @@ window.KCaptions = (function () {
     KApp.toast("Metin, satır uzunluğu ve zamanlama düzeltildi", "good");
   }
 
+  /*
+   * Otomatik emoji seçenekleri: düğmenin yanındaki iki küçük menü (yoğunluk: seyrek / orta / yoğun,
+   * yer: satır sonu / tetikleyen kelimeden sonra); Ayarlar'da hatırlanır (otoEmojiYogunluk, otoEmojiYer).
+   */
+  var OTO_EMOJI_YOGUNLUK = ["seyrek", "orta", "yogun"];
+  function otomatikEmojiSecenekleri() {
+    var s = {};
+    try { s = K.settings() || {}; } catch (e) { s = {}; }
+    var y = el("cap-auto-emoji-yogunluk") ? el("cap-auto-emoji-yogunluk").value : s.otoEmojiYogunluk;
+    var yer = el("cap-auto-emoji-yer") ? el("cap-auto-emoji-yer").value : s.otoEmojiYer;
+    return { yogunluk: OTO_EMOJI_YOGUNLUK.indexOf(y) !== -1 ? y : "seyrek", yer: yer === "kelime" ? "kelime" : "son" };
+  }
+  function otomatikEmojiAyarlariniBagla() {
+    var s = {};
+    try { s = K.settings() || {}; } catch (e) { s = {}; }
+    var yg = el("cap-auto-emoji-yogunluk"), yer = el("cap-auto-emoji-yer");
+    if (yg) {
+      yg.value = OTO_EMOJI_YOGUNLUK.indexOf(s.otoEmojiYogunluk) !== -1 ? s.otoEmojiYogunluk : "seyrek";
+      yg.addEventListener("change", function () { K.settings().otoEmojiYogunluk = otomatikEmojiSecenekleri().yogunluk; K.saveSettings(); });
+    }
+    if (yer) {
+      yer.value = s.otoEmojiYer === "kelime" ? "kelime" : "son";
+      yer.addEventListener("change", function () { K.settings().otoEmojiYer = otomatikEmojiSecenekleri().yer; K.saveSettings(); });
+    }
+  }
+
+  /*
+   * Dolguları çıkar (editör düğmesi; Ayarlar › Altyazı'daki anahtar yeni transkriptlerde aynısını yapar):
+   * ııı / eee / hmm / um gibi tek başına dolgu sözcükleri metinden ve ölçülmüş kelimelerden atılır,
+   * *vurgu* korunur. Ctrl+Z ile geri alınır.
+   */
+  function dolgulariCikar() {
+    if (!segments.length) return;
+    var r = CT.dolgulariAt(segments, styleLocale() || algilananDil);
+    if (!r.sayi) {
+      KApp.toast("Altyazıda dolgu sesi (ııı, eee, hmm) bulunamadı", "warn");
+      return;
+    }
+    snapshot("dolguları çıkar");
+    segments = r.segments;
+    render(); saveDraftNow();
+    KApp.toast(r.sayi + " dolgu sesi çıkarıldı · Ctrl+Z ile geri al", "good");
+  }
+
   // Anlamina gore satir sonlarina emoji: seyrek, tekrarsiz, Ctrl+Z ile geri alinir
   function otomatikEmoji() {
     if (!segments.length || !window.SufloAutoEmoji) return;
     var dil = (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili();
-    var oneriler = window.SufloAutoEmoji.suggest(segments, { lang: dil === "en" ? "en" : "tr" });
+    var sec = otomatikEmojiSecenekleri();
+    var oneriler = window.SufloAutoEmoji.suggest(segments, { lang: dil === "en" ? "en" : "tr", yogunluk: sec.yogunluk });
     if (!oneriler.length) {
       KApp.toast("Emojiye uygun satır bulunamadı", "warn");
       return;
     }
     snapshot("otomatik emoji");
     oneriler.forEach(function (o) {
-      segments[o.index].text = window.SufloAutoEmoji.append(segments[o.index].text, o.emoji);
+      var sg = segments[o.index], once = sg.text;
+      sg.text = window.SufloAutoEmoji.yerlestir(sg.text, o.emoji, o.kelime, sec.yer);
+      kelimeleriYenidenHizala(sg, once);
     });
     render(); saveDraftNow();
     KApp.toast(oneriler.length + " satıra emoji eklendi · beğenmezsen Ctrl+Z", "good");
@@ -4933,12 +4981,13 @@ window.KCaptions = (function () {
     var cift = !!(opts && opts.ciftDil);
     var vurguKoru = !!(opts && opts.vurgu);
     var kelimeli = !!(opts && opts.kelimeler);
+    var maske = kufurMaskesiAcik();
     segments.forEach(function (s, i) {
-      var txt = satirlariTopla(styleText(vurguKoru ? s.text : CT.stripEmphasis(s.text)));
+      var txt = satirlariTopla(styleText(kufurMaskele(vurguKoru ? s.text : CT.stripEmphasis(s.text), vurguKoru, maske)));
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
       if (cift && typeof s.orig === "string") {
         // cift dilde her dil tek satir: ust satir orijinal, alt satir ceviri (4 satirlik cue olmasin)
-        var asil = CL.duzMetin(styleText(CT.stripEmphasis(s.orig), true));
+        var asil = CL.duzMetin(styleText(kufurMaskele(CT.stripEmphasis(s.orig), false, maske), true));
         var ceviri = CL.duzMetin(txt);
         if (asil && asil !== ceviri) txt = asil + "\n" + ceviri;
       }
@@ -4947,11 +4996,31 @@ window.KCaptions = (function () {
       var next = segments[i + 1];
       if (next && end > next.start) end = Math.max(next.start, s.start + 0.05);
       var cue = { start: s.start, end: end, text: txt };
-      if (kelimeli && !cift && s.words && s.words.length) cue.words = s.words;
+      if (kelimeli && !cift && s.words && s.words.length) {
+        cue.words = maske ? s.words.map(function (w) {
+          var y = {}; for (var k in w) if (Object.prototype.hasOwnProperty.call(w, k)) y[k] = w[k];
+          y.text = kufurMaskele(w.text, false, true);
+          return y;
+        }) : s.words;
+      }
       out.push(cue);
     });
-    return out;
+    // "Emojileri bu katmanda atla": yalnız o render boyunca (overlayUygula), transkript değişmez
+    return emojisizCikti ? CT.emojisizCueler(out) : out;
   }
+
+  /*
+   * Ayarlar › Altyazı › Küfürleri maskele (varsayılan kapalı): yalnız çıktı anında (cueler, TXT, önizleme);
+   * editördeki metin değişmez. koruma: *vurgu* işaretini okuyan stil motoru yolu (js/kufur-maske.js).
+   */
+  function kufurMaskesiAcik() {
+    try { return K.settings().kufurMaske === true && !!window.SufloKufurMaske; } catch (e) { return false; }
+  }
+  function kufurMaskele(t, koruma, acik) {
+    if (acik === undefined) acik = kufurMaskesiAcik();
+    return acik ? window.SufloKufurMaske.maskele(t, { koruma: !!koruma }) : t;
+  }
+  var emojisizCikti = false;
 
   // SRT: cue icindeki satir kirilimi da CRLF (Premiere caption izi iki satiri boyle okur)
   function buildSrt(opts) {
@@ -5412,7 +5481,7 @@ window.KCaptions = (function () {
       };
     }
     var orta = segments[Math.floor(segments.length / 2)] || segments[0];
-    var metin = styleText(CT.stripEmphasis(orta.text || ""));
+    var metin = styleText(kufurMaskele(CT.stripEmphasis(orta.text || "")));
     return { kelimeler: metin ? metin.split(/\s+/) : [], sureler: null };
   }
 
@@ -6403,10 +6472,14 @@ window.KCaptions = (function () {
      * boş). Sessizce emojisiz render etmek kullanıcıyı "neden kayboldu" diye
      * bırakır; dürüst olan burada durup yol göstermek.
      */
-    if (!secilenMogrt && emojiIceriyorMu()) {
+    var emojiAtla = emojiAtlaBirKez;
+    emojiAtlaBirKez = false;
+    emojiAtlaDugmesi(false);
+    if (!secilenMogrt && !emojiAtla && emojiIceriyorMu()) {
       status("Altyazıda emoji var. Stilli katman motoru emoji çizemiyor; " +
-        "emojili altyazı için \"Sekansa uygula\"yı kullan (Premiere renkli çizer) " +
-        "ya da emojileri kaldırıp tekrar dene.", "warn");
+        "emojili altyazı için \"Sekansa uygula\"yı kullan (Premiere renkli çizer), " +
+        "emojileri kaldır ya da \"Emojileri bu katmanda atla\" ile emojisiz ekle (transkript değişmez).", "warn");
+      emojiAtlaDugmesi(true);
       return;
     }
 
@@ -6437,6 +6510,8 @@ window.KCaptions = (function () {
        * videonun 0. saniyesi, timeline'da klibin konduğu ana denk gelir.
        */
       var baslangic = (scope === "inout" && spec.inPoint > 0) ? spec.inPoint : 0;
+      // "Emojileri bu katmanda atla": ASS kurulana kadar (eşzamanlı) cueler emojisiz döner; finally'de kapanır
+      emojisizCikti = emojiAtla;
       var cs = cueler();
       if (!cs.length) throw new Error("Yazılacak altyazı yok.");
       var st = stil();
@@ -6471,6 +6546,7 @@ window.KCaptions = (function () {
         ass = buildAssKaydirilmis(baslangic,
           { karaoke: karaoke, animasyon: st.animasyon, genislik: g, yukseklik: y });
       }
+      emojisizCikti = false;
 
       /*
        * Deneme hakkıyla (Pro değil) üretilen katmana sağ üstte küçük suflo.app filigranı
@@ -6517,6 +6593,8 @@ window.KCaptions = (function () {
       yildizIste();
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      emojisizCikti = false;
     }
   }
 
@@ -6681,6 +6759,21 @@ window.KCaptions = (function () {
     }
   }
 
+  /*
+   * Emoji bekçisinin tek tıklık yolu: "Emojileri bu katmanda atla" bir sonraki stilli uygulamayı emojisiz
+   * render eder (caption-text.js emojisizCueler; yalnız o katman, transkript ve emojiler editörde kalır).
+   */
+  var emojiAtlaBirKez = false;
+  function emojiAtlaDugmesi(goster) {
+    var b = el("cap-emoji-atla");
+    if (b) b.hidden = !goster;
+  }
+  function emojileriAtlaVeUygula() {
+    emojiAtlaBirKez = true;
+    emojiAtlaDugmesi(false);
+    return overlayUygula().then(uygulaEtiketiniSifirla);
+  }
+
   function emojiIceriyorMu() {
     for (var i = 0; i < segments.length; i++) {
       /*
@@ -6775,7 +6868,7 @@ window.KCaptions = (function () {
       var icerik, ad, bom = "﻿";
       var ek = dosyaDilEki();
       if (fmt === "txt") {
-        var lines = segments.map(function (s) { return CL.duzMetin(styleText(CT.stripEmphasis(s.text))); }).filter(Boolean);
+        var lines = segments.map(function (s) { return CL.duzMetin(styleText(kufurMaskele(CT.stripEmphasis(s.text)))); }).filter(Boolean);
         if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
         icerik = lines.join("\r\n");
         ad = "suflo-transkript" + ek + ".txt";
@@ -6884,7 +6977,7 @@ window.KCaptions = (function () {
     if (!dir) return { ok: false, hata: "proje_kaydedilmemis", mesaj: "Save the Premiere project first: captions are written next to the project file." };
     var ek = dosyaDilEki(), icerik, ad;
     if (bicim === "txt") {
-      icerik = segments.map(function (s) { return CL.duzMetin(styleText(CT.stripEmphasis(s.text))); }).filter(Boolean).join("\r\n");
+      icerik = segments.map(function (s) { return CL.duzMetin(styleText(kufurMaskele(CT.stripEmphasis(s.text)))); }).filter(Boolean).join("\r\n");
       ad = "suflo-transkript" + ek + ".txt";
     } else if (bicim === "vtt") {
       icerik = buildVtt({ ciftDil: ciftDilAcik() });
@@ -6954,6 +7047,9 @@ window.KCaptions = (function () {
     });
     if (el("cap-auto-fix")) el("cap-auto-fix").addEventListener("click", qualityAutoFix);
     if (el("cap-auto-emoji")) el("cap-auto-emoji").addEventListener("click", otomatikEmoji);
+    otomatikEmojiAyarlariniBagla();
+    if (el("cap-dolgu-sil")) el("cap-dolgu-sil").addEventListener("click", dolgulariCikar);
+    if (el("cap-emoji-atla")) el("cap-emoji-atla").addEventListener("click", emojileriAtlaVeUygula);
     if (el("cap-auto-vurgu")) el("cap-auto-vurgu").addEventListener("click", otomatikVurgu);
     if (el("cap-guvenli-alan")) el("cap-guvenli-alan").addEventListener("change", function () {
       var v = el("cap-render-onizleme");

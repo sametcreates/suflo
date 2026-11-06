@@ -422,6 +422,7 @@
         </button>
         <div id="cap-progress" class="progress-line" hidden><i></i></div>
         <div id="cap-status" class="inline-status"></div>
+        <button type="button" id="cap-emoji-atla" class="btn tiny" hidden title="Emojiler yalnız bu stilli katmanda çizilmez; transkriptteki emojiler kalır">Emojileri bu katmanda atla</button>
         <!-- Canlı transkripsiyon (js/whisper-akis.js): motor çalışırken akan geçici satırlar; salt okunur,
              taslağa / geri al yığınına girmez, nihai satırlar gelince silinir -->
         <div id="cap-canli" class="canli-kutu" role="region" aria-label="Canlı transkripsiyon" hidden>
@@ -479,8 +480,20 @@
             </label>
             <button type="button" id="cap-filter-issues" class="btn tiny caption-tool-toggle" title="Yalnız kontrol gerektiren satırları göster">Kontrol gerekenler</button>
             <button type="button" id="cap-auto-fix" class="btn tiny caption-tool-primary" title="Boşluk, satır uzunluğu, okuma hızı ve zamanlamayı otomatik düzelt">Nizami düzelt</button>
-            <button type="button" id="cap-auto-emoji" class="btn tiny" title="Satırların anlamına göre seyrek emoji ekler (Ctrl+Z ile geri alınır)">Otomatik emoji</button>
+            <span class="cap-oto-emoji">
+              <button type="button" id="cap-auto-emoji" class="btn tiny" title="Satırların anlamına göre seyrek emoji ekler (Ctrl+Z ile geri alınır)">Otomatik emoji</button>
+              <select id="cap-auto-emoji-yogunluk" class="mini-select" title="Otomatik emoji: kaç satıra emoji eklensin">
+                <option value="seyrek">Seyrek</option>
+                <option value="orta">Dengeli</option>
+                <option value="yogun">Yoğun</option>
+              </select>
+              <select id="cap-auto-emoji-yer" class="mini-select" title="Otomatik emoji: emoji nereye eklensin">
+                <option value="son">Satır sonuna</option>
+                <option value="kelime">Kelimeden sonra</option>
+              </select>
+            </span>
             <button type="button" id="cap-auto-vurgu" class="btn tiny" title="Sayıları ve önemli kelimeleri *yıldızla* işaretler; Altyazı Efektleri bunları vurgu renginde çizer. Elle: satırda kelimeye gel, Ctrl+B (Mac: ⌘B) ya da *kelime* yaz">Otomatik vurgu</button>
+            <button type="button" id="cap-dolgu-sil" class="btn tiny" title="Tek başına söylenen ııı, eee, hmm, um gibi dolgu seslerini altyazıdan çıkarır; vurgular korunur (Ctrl+Z ile geri alınır)">Dolguları çıkar</button>
             <button type="button" id="cap-proofread" class="btn tiny" title="Altyazı metnini bulut yedeğiyle ikinci kez kontrol eder; ses gönderilmez">AI metin kontrolü</button>
             <span class="caption-history-wrap">
               <button type="button" id="cap-history" class="btn tiny" title="Düzenleme geçmişi">Geçmiş</button>
@@ -2507,6 +2520,18 @@
         <i></i>
         <span>Kısa parçaları birleştir</span>
       </label>
+      <label class="switch" title="Tek başına söylenen ııı, ıı, eee, ee, ehm, hmm, ımm ve İngilizce um / uh atılır">
+        <input id="set-dolgu-sil" type="checkbox">
+        <i></i>
+        <span>Dolgu seslerini altyazıdan çıkar</span>
+      </label>
+      <p class="hint">Yeni transkriptlerde geçerli: dolgu sesleri metinden ve kelime zamanlarından atılır, vurgular korunur. Mevcut altyazı için editördeki "Dolguları çıkar" düğmesi (Ctrl+Z ile geri alınır).</p>
+      <label class="switch" title="Yalnız çıktıda: editördeki metin değişmez">
+        <input id="set-kufur-maske" type="checkbox">
+        <i></i>
+        <span>Küfürleri maskele</span>
+      </label>
+      <p class="hint">Küfürler ilk harfi kalarak yıldızlanır (s****): stilli katman, önizleme, altyazı izi, SRT / VTT / ASS / TXT ve After Effects. Transkript değişmez; anahtarı kapatınca çıktı eski haline döner.</p>
       <p class="hint">Satır modlarında (32 / 42 karakter, 2 satır × 42) yeni transkriptlerde geçerli: altyazı en kısa sürenin altında kalmaz (sonraki satıra kadar boşluk varsa), en uzun süreyi aşmaz (uzun satır bölünür). Kelime zamanı olmayan transkriptte (bulut yedeği) yalnız 2 satır × 42'de geçerli; 32 / 42 karakter eski bölmeyi izler. Birleştirme kelime zamanı olmayan kısa parçaları toplar (kelime zamanlı satırlar zaten en az parçayla kurulur), cümle sonunu aşmaz, satır uzunluğunu ve kelime sınırını korur.</p>
     </div>
 
@@ -2984,6 +3009,7 @@
   <script src="js/sessiz-ses.js"></script>
   <script src="js/diller.js"></script>
   <script src="js/auto-emoji.js"></script>
+  <script src="js/kufur-maske.js"></script>
   <script src="js/style-share.js"></script>
   <script src="js/marka-kiti.js"></script>
   <!-- Animasyon motoru v2: yazı animasyonları kataloğu (saf; style-engine.js'ten önce) ve geriye uyumlu stil kodu (SFL1. + ek) -->

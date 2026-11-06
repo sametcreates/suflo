@@ -49,5 +49,48 @@ chk("gevsek kokler eslesmez (yapmak, büyük, o zaman)", ["yapmak istiyorum", "b
 chk("Ingilizce gevsek kokler eslesmez (later, apple, window, hotel)", ["see you later", "apple", "window", "hotel"].every(function (t) { return E.pick(t, "en") === null; }));
 chk("olu kurallar calisir: don't -> ❌, won -> 🏆", E.pick("don't do it", "en") === "❌" && E.pick("I won the race", "en") === "🏆");
 chk("para kazandim hala 💰", E.pick("para kazandım", "tr") === "💰");
+
+/* parti 6: baglam, oncelik, haric, unlu daralmasi, olumsuzluk, secenekler */
+function p(t, l) { return E.pick(t, l || "tr"); }
+chk("'doğru' edat olarak emoji almaz: 'Eve doğru yürüdük' -> null", p("Eve doğru yürüdük") === null, p("Eve doğru yürüdük"));
+chk("'doğru' cevap olarak ✅ ('Doğru!', 'çok doğru', 'doğru mu')",
+  p("Doğru!") === "✅" && p("Bu çok doğru") === "✅" && p("Bu doğru mu?") === "✅", [p("Doğru!"), p("Bu çok doğru"), p("Bu doğru mu?")].join(","));
+chk("'doğruyu', 'doğrudan' yön/edat: emoji yok", p("doğrudan söyleyeyim") === null && p("eve doğru gidelim") === null);
+chk("'Hatay' sehri ⚠️ almaz (hata kokunun haric listesi)", p("Hatay çok güzel bir şehir") !== "⚠️" && p("HATAY") === null, p("Hatay çok güzel bir şehir"));
+chk("'hata' hala ⚠️, 'hatırladım' ⚠️ degil", p("Büyük bir hata yaptım") === "⚠️" && p("Şimdi hatırladım") === null);
+chk("'Kazanan biz olduk' -> 🏆 (ozgul kok genelden once)", p("Kazanan biz olduk") === "🏆" && p("Şampiyon olduk") === "🏆", p("Kazanan biz olduk"));
+chk("'para kazandım' hala 💰", p("para kazandım") === "💰" && p("Bütün paraları harcadım") === "💰");
+chk("'Bunun sakıncası yok' -> null ('sakın' koku 'sakınca'yi almaz)", p("Bunun sakıncası yok") === null && p("Sakın bunu yapma") === "⚠️", p("Bunun sakıncası yok"));
+chk("unlu daralmasi: 'başlıyoruz' -> 🚀", p("Merhaba arkadaşlar, bugün başlıyoruz") === "🚀", p("Merhaba arkadaşlar, bugün başlıyoruz"));
+chk("daralt(): başla→başlıyor, bekle→bekliyor, anla→anlıyor, oyna→oynuyor, söyle→söylüyor; ünsüzle biten kök null",
+  ["başla", "bekle", "anla", "oyna", "söyle"].map(E.daralt).join(",") === "başlıyor,bekliyor,anlıyor,oynuyor,söylüyor" && E.daralt("git") === null,
+  ["başla", "bekle", "anla", "oyna", "söyle", "git"].map(E.daralt).join(","));
+chk("'bekliyoruz' -> ⏰ (fiil kokunden daralma)", p("Sizi bekliyoruz") === "⏰", p("Sizi bekliyoruz"));
+chk("olumsuzluk: 'güzel değil', 'hiç komik değildi' olumlu emoji almaz",
+  p("Bu hiç güzel değil") === null && p("Hiç komik değildi") === null, [p("Bu hiç güzel değil"), p("Hiç komik değildi")].join(","));
+chk("onay sorusu 'değil mi' olumsuzluk sayilmaz", p("Çok komik, değil mi?") === "😂" && p("Bu doğru değil mi?") === "✅", [p("Çok komik, değil mi?"), p("Bu doğru değil mi?")].join(","));
+chk("olumsuzluk satirin baska bir anahtarini engellemez", p("komik değil ama harika") === "🔥", p("komik değil ama harika"));
+chk("Ingilizce olumsuzluk: 'not funny', 'isn't amazing' -> null", p("This is not funny", "en") === null && p("It isn't amazing", "en") === null && p("That was amazing", "en") === "🔥");
+chk("Turkce buyuk harf (I/İ) toLocaleLowerCase('tr') ile: 'KAZANAN BİZİZ', 'İNANILMAZ'",
+  p("KAZANAN BİZİZ") === "🏆" && p("BU İNANILMAZ") === "😱", [p("KAZANAN BİZİZ"), p("BU İNANILMAZ")].join(","));
+chk("haric 'başarısız' ✅ almaz", p("Bu deneme başarısız oldu") === null, p("Bu deneme başarısız oldu"));
+var es = E.eslesme("Bu harika, bir video", "tr");
+chk("eslesme tetikleyen sozcugu verir", es && es.emoji === "🔥" && es.kelime === 1, JSON.stringify(es));
+chk("yerlestir 'kelime': tetikleyen sozcukten sonra, *vurgu* ve noktalama bozulmaz",
+  E.yerlestir("Bu *harika*, bir video", "🔥", 1, "kelime") === "Bu *harika*, 🔥 bir video", E.yerlestir("Bu *harika*, bir video", "🔥", 1, "kelime"));
+chk("yerlestir 'son' ve son sozcukte satir sonu", E.yerlestir("Bu harika", "🔥", 1, "kelime") === "Bu harika 🔥" && E.yerlestir("a harika b", "🔥", 1, "son") === "a harika b 🔥");
+chk("yerlestir satir kirilimini korur", E.yerlestir("bu harika\nbir gün", "🔥", 1, "kelime") === "bu harika 🔥\nbir gün", JSON.stringify(E.yerlestir("bu harika\nbir gün", "🔥", 1, "kelime")));
+var cok = [];
+for (var ci = 0; ci < 24; ci++) cok.push({ text: ["para kazandık", "harika bir gün", "bir fikir", "dikkat edin", "şarkı çalıyor", "telefon aldım"][ci % 6] });
+var sy = E.suggest(cok, { lang: "tr" }), sv = E.suggest(cok, { lang: "tr", yogunluk: "seyrek" });
+var or = E.suggest(cok, { lang: "tr", yogunluk: "orta" }), yo = E.suggest(cok, { lang: "tr", yogunluk: "yogun" });
+chk("yogunluk: varsayilan = seyrek (bugunku 0.25 / 2 / 6)", JSON.stringify(sy) === JSON.stringify(sv) && sy.length === 6, sy.length);
+chk("yogunluk: seyrek < orta < yogun", sv.length < or.length && or.length < yo.length, [sv.length, or.length, yo.length].join("<"));
+chk("yogun da tekrar korumasini tutar (ayni emoji 3 satirdan once tekrar etmez)", yo.every(function (o, i) {
+  return yo.slice(0, i).every(function (q) { return q.emoji !== o.emoji || o.index - q.index >= 3; });
+}));
+chk("tum emojilerin cevrimdisi SVG'si var (yeni kurallarla)", E.emojis().every(function (e) { return esleme[e]; }));
+chk("YOGUNLUKLAR listesi", JSON.stringify(E.YOGUNLUKLAR) === '["seyrek","orta","yogun"]');
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

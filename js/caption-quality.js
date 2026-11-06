@@ -49,20 +49,73 @@
     return text;
   }
 
+  /*
+   * Virgül / noktadan sonra eksik boşluk ("geldik.Sonra", "evet,tamam"): yalnız ardından HARF geliyorsa
+   * eklenir; sayılar (3,5 / 1.250 / 12.30) zaten harf değildir. Dokunulmayanlar: URL ve e-posta (://, @,
+   * www.), alan adı (suflo.app, google.com.tr — bilinen uzantılar), kısaltmalar (Dr., vb., örn.) ve tek
+   * harfli kısaltma zinciri (A.B.D., e.g., T.C.).
+   */
+  var HARF = "A-Za-z\u00C0-\u024F\u0400-\u04FF";
+  var KISALTMA = /^(dr|prof|doç|av|uzm|op|sn|vb|vs|örn|bkz|yy|mö|ms|mr|mrs|st|no|etc|vol|inc|ltd|co|jr|sr|vd|bknz|hz|yrd)$/i;
+  var UZANTI = /^(com|net|org|app|io|dev|ai|co|tr|me|tv|gov|edu|info|xyz|de|uk|us|eu|ly|gg|so|to|fm|art|shop|store|site|online|blog|tech|link|page)$/;
+  var NOKTA_ARDI = new RegExp("([,.])(?=[" + HARF + "])", "g");
+  var HARF_KOSUSU_SON = new RegExp("[" + HARF + "]+$");
+  var HARF_KOSUSU_BAS = new RegExp("^[" + HARF + "]+");
+  function eksikBosluk(sozcuk) {
+    if (/:\/\/|@|^www\./i.test(sozcuk)) return sozcuk;
+    return sozcuk.replace(NOKTA_ARDI, function (m, p, konum, tum) {
+      if (p === ",") return ", ";
+      var once = (HARF_KOSUSU_SON.exec(tum.slice(0, konum)) || [""])[0];
+      var sonra = (HARF_KOSUSU_BAS.exec(tum.slice(konum + 1)) || [""])[0];
+      if (KISALTMA.test(once)) return m;
+      // A.B.D. / e.g.: tek harf . tek harf .
+      if (once.length === 1 && sonra.length === 1 && (tum.charAt(konum + 2) === "." || tum.charAt(konum - 2) === ".")) return m;
+      // alan adı: önünde harf / rakam, ardından bilinen uzantı (sonrası bitiş, /, nokta ya da kesme işaretiyle ek)
+      var kalan = tum.slice(konum + 1 + sonra.length);
+      if (UZANTI.test(sonra) && /[0-9A-Za-z-]$/.test(tum.slice(0, konum)) && /^(|[\/.'’][\s\S]*|[,;:!?)]*)$/.test(kalan)) return m;
+      return ". ";
+    });
+  }
+
+  // URL / e-posta / alan adı: boşluk ve büyük harf kuralları içine dokunmaz ("https://", "ali@ornek.com")
+  var ADRES = /(?:https?:\/\/|www\.)[^\s]+|[^\s@]+@[^\s@]+\.[^\s@]+/gi;
+  function adresMi(sozcuk) {
+    var m = /^([0-9A-Za-z-]+)\.([a-z]+)/.exec(sozcuk);
+    return /^(?:https?:\/\/|www\.)|@/i.test(sozcuk) || !!(m && UZANTI.test(m[2]));
+  }
+
   function normalizeText(text, lang) {
+    var adresler = [];
     // satir kirilimi (2 satir × 42, Shift+Enter) tek "\n" olarak kalir; bos satir ve kenar bosluklari gider
     var s = String(text || "")
+      .replace(ADRES, function (a) {
+        // sondaki cümle noktalaması adresin parçası değil
+        var son = /[.,;:!?)]+$/.exec(a);
+        var govde = son ? a.slice(0, -son[0].length) : a;
+        adresler.push(govde);
+        return "\u0000" + (adresler.length - 1) + "\u0000" + (son ? son[0] : "");
+      })
       .replace(/\r\n?/g, "\n")
       .replace(/[ \t]*\n\s*/g, "\n")
       .replace(/[ \t]+/g, " ")
       .replace(/\s+([,.;:!?])/g, "$1")
-      .replace(/([!?;:])([^\s!?;:])/g, "$1 $2")
+      // saat / oran ("12:30", "16:9") iki nokta kuralına girmez
+      .replace(/([!?;:])([^\s!?;:])/g, function (m, a, b, konum, tum) { return a === ":" && /\d/.test(tum.charAt(konum - 1)) && /\d/.test(b) ? m : a + " " + b; })
       .replace(/\(\s+/g, "(")
       .replace(/\s+\)/g, ")")
       .replace(/([!?])\1{2,}/g, "$1$1")
-      .replace(/\.{4,}/g, "…")
+      // üç (ve daha çok) nokta tek üç nokta karakteri
+      .replace(/\.{3,}/g, "…")
+      // özel ad eki: tipografik kesme ("Instagram’da") düz kesmeye; tırnak olarak kullanılan ’ (ardı boşluk) kalır
+      .replace(new RegExp("([" + HARF + "0-9])\u2019(?=[" + HARF + "])", "g"), "$1'")
       .trim();
-    return capitalize(s, lang);
+    // virgül / nokta yalnız harften önce boşluk alır (sayı, adres ve kısaltma hariç)
+    s = s.split("\n").map(function (satir) {
+      return satir.split(" ").map(eksikBosluk).join(" ");
+    }).join("\n");
+    s = s.replace(/\u0000(\d+)\u0000/g, function (m, i) { return adresler[Number(i)]; });
+    // adresle başlayan satır büyük harfe çevrilmez ("www.suflo.app", "suflo.app'te")
+    return adresMi(s.split(/\s/)[0] || "") ? s : capitalize(s, lang);
   }
 
   function maxChars(options) {
@@ -233,7 +286,13 @@
     options = options || {};
     var out = (segments || []).map(function (source) {
       var s = copySegment(source);
+      var eski = s.text;
       s.text = normalizeText(s.text, options.lang);
+      // eklenen boşluk sözcük sayısını değiştirebilir ("geldik.Sonra"): ölçülmüş kelimeler yeni metne hizalanır
+      if (s.text !== eski && s.words && s.words.length && CL && CL.kelimeleriHizala) {
+        var hiza = CL.kelimeleriHizala(s.words, s.text, s.start, s.end, options.lang);
+        if (hiza.length) s.words = hiza; else delete s.words;
+      }
       return s;
     }).filter(function (s) { return !!s.text; });
     if (!options.wordMode) out = splitOverlong(out, options);

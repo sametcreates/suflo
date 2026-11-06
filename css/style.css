@@ -2045,6 +2045,10 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
 .caption-editor-search svg { flex: none; width: 13px; height: 13px; }
 .caption-editor-search input { min-width: 0; height: 28px; padding: 0 0 0 7px; border: 0; background: transparent; box-shadow: none; }
 .caption-editor-search input:focus { border: 0; box-shadow: none; }
+/* Otomatik emoji + yoğunluk / yer menüleri tek öbek: dar panelde birlikte kayar */
+.cap-oto-emoji { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.cap-oto-emoji .mini-select { max-width: 120px; }
+#cap-emoji-atla { margin-top: 6px; }
 .caption-tool-primary { color: #fff !important; border-color: rgba(121,137,255,.58) !important; background: linear-gradient(135deg,#5269ef,#7e68ef) !important; }
 .caption-tool-toggle.on { color: #c9ceff; border-color: rgba(126,142,255,.55); background: rgba(91,107,226,.16); }
 .caption-learn { flex: 1 1 100%; color: #a8f0cf !important; border-color: rgba(63,207,142,.28) !important; background: rgba(63,207,142,.07) !important; }

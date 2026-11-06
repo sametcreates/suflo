@@ -737,6 +737,23 @@ window.KApp = (function () {
 
   // "İndir & kur" tıkı (Ayarlar ve Altyazı kurulum kartı): programla çağrı (olaysız) her zaman geçerli
   /*
+   * Ayarlar › Altyazı › metin temizliği (ikisi de varsayılan kapalı):
+   *   dolguSil:   yeni transkriptte ııı / eee / hmm / um atılır (captions.js kurSecenekleri → caption-text.js dolgulariAt)
+   *   kufurMaske: yalnız çıktı anında maske (captions.js cueler → js/kufur-maske.js); transkript değişmez
+   */
+  function metinTemizlikAyarlari(s) {
+    [["set-dolgu-sil", "dolguSil"], ["set-kufur-maske", "kufurMaske"]].forEach(function (a) {
+      var e = el(a[0]);
+      if (!e) return;
+      e.checked = s[a[1]] === true;
+      e.addEventListener("change", function () {
+        K.settings()[a[1]] = this.checked;
+        K.saveSettings();
+      });
+    });
+  }
+
+  /*
    * Ayarlar › Altyazı: satır modlarında (32 / 42 karakter, 2 satır × 42) en kısa / en uzun ekran
    * süresi ve kısa parça birleştirme (caption-text.js segmentleriKur). Geçersiz değer sınıra çekilir;
    * en uzun süre en kısa sürenin altına inemez. Yeni transkriptlerde geçerli.
@@ -1494,6 +1511,8 @@ window.KApp = (function () {
         K.saveSettings();
       });
     }
+    // Ayarlar › Altyazı › Dolgu seslerini altyazıdan çıkar (yeni transkriptler) ve Küfürleri maskele (yalnız çıktı)
+    metinTemizlikAyarlari(s);
     // Ayarlar › Altyazı › en kısa / en uzun süre ve kısa parçaları birleştir (satır modları, 3.2 adım 4)
     altyaziSureAyarlari(s);
     el("set-provider").value = s.provider || "groq";

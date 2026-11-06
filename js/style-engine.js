@@ -1525,6 +1525,30 @@
   function harfleri(t) { return String(t).match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) || []; }
 
   /*
+   * Altyazı Efektleri'nin kendiliğinden anahtar kelime seçiminde atlanan sözcükler: caption-text.js
+   * VURGU_DURAK_KELIMELER ile aynı liste (otomatik vurgu ile kart aynı kelimeyi seçsin; testler eşitliği
+   * denetler). Eski stillerin meaningfulWord'ü bilerek değişmez (kayıtlı stillerin görünümü korunur).
+   */
+  var ANLAMSIZ_KELIME = [
+    "ve", "ile", "bir", "bu", "şu", "o", "da", "de", "ki", "mi", "mı", "mu", "mü", "için", "ama", "fakat", "çünkü", "gibi",
+    "daha", "çok", "en", "hem", "ya", "yani", "şey", "işte", "zaten", "sonra", "önce", "kadar", "olarak", "olan", "diye", "bunu",
+    "şunu", "onu", "bunun", "benim", "senin", "bizim", "onların", "arkadaşlar", "arkadaşım", "arkadaşlarım", "arkadaş", "millet",
+    "gençler", "dostlar", "beyler", "hanımlar", "kanka", "abi", "abla", "hocam", "kardeşim", "gerçekten", "aslında", "şimdi",
+    "tabii", "tabi", "evet", "tamam", "bence", "sanki", "hani", "hadi", "peki", "açıkçası", "herhalde", "galiba", "falan",
+    "filan", "şöyle", "böyle", "merhaba", "selam", "the", "a", "an", "and", "or", "of", "to", "in", "on", "is", "are", "was",
+    "that", "this", "with", "for", "it", "you", "your", "they", "have", "just", "really", "about", "because", "there", "their",
+    "what", "which", "would", "could", "should", "guys", "actually", "basically", "literally", "okay", "yeah", "well"
+  ];
+  var ANLAMSIZ = {};
+  ANLAMSIZ_KELIME.forEach(function (w) { ANLAMSIZ[w] = true; });
+  function anlamsizKelime(t) {
+    var s = String(t || "").replace(/İ/g, "i").replace(/I/g, "ı");
+    try { s = s.toLocaleLowerCase("tr"); } catch (e) { s = s.toLowerCase(); }
+    s = s.replace(/[^0-9a-z\u00C0-\u024F\u0400-\u04FF]/g, "");
+    return Object.prototype.hasOwnProperty.call(ANLAMSIZ, s);
+  }
+
+  /*
    * Yazı animasyonlu kart (renderEfekt'ten). c: { anim, group, kir, fs, sx, ka, kartBas, kartSon (sn), L (katmanlar),
    * yaz (renderEfekt'in olay yazıcısı: gölge kopyası dahil), kutuYaz (kutu açıksa), normal, vurgu (ASS renkleri),
    * vurguAcik, width, height, factor (hareket şiddeti), olcek, font, golgeYumusak }
@@ -1798,8 +1822,16 @@
        */
       g.forEach(function (cue, i) { if (cue.vurgu) anahtar.push(i); });
       if (!anahtar.length) {
-        var enU = 0;
-        g.forEach(function (cue, i) { if (harfleri(cue.text).length > harfleri(g[enU].text).length) enU = i; });
+        // yalnız Altyazı Efektleri: hitap / dolgu ("arkadaşlar", "gerçekten") anahtar sayılmaz; hepsi öyleyse eski seçim
+        var enU = -1;
+        g.forEach(function (cue, i) {
+          if (anlamsizKelime(cue.text)) return;
+          if (enU < 0 || harfleri(cue.text).length > harfleri(g[enU].text).length) enU = i;
+        });
+        if (enU < 0) {
+          enU = 0;
+          g.forEach(function (cue, i) { if (harfleri(cue.text).length > harfleri(g[enU].text).length) enU = i; });
+        }
         anahtar.push(enU);
       }
       /*
@@ -2399,6 +2431,8 @@
     splitToWords: splitToWords,
     lastWords: lastWords,
     markEmphasis: markEmphasis,
+    ANLAMSIZ_KELIME: ANLAMSIZ_KELIME.slice(),
+    anlamsizKelime: anlamsizKelime,
     stripEmphasis: stripEmphasis,
     compile: compile,
     efektKonumlari: efektKonumlari,

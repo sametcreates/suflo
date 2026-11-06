@@ -477,6 +477,8 @@
     lenVal = String(lenVal || "c42");
     secenek = secenek || {};
     var liste = (mapped || []).slice();
+    // Ayarlar › Altyazı › Dolgu seslerini altyazıdan çıkar: satır kurulmadan önce metinden ve kelimelerden
+    if (secenek.dolguSil) liste = dolgulariAt(liste, secenek.dil).segments;
     var olculmus = !!WW && liste.some(kelimeli);
     if (/^k/.test(lenVal)) {
       // Satırlar ölçülmüş kelime taşıyorsa (yerel -ojf) kelime cue'ları onlardan kurulur:
@@ -860,13 +862,87 @@
     return { text: parts.join(""), caret: caret };
   }
 
-  var VURGU_DURAK = /^(ve|ile|bir|bu|şu|o|da|de|ki|mi|mı|mu|mü|için|ama|fakat|çünkü|gibi|daha|çok|en|hem|ya|yani|şey|işte|zaten|sonra|önce|kadar|olarak|olan|diye|bunu|şunu|onu|bunun|benim|senin|bizim|onların|the|a|an|and|or|of|to|in|on|is|are|was|that|this|with|for|it|you|your|they|have|just|really|about|because|there|their|what|which|would|could|should)$/i;
-  var BIRIM = /^(%|tl|lira|dolar|euro|avro|\$|€|₺|bin|milyon|milyar|yüzde|percent|k|m|dk|sn|saat|gün|yıl|ay|kg|km|x)$/i;
+  /*
+   * Otomatik vurgunun atladığı sözcükler: bağlaçlar, zamirler, hitaplar ve dolgular ("arkadaşlar",
+   * "gerçekten", "aslında", "yani"…). Stil motorunun Altyazı Efektleri yolu (style-engine.js
+   * ANLAMSIZ_KELIME) aynı listeyi kullanır; testler ikisinin eşitliğini denetler.
+   */
+  var VURGU_DURAK_KELIMELER = [
+    "ve", "ile", "bir", "bu", "şu", "o", "da", "de", "ki", "mi", "mı", "mu", "mü", "için", "ama", "fakat", "çünkü", "gibi",
+    "daha", "çok", "en", "hem", "ya", "yani", "şey", "işte", "zaten", "sonra", "önce", "kadar", "olarak", "olan", "diye", "bunu",
+    "şunu", "onu", "bunun", "benim", "senin", "bizim", "onların", "arkadaşlar", "arkadaşım", "arkadaşlarım", "arkadaş", "millet",
+    "gençler", "dostlar", "beyler", "hanımlar", "kanka", "abi", "abla", "hocam", "kardeşim", "gerçekten", "aslında", "şimdi",
+    "tabii", "tabi", "evet", "tamam", "bence", "sanki", "hani", "hadi", "peki", "açıkçası", "herhalde", "galiba", "falan",
+    "filan", "şöyle", "böyle", "merhaba", "selam", "the", "a", "an", "and", "or", "of", "to", "in", "on", "is", "are", "was",
+    "that", "this", "with", "for", "it", "you", "your", "they", "have", "just", "really", "about", "because", "there", "their",
+    "what", "which", "would", "could", "should", "guys", "actually", "basically", "literally", "okay", "yeah", "well"
+  ];
+  var DURAK = {};
+  VURGU_DURAK_KELIMELER.forEach(function (w) { DURAK[w] = true; });
+  // geriye dönük: dışarıdan okuyan olursa diye aynı liste düzenli ifade olarak
+  var VURGU_DURAK = new RegExp("^(" + VURGU_DURAK_KELIMELER.join("|") + ")$", "i");
+  function durakMi(w) { return Object.prototype.hasOwnProperty.call(DURAK, w); }
+
+  // Türkçe-duyarlı küçük harf (İ → i, I → ı), noktalama ve *vurgu* yıldızı atılmış sözcük
+  function vurguKatla(w) {
+    var s = String(w || "").replace(/İ/g, "i").replace(/I/g, "ı");
+    try { s = s.toLocaleLowerCase("tr"); } catch (e) { s = s.toLowerCase(); }
+    return s.replace(/\u0307/g, "").replace(/^[^0-9a-z\u00C0-\u024F\u0400-\u04FF%$€₺]+|[^0-9a-z\u00C0-\u024F\u0400-\u04FF%$€₺]+$/g, "");
+  }
 
   /*
-   * Otomatik vurgu: sayilar (birimiyle: "100 TL", "%50", "3 milyon") her zaman;
-   * sayisiz ve 4+ kelimelik satirda en anlamli tek kelime. Elle isaretlenmis
-   * satirlara dokunulmaz. Doner: yeni metin (degisiklik yoksa ayni metin).
+   * Birimler: sayıdan hemen sonra gelince sayıyla birlikte vurgulanır. Harfli birimler (2+ harf) Türkçe
+   * ek alabilir ("3 ayda", "2 saatte", "100 TL'ye", "5 bin'e", "1 milyonluk"); tek karakterliler almaz.
+   * BUYUKLUK: ardından bir birim daha gelebilir ("10 bin TL", "3 milyon dolar").
+   */
+  var BIRIM = /^(%|tl|lira|dolar|euro|avro|\$|€|₺|bin|milyon|milyar|yüzde|percent|k|m|dk|sn|saat|gün|yıl|ay|hafta|dakika|saniye|sene|kg|km|kilo|gram|metre|kat|kez|kere|x|million|billion|thousand|dollars|hours|days|years|minutes)$/i;
+  var BUYUKLUK = /^(bin|milyon|milyar|k|m|million|billion|thousand)$/;
+  var BIRIM_EK = /^(.{2,}?)['’]?(d[ae]|t[ae]|d[ae]n|t[ae]n|[ae]|y[ae]|[ıiuü]|y[ıiuü]|l[ıiuü]k|l[ıiuü]ğ[ıiuü]|n[ıiuü]n|[ıiuü]n|y?l[ae]|l[ae]r|l[ae]r[ıi]|l[ae]rd[ae]|c[ıiuü]k)$/;
+  function birimMi(w) {
+    if (!w) return false;
+    if (BIRIM.test(w)) return w;
+    var m = BIRIM_EK.exec(w);
+    return m && /^[a-zçğıöşü]{2,}$/.test(m[1]) && BIRIM.test(m[1]) ? m[1] : false;
+  }
+
+  /*
+   * Okunuşla yazılmış sayılar ("yüzde elli", "iki yüz bin", "on beş"). Tek başına çok anlamlı olanlar
+   * ("bir" tanımlık, "on" / "altı" / "yüz" / "bin" / "yedi" / "yarım") yalnız başka bir sayı sözcüğüyle,
+   * "yüzde"den sonra ya da ardından birim gelince sayı sayılır. Tek başına küçük sayı ("iki") de
+   * ancak birimle vurgulanır: "iki kişi" sıradan konuşmadır, "iki milyon" veridir.
+   */
+  var SAYI_SOZ = { bir: 1, iki: 1, "üç": 1, "dört": 1, "beş": 1, "altı": 1, yedi: 1, sekiz: 1, dokuz: 1,
+    on: 1, yirmi: 1, otuz: 1, "kırk": 1, elli: 1, "altmış": 1, "yetmiş": 1, seksen: 1, doksan: 1,
+    "yüz": 1, bin: 1, milyon: 1, milyar: 1, "yarım": 1, "buçuk": 1 };
+  var YUZDE = /^yüzde$/;
+  var SAYI_TEK_BASINA = /^(yirmi|otuz|kırk|elli|altmış|yetmiş|seksen|doksan|milyon|milyar)$/;
+  var SAYI_EK = /^(.+?)['’]?(d[ae]|t[ae]|d[ae]n|t[ae]n|y[ae]|[ae]|l[ıiuü]k|y[ıiuü]|[ıiuü]|n[ıiuü]n|[ıiuü]nc[ıiuü])$/;
+  function sayiSozu(w) {
+    if (!w) return null;
+    if (Object.prototype.hasOwnProperty.call(SAYI_SOZ, w)) return { kok: w, ekli: false };
+    var m = SAYI_EK.exec(w);
+    if (m && Object.prototype.hasOwnProperty.call(SAYI_SOZ, m[1]) && !/^(on|altı|yüz)$/.test(m[1])) return { kok: m[1], ekli: true };
+    return null;
+  }
+
+  /*
+   * Değer sözlüğü: vurgulanmaya en değer sözcükler, öncelik sırasıyla (kat: 3 > 2 > 1). Her biri kendi
+   * kalıbıyla (ek serbestliği sözcüğe göre) eşleşir; iki sözcüklüler ("en iyi") tek aralık olur.
+   */
+  var DEGER = [
+    { kat: 3, re: /^ücretsiz/ }, { kat: 3, re: /^bedava/ }, { kat: 3, re: /^garanti/ }, { kat: 3, re: /^asla$/ },
+    { kat: 3, re: /^mutlaka$/ }, { kat: 3, re: /^kesinlikle$/ }, { kat: 3, re: /^yasak/ },
+    { kat: 2, re: /^gizli(?!lik)/ }, { kat: 2, re: /^(sır|sırr[ıi]n?[ıi]?|sırlar[ıi]?(n[ıi])?)$/ }, { kat: 2, re: /^hata(?!y)/ },
+    { kat: 2, on: "en", re: /^iyi(si|sini|ler|lerden)?$/ }, { kat: 2, on: "en", re: /^kötü(sü|sünü|ler|lerden)?$/ },
+    { kat: 1, re: /^ilk(i|ini)?$/ }, { kat: 1, re: /^son$/, degil: "olarak" }
+  ];
+
+  /*
+   * Otomatik vurgu: sayilar (birimiyle: "100 TL", "%50", "3 ayda", "yüzde elli") her zaman; sonra satır
+   * başına anahtar kelime: 5 ve daha az kelimelik satırda en çok 1, daha uzunda en çok 2 vurgu (sayı
+   * grupları da sayılır), her cümlecikte (virgül / nokta ile ayrılan) en çok bir anahtar kelime.
+   * Önce değer sözlüğü; o yoksa sayısız ve 4+ kelimelik satırda en anlamli tek kelime. Elle
+   * isaretlenmis satirlara dokunulmaz (yeniden çağırmak sonucu değiştirmez). Doner: yeni metin.
    */
   function autoEmphasis(text) {
     var t = String(text || "");
@@ -874,35 +950,101 @@
     var parts = t.split(/(\s+)/);
     var idx = [];
     for (var i = 0; i < parts.length; i++) if (/\S/.test(parts[i])) idx.push(i);
-    var isaret = {};
-    idx.forEach(function (pi, k) {
-      if (/\d/.test(parts[pi])) {
-        isaret[k] = true;
-        var sonraki = idx[k + 1];
-        var temiz = sonraki != null ? parts[sonraki].replace(/[.,!?;:…]+$/, "") : "";
-        if (sonraki != null && BIRIM.test(temiz)) isaret[k + 1] = true;
+    var kat = idx.map(function (pi) { return vurguKatla(parts[pi]); });
+    // cümlecik: noktalamayla biten sözcükten sonra yenisi başlar
+    var cumlecik = [], c = 0;
+    idx.forEach(function (pi, k) { cumlecik.push(c); if (/[,;:.!?…]["'’”»)]*$/.test(parts[pi]) || /^[-–—]$/.test(parts[pi])) c++; });
+    var grup = {}, grupNo = 0;   // k -> grup numarası (ayrı * … * aralıkları)
+    function sonaYaz(k) { return k < idx.length && !/[,;:.!?…]$/.test(parts[idx[k - 1]]); }
+    // birim(ler)i sayının grubuna kat; k: sayının son sözcüğü
+    function birimEkle(k, g) {
+      var n = k + 1;
+      if (!sonaYaz(n)) return;
+      var b = birimMi(kat[n]);
+      if (!b) return;
+      grup[n] = g;
+      if (BUYUKLUK.test(b) && sonaYaz(n + 1)) {
+        var b2 = birimMi(kat[n + 1]);
+        if (b2 && !BUYUKLUK.test(b2)) grup[n + 1] = g;
       }
-    });
-    if (!Object.keys(isaret).length && idx.length >= 4) {
-      var en = -1, puan = 0;
-      idx.forEach(function (pi, k) {
-        var w = parts[pi].replace(/[^0-9A-Za-z\u00C0-\u024F\u0400-\u04FF]/g, "");
-        if (VURGU_DURAK.test(w) || w.length < 5) return;
-        var p = w.length + (/[!?]$/.test(parts[pi]) ? 3 : 0);
-        if (p > puan) { puan = p; en = k; }
-      });
-      if (en >= 0) isaret[en] = true;
     }
-    var ks = Object.keys(isaret).map(Number).sort(function (a, b) { return a - b; });
+    for (var k = 0; k < idx.length; k++) {
+      if (grup.hasOwnProperty(k)) continue;
+      var w = parts[idx[k]];
+      if (/\d/.test(w)) {
+        var g = ++grupNo;
+        if (k > 0 && YUZDE.test(kat[k - 1]) && !grup.hasOwnProperty(k - 1) && sonaYaz(k)) grup[k - 1] = g;
+        grup[k] = g;
+        birimEkle(k, g);
+        continue;
+      }
+      // okunuşla sayı: en uzun sayı sözcüğü koşusu ("iki yüz elli bin")
+      if (!sayiSozu(kat[k])) continue;
+      var bitis = k;
+      while (bitis + 1 < idx.length && sonaYaz(bitis + 1) && !sayiSozu(kat[bitis]).ekli && sayiSozu(kat[bitis + 1])) bitis++;
+      var yuzde = k > 0 && YUZDE.test(kat[k - 1]) && sonaYaz(k);
+      var kokler = [];
+      for (var q = k; q <= bitis; q++) kokler.push(sayiSozu(kat[q]).kok);
+      var sonrakiBirim = sonaYaz(bitis + 1) && birimMi(kat[bitis + 1]);
+      var tumBir = kokler.every(function (x) { return x === "bir"; });
+      var gecerli = !tumBir && (yuzde || kokler.length >= 2 || sonrakiBirim || SAYI_TEK_BASINA.test(kokler[0])) ||
+        (tumBir && kokler.length === 1 && sonrakiBirim && BUYUKLUK.test(sonrakiBirim));
+      if (kokler.length === 1 && /^buçuk$/.test(kokler[0])) gecerli = false;
+      if (!gecerli) { k = bitis; continue; }
+      var g2 = ++grupNo;
+      if (yuzde && !grup.hasOwnProperty(k - 1)) grup[k - 1] = g2;
+      for (var r = k; r <= bitis; r++) grup[r] = g2;
+      birimEkle(bitis, g2);
+      k = bitis;
+    }
+    var sayiGrubu = grupNo;
+    var sinir = idx.length <= 5 ? 1 : 2;
+    var kalan = sinir - sayiGrubu;
+    if (kalan > 0 && idx.length >= 2) {
+      // değer sözlüğü: puan = kat × 100 + uzunluk; cümlecik başına bir
+      var adaylar = [];
+      kat.forEach(function (w, k2) {
+        if (grup.hasOwnProperty(k2)) return;
+        for (var d = 0; d < DEGER.length; d++) {
+          var D = DEGER[d];
+          if (!D.re.test(w)) continue;
+          if (D.on && !(k2 > 0 && kat[k2 - 1] === D.on && sonaYaz(k2) && !grup.hasOwnProperty(k2 - 1))) continue;
+          if (D.degil && kat[k2 + 1] === D.degil) continue;
+          adaylar.push({ bas: D.on ? k2 - 1 : k2, son: k2, puan: D.kat * 100 + w.length });
+          break;
+        }
+      });
+      adaylar.sort(function (a, b) { return b.puan - a.puan || a.bas - b.bas; });
+      var kullanilan = {};
+      Object.keys(grup).forEach(function (x) { kullanilan[cumlecik[x]] = true; });
+      adaylar.forEach(function (a) {
+        if (kalan <= 0 || kullanilan[cumlecik[a.son]]) return;
+        var g3 = ++grupNo;
+        for (var z = a.bas; z <= a.son; z++) grup[z] = g3;
+        kullanilan[cumlecik[a.son]] = true;
+        kalan--;
+      });
+    }
+    if (!Object.keys(grup).length && idx.length >= 4) {
+      var en = -1, puan = 0;
+      idx.forEach(function (pi, k3) {
+        var w3 = kat[k3].replace(/[^0-9a-z\u00C0-\u024F\u0400-\u04FF]/g, "");
+        if (durakMi(w3) || w3.length < 5) return;
+        var p = w3.length + (/[!?]$/.test(parts[pi]) ? 3 : 0);
+        if (p > puan) { puan = p; en = k3; }
+      });
+      if (en >= 0) grup[en] = ++grupNo;
+    }
+    var ks = Object.keys(grup).map(Number).sort(function (a, b) { return a - b; });
     if (!ks.length) return t;
-    // ardisik isaretli kelimeler tek * ... * araliginda birlesir
+    // aynı gruptaki ardışık sözcükler tek * ... * aralığında birleşir; farklı gruplar ayrı kalır
     var gruplar = [];
-    ks.forEach(function (k) {
-      var g = gruplar[gruplar.length - 1];
-      if (g && g[1] === k - 1) g[1] = k; else gruplar.push([k, k]);
+    ks.forEach(function (k4) {
+      var son = gruplar[gruplar.length - 1];
+      if (son && son[1] === k4 - 1 && son[2] === grup[k4]) son[1] = k4; else gruplar.push([k4, k4, grup[k4]]);
     });
-    gruplar.forEach(function (g) {
-      var a = idx[g[0]], b = idx[g[1]];
+    gruplar.forEach(function (g4) {
+      var a = idx[g4[0]], b = idx[g4[1]];
       // sondaki noktalama yildizin disinda kalsin: "*100 TL*."
       var m = /^(.*?)([.,!?;:…]*)$/.exec(parts[b]);
       parts[a] = "*" + parts[a];
@@ -943,6 +1085,130 @@
       .replace(/ *\n */g, "\n").trim();
   }
 
+  /*
+   * Emojisiz cue'lar ("Emojileri bu katmanda atla"): stilli katman motoru (libass) renkli emoji çizemez.
+   * Yalnız emojiden oluşan sözcük düşer, emojili sözcükten emoji silinir; *vurgu* yıldızı komşu sözcüğe
+   * geçer. Ölçülmüş kelimeler (cue.words) düşen sözcüklerle birlikte ayıklanır (sayı metinle tutar).
+   * Girdi değişmez; transkript etkilenmez.
+   */
+  function emojisizCueler(cues) {
+    return (cues || []).map(function (c) {
+      var y = {};
+      for (var k in c) if (Object.prototype.hasOwnProperty.call(c, k)) y[k] = c[k];
+      if (!emojiVar(c.text)) return y;
+      var r = sozcukAyikla(String(c.text || ""), function (w) {
+        var kalan = w.replace(EMOJI_TUMU, "");
+        return kalan.replace(/\*/g, "") ? kalan : null;   // null: sözcük düşer
+      });
+      y.text = r.text;
+      if (c.words && c.words.length) {
+        if (c.words.length === r.sayi) {
+          y.words = c.words.filter(function (w, i) { return r.kalanlar.indexOf(i) !== -1; });
+          if (!y.words.length) delete y.words;
+        } else delete y.words;
+      }
+      return y;
+    }).filter(function (c) { return String(c.text || "").replace(/\*/g, "").trim(); });
+  }
+
+  /*
+   * Satırın sözcüklerini (boşlukla ayrılan, *vurgu*su ayıklanınca boş kalmayan) tek tek süz: fn(sozcuk)
+   * yeni sözcüğü ya da null (düşür) döner. Düşen sözcüğün açılış yıldızı sonraki, kapanış yıldızı önceki
+   * kalan sözcüğe geçer; cümle sonu noktalaması (.!?…) önceki sözcükte noktalama yoksa ona taşınır.
+   * Satır kırılımları korunur. Döner: { text, sayi (özgün içerikli sözcük), kalanlar (kalan sıraları) }.
+   */
+  function sozcukAyikla(text, fn) {
+    var satirlar = String(text).split("\n"), sayac = 0, kalanlar = [];
+    var tumu = [];   // { satir, w, i (içerik sırası) | -1 }
+    satirlar.forEach(function (st, si) {
+      st.split(/\s+/).filter(Boolean).forEach(function (w) {
+        var icerik = w.replace(/\*/g, "").length > 0;
+        tumu.push({ satir: si, w: w, i: icerik ? sayac++ : -1 });
+      });
+    });
+    var cikti = [];
+    var bekleyenAc = "";
+    tumu.forEach(function (o) {
+      if (o.i < 0) { cikti.push(o); return; }
+      var yeni = fn(o.w);
+      if (yeni === null || yeni === undefined) {
+        var ac = /^\*+/.exec(o.w), kapa = /\*+(?=[^*]*$)/.test(o.w.replace(/^\*+/, "")) ? "*" : "";
+        if (ac && !kapa) bekleyenAc = "*";
+        if (kapa && !ac) {
+          var once = cikti.length ? cikti[cikti.length - 1] : null;
+          if (once && once.i >= 0) once.w = once.w.replace(/^(.*?)([.,!?;:…»"')\]]*)$/, function (m, a, b) { return /\*$/.test(a) ? m : a + "*" + b; });
+          else bekleyenAc = "";
+        }
+        var nokta = /[.!?…]+$/.exec(o.w.replace(/\*+$/, ""));
+        var once2 = cikti.length ? cikti[cikti.length - 1] : null;
+        if (nokta && once2 && once2.i >= 0 && !/[.,!?;:…]["'’”»)*]*$/.test(once2.w)) once2.w += nokta[0];
+        return;
+      }
+      if (bekleyenAc) { yeni = "*" + yeni.replace(/^\*+/, ""); bekleyenAc = ""; }
+      kalanlar.push(o.i);
+      cikti.push({ satir: o.satir, w: yeni, i: o.i });
+    });
+    var satirMetni = [];
+    satirlar.forEach(function (st, si) {
+      var ws = cikti.filter(function (o) { return o.satir === si; }).map(function (o) { return o.w; });
+      if (ws.length) satirMetni.push(ws.join(" "));
+    });
+    return { text: satirMetni.join("\n"), sayi: sayac, kalanlar: kalanlar };
+  }
+
+  /*
+   * Dolgu sesleri (Ayarlar › Altyazı › "Dolgu seslerini altyazıdan çıkar", editörde "Dolguları çıkar"):
+   * tek başına söylenen ııı, ıı, eee, ee, ehm, hmm, ımm ve İngilizce um / uh. "Eh", "e" gibi anlamlı
+   * ünlemler ve büyük I'lardan oluşan sözcük (Roma rakamı III) dolgu sayılmaz.
+   */
+  var DOLGU = /^(ı{2,}h?m*|ı+m{2,}|ı+hm+|e{2,}h?m*|eh?m{1,}|e+hm+|hm{1,}|h{1,}m{2,}|um{1,}|u+h{1,}m?|uhm+|erm+)$/;
+  function dolguMu(w) {
+    var ham = String(w == null ? "" : w).replace(/[\s*.,!?;:…"'’“”«»()\[\]\-–—]/g, "");
+    if (!ham || /^I+$/.test(ham)) return false;
+    var s = ham.replace(/İ/g, "i").replace(/I/g, "ı");
+    try { s = s.toLocaleLowerCase("tr"); } catch (e) { s = s.toLowerCase(); }
+    return DOLGU.test(s);
+  }
+
+  /*
+   * Satırlardan dolgu sözcüklerini at: metinden ve ölçülmüş kelimelerden (words[]) aynı ölçütle; *vurgu*
+   * korunur (yıldız komşu sözcüğe geçer), satır baş/sonundaki dolgu atılınca satır kalan kelimeye daralır,
+   * yalnız dolgudan oluşan satır düşer. Satır başı büyük harfle başlıyorduysa yeni ilk sözcük büyür.
+   * Girdi değişmez. Döner: { segments, sayi (atılan dolgu) }.
+   */
+  function dolgulariAt(segs, loc) {
+    var atilan = 0, out = [];
+    (segs || []).forEach(function (s) {
+      if (!s) return;
+      var metin = String(s.text == null ? "" : s.text);
+      var r = sozcukAyikla(metin, function (w) { return dolguMu(w) ? null : w; });
+      var atilanBu = r.sayi - r.kalanlar.length;
+      if (!atilanBu) { out.push(s); return; }
+      atilan += atilanBu;
+      if (!r.text.replace(/[*\s.,!?;:…\-–—]/g, "")) return;   // yalnız dolguydu
+      var y = kelimeKopya(s, r.text);
+      var ilk = metin.replace(/^[\s*"'“«(]+/, "").charAt(0);
+      if (ilk && ilk !== ilk.toLowerCase()) {
+        y.text = y.text.replace(/^([\s*"'“«(]*)(\S)/, function (m, a, b) {
+          var l = String(loc || "").slice(0, 2);
+          return a + (l === "tr" || l === "az" ? (b === "i" ? String.fromCharCode(0x130) : b.toLocaleUpperCase("tr")) : b.toUpperCase());
+        });
+      }
+      if (kelimeli(s)) {
+        var ws = s.words.filter(function (w) { return !dolguMu(w && w.text); });
+        if (ws.length) {
+          y.words = ws;
+          var a = Number(ws[0].start), b = Number(ws[ws.length - 1].end);
+          var a0 = Number(s.words[0].start), b0 = Number(s.words[s.words.length - 1].end);
+          if (isFinite(a) && a > a0 && a > y.start && a < y.end) y.start = a;
+          if (isFinite(b) && b < b0 && b < y.end && b > y.start) y.end = b;
+        } else delete y.words;
+      }
+      out.push(y);
+    });
+    return { segments: out, sayi: atilan };
+  }
+
   // Aramada büyük/küçük harf katlama: "tr" yereli "I" harfini "ı" yapar, İngilizce
   // metinde "it" sorgusu "It" ile eşleşmezdi. İki taraf da yerelden bağımsız katlanır.
   function aramaKatla(s) {
@@ -954,6 +1220,9 @@
     metinStili: metinStili,
     emojiVar: emojiVar,
     emojiSil: emojiSil,
+    emojisizCueler: emojisizCueler,
+    dolguMu: dolguMu,
+    dolgulariAt: dolgulariAt,
     stripEmphasis: stripEmphasis,
     hasEmphasis: hasEmphasis,
     toggleWord: toggleWord,
@@ -963,6 +1232,7 @@
     emphasisInfo: emphasisInfo,
     normalizeEmphasis: normalizeEmphasis,
     autoEmphasis: autoEmphasis,
+    VURGU_DURAK_KELIMELER: VURGU_DURAK_KELIMELER.slice(),
     cleanSegments: cleanSegments,
     gurultuMu: gurultuMu,
     sesEtiketleri: sesEtiketleri,

@@ -111,7 +111,7 @@ var removed = call("KS_removeCaptionMogrtBatch", { batch: "cap-test" });
 ok("Yarim kalan MOGRT altyazi grubu guvenle temizlenir", removed.ok && removed.removed === 1 && clips.numItems === 0, JSON.stringify(removed));
 
 var captions = fs.readFileSync(path.join(ROOT, "js", "captions.js"), "utf8");
-ok("MOGRT seciliyken libass emoji bekcisi bu yolu engellemez", /if \(!secilenMogrt && emojiIceriyorMu\(\)\)/.test(captions));
+ok("MOGRT seciliyken libass emoji bekcisi bu yolu engellemez", /if \(!secilenMogrt && !emojiAtla && emojiIceriyorMu\(\)\)/.test(captions));
 var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 ok("Normal caption ve stilli MOGRT ayri butonlardir",
   /id="cap-apply"[^>]*>Normal altyazı izi ekle/.test(html) && /id="cap-apply-style"/.test(html));
