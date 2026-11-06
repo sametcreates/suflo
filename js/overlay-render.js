@@ -99,10 +99,15 @@
    * 59,94 / 23,976 fps'te kare zamanı (1,0677 sn) santisaniyeye yuvarlanınca (1,07) olay karenin ARDINDAN başlıyor, cue
    * bir kare geç açılıp bir kare geç kapanıyordu. Burada her zaman katman ızgarasının en yakın karesine oturur (ofs:
    * katmanın timeline başı; 0 = katman zamanı) ve LIBASS_PAY kadar öne alınır: santisaniyeye yuvarlanan değer o karenin
-   * ms'sini geçmez, bir önceki karenin ms'sine de inmez (100 fps'e kadar; ffmpeg'in r=29.97 ızgarasıyla 1 saatte birkaç
-   * ms'lik farkı da karşılar). Kopya döner (kelimeler de); girdi değişmez. fps geçersizse cue'lar aynen (kopya).
+   * ms'sini geçmez, bir önceki karenin ms'sine de inmez (kare aralığı ≥ 15,5 ms, yani PAY_FPS_SINIR fps'e kadar;
+   * ffmpeg'in r=29.97 ızgarasıyla 1 saatte birkaç ms'lik farkı da karşılar). Daha yüksek fps'te (100 / 119,88 / 120)
+   * santisaniye penceresi kareden geniştir, sabit pay kartı bir kare ERKEN açardı: orada ffmpeg'in kare ms'si birebir
+   * hesaplanır ((long long)(pts · av_q2d(1/r) · 1000)) ve (önceki kare, bu kare] aralığındaki son santisaniye seçilir;
+   * aralıkta santisaniye yoksa (120 fps'te her 6 karede bir) eski en yakın santisaniye. Kopya döner (kelimeler de);
+   * girdi değişmez. Yarım kareden kısa kart en az bir kare görünür. fps geçersizse cue'lar aynen (kopya).
    */
   var LIBASS_PAY = 0.0099;
+  var PAY_FPS_SINIR = 64;
   function kareIzgarasi(fps) {
     var f = Number(fps);
     if (!(f > 0) || !isFinite(f) || f > 1000) return 0;
@@ -110,26 +115,38 @@
     if (Math.abs(f - n * 1000 / 1001) < 0.005 && Math.abs(f - n) > 0.005) return n * 1000 / 1001;
     return f;
   }
-  function kareZamani(t, f, ofs) {
+  // ffmpeg'in kare süresi (av_q2d(time_base)); f kareIzgarasi'nın değeri: NTSC ızgarasında 1001 / (n·1000), yoksa 1 / f
+  function kareAdimi(f) {
+    var n = Math.round(f);
+    return Math.abs(f - n) > 0.005 && f === n * 1000 / 1001 ? 1001 / (n * 1000) : 1 / f;
+  }
+  function kareZamani(t, f, ofs, q) {
     var x = Number(t);
     if (!isFinite(x)) return t;
     var k = Math.round((x - ofs) * f + 1e-7);
-    return Math.max(0, Math.round((ofs + k / f - LIBASS_PAY) * 1e6) / 1e6);
+    if (f <= PAY_FPS_SINIR || k <= 0) return Math.max(0, Math.round((ofs + k / f - LIBASS_PAY) * 1e6) / 1e6);
+    // yüksek fps: libass'in gördüğü kare ms'si (ffmpeg vf_subtitles keser); olay [bas, son) ms aralığında görünür
+    var simdi = Math.floor(k * q * 1000), once = Math.floor((k - 1) * q * 1000);
+    var cs = Math.floor(simdi / 10);
+    if (cs * 10 <= once) cs = Math.round(k / f * 100);   // aralıkta santisaniye yok: eski yuvarlama
+    return Math.max(0, Math.round((ofs + cs / 100) * 1e6) / 1e6);
   }
   function kareZamanlari(cues, fps, ofs) {
-    var f = kareIzgarasi(fps), o = Number(ofs) || 0;
+    var f = kareIzgarasi(fps), o = Number(ofs) || 0, q = f ? kareAdimi(f) : 0;
     return (cues || []).map(function (c) {
       var y = {};
       for (var a in c) if (Object.prototype.hasOwnProperty.call(c, a)) y[a] = c[a];
       if (!f) return y;
-      y.start = kareZamani(c.start, f, o);
-      y.end = kareZamani(c.end, f, o);
+      y.start = kareZamani(c.start, f, o, q);
+      y.end = kareZamani(c.end, f, o, q);
+      // yarım kareden kısa kart iki ucu aynı kareye oturup görünmez olmasın: en az bir kare (eski yuvarlama da bir kare gösterirdi)
+      if (Number(c.end) > Number(c.start) && !(y.end > y.start)) y.end = kareZamani(Number(c.start) + 1 / f, f, o, q);
       if (c.words && c.words.length) {
         y.words = c.words.map(function (w) {
           var z = {};
           for (var b in w) if (Object.prototype.hasOwnProperty.call(w, b)) z[b] = w[b];
-          z.start = kareZamani(w.start, f, o);
-          z.end = kareZamani(w.end, f, o);
+          z.start = kareZamani(w.start, f, o, q);
+          z.end = kareZamani(w.end, f, o, q);
           return z;
         });
       }

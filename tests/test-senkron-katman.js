@@ -74,6 +74,27 @@ function ciz(ass, fps, sure, ad) {
   else ok(fz[1] + " fps: eski yol (santisaniyeye yuvarlama) aynı kartları bir kare geç açıyordu", gec === kareler.length, JSON.stringify(eski.slice(0, kareler.length)));
 });
 
+// 100 / 120 fps: kare aralığı santisaniye penceresinden dar; sabit 9,9 ms pay 100 fps'te her kartı bir kare ERKEN açardı.
+// Kart erken açılmaz; (önceki kare, bu kare] aralığında santisaniye varsa tam karesinde açılır / kapanır (gerçek libass).
+[[100, 1 / 100, "100"], [120, 1 / 120, "120"]].forEach(function (fz) {
+  var F = fz[0], q = fz[1];
+  function an(j) { return Math.floor(j * q * 1000); }
+  function tamMi(k) { return Math.floor(an(k) / 10) * 10 > an(k - 1); }
+  var kareler = [];
+  for (var k = 20; kareler.length < 8; k += 14) kareler.push(k);
+  var cues = kareler.map(function (k, i) { return { start: k / F, end: (k + 9) / F, text: "kart " + (i + 1) }; });
+  var kareCue = OR.kareZamanlari(cues, F, 0);
+  var sure = (kareler[kareler.length - 1] + 14) / F;
+  var yeni = ciz(kutuAss(kareCue.map(function (c) { return { bas: tcAss(c.start), son: tcAss(c.end) }; })), F, sure, "yuksek" + fz[2]);
+  var hata = [];
+  kareler.forEach(function (k, i) {
+    var x = yeni[i];
+    if (x[0] < k || x[1] < k + 8 || x[0] > k + 1 || x[1] > k + 9) hata.push(i + ":" + JSON.stringify(x));
+    else if ((tamMi(k) && x[0] !== k) || (tamMi(k + 9) && x[1] !== k + 8)) hata.push(i + ":" + JSON.stringify(x) + " tam değil");
+  });
+  ok(fz[2] + " fps: kart erken açılmaz, santisaniye varsa tam karesinde açılıp kapanır (gerçek libass)", !hata.length, hata.join(" ") + " " + JSON.stringify(kareler));
+});
+
 // 1 saatlik sekansın sonunda da (ffmpeg'in r=29.97 ızgarası 30000/1001'den birkaç ms sapar) kart karesinde açılır
 (function () {
   var F = 30000 / 1001, k0 = 107800;

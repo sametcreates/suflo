@@ -14,6 +14,43 @@ ok("kaynak: captions.js'teki zincirin aynısı (alpha=1 + unpremultiply)",
   "color=c=black@0.0:s=1920x1080:r=25:d=12,format=rgba,subtitles=f=altyazi.ass:alpha=1:fontsdir=.,unpremultiply=inplace=1");
 ok("ffmpeg argümanları: lavfi → qtrle, ses yok", JSON.stringify(OR.ffmpegArgs("X", "/o.mov")) === JSON.stringify(["-y", "-f", "lavfi", "-i", "X", "-c:v", "qtrle", "-an", "/o.mov"]));
 
+function J2(x) { return JSON.stringify(x); }
+/* ---------------- kareZamanlari: yüksek fps (100 / 119,88 / 120) ---------------- */
+// ffmpeg vf_subtitles'in libass'e verdiği an: (long long)(pts · av_q2d(1/r) · 1000); olay [bas, son) ms aralığında görünür,
+// ASS santisaniye taşır (stil motoru Math.round(t·100)). Kart k. karede açılmalı; aralıkta santisaniye yoksa en çok bir kare geç,
+// hiçbir zaman erken. Sabit 9,9 ms pay 100 fps'te her kartı bir kare ERKEN açıyordu.
+(function () {
+  [[25, 1 / 25], [30000 / 1001, 1001 / 30000], [60000 / 1001, 1001 / 60000], [100, 1 / 100], [120000 / 1001, 1001 / 120000], [120, 1 / 120]].forEach(function (fz) {
+    var F = fz[0], q = fz[1], tam = 0, mumkun = 0, erken = 0, cokGec = 0, ilkErken = -1;
+    function an(j) { return Math.floor(j * q * 1000); }
+    for (var k = 1; k < 3000; k++) {
+      var t = OR.kareZamanlari([{ start: k / F, end: (k + 5) / F }], F, 0)[0].start;
+      var cs = Math.round(t * 100), j = 0;
+      while (cs * 10 > an(j)) j++;
+      var var_ = Math.floor(an(k) / 10) * 10 > an(k - 1);
+      if (var_) { mumkun++; if (j === k) tam++; }
+      if (j < k) { erken++; if (ilkErken < 0) ilkErken = k; }
+      if (j > k + 1) cokGec++;
+    }
+    ok("kareZamanlari " + F.toFixed(3) + " fps: kart hiçbir karede erken açılmaz, santisaniye varsa tam karesinde",
+      erken === 0 && cokGec === 0 && tam === mumkun, "erken " + erken + " (ilk " + ilkErken + ") · tam " + tam + "/" + mumkun + " · 2+ geç " + cokGec);
+  });
+  // ofs: katman sekansın ortasından başlıyorsa da (stil motoru offset'i çıkarır) aynı kare
+  var o = 12.34, k2 = 457, z = OR.kareZamanlari([{ start: o + k2 / 100, end: o + (k2 + 3) / 100 }], 100, o)[0];
+  ok("kareZamanlari 100 fps, ofs'lu katman: santisaniye kare zamanının kendisi", Math.round((z.start - o) * 100) === k2 && Math.round((z.end - o) * 100) === k2 + 3, z.start + " " + z.end);
+  // yarım kareden kısa kart (motorun 14 ms'lik kelimesi) iki ucu aynı kareye oturup katmandan kaybolmasın: bir kare görünür
+  [25, 30000 / 1001, 100].forEach(function (F) {
+    var q = Math.abs(F - Math.round(F)) > 0.005 ? 1001 / (Math.round(F) * 1000) : 1 / F;
+    function an(j) { return Math.floor(j * q * 1000); }
+    var c = OR.kareZamanlari([{ start: 30 / F + 0.001, end: 30 / F + 0.001 + 0.3 / F, text: "a" }], F, 0)[0];
+    var bas = Math.round(c.start * 100) * 10, son = Math.round(c.end * 100) * 10, gor = [];
+    for (var j = 0; j < 60; j++) if (bas <= an(j) && an(j) < son) gor.push(j);
+    ok("kareZamanlari " + F.toFixed(3) + " fps: yarım kareden kısa kart tam bir kare (kendi karesinde) görünür", gor.length === 1 && gor[0] === 30, J2(c) + " " + gor.join(","));
+  });
+  var sifir = OR.kareZamanlari([{ start: 2, end: 2, text: "s" }], 25, 0)[0];
+  ok("kareZamanlari: sıfır süreli kart sıfır süreli kalır (uzatılmaz)", sifir.start === sifir.end, J2(sifir));
+})();
+
 /* ---------------- buildArgs / previewArgs (Marka Kiti logosu) ---------------- */
 var TABAN = { assName: "altyazi.ass", fontsdir: ".", w: 1920, h: 1080, fps: 25, dur: 12, out: "/o.mov" };
 ok("buildArgs: logo yokken bugünkü argümanların aynısı",
