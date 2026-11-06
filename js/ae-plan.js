@@ -106,7 +106,11 @@
     "iki-ton": "renk değişimi yumuşak geçişsiz, anında",
     "buyuyen-vurgu": "anahtar kelime yanındakileri itmeden büyür",
     "kapak-cevir": "kart 3B katman olarak X ekseninde döner, perspektif kompozisyonun kamerasına bağlı",
-    "perde": "perde maskesi yazıyla birlikte yükselir"
+    "perde": "perde maskesi yazıyla birlikte yükselir",
+    // AutoCaptions koleksiyonu
+    "isilti-kay": "ışıltı yerine yumuşak bulanıklık kullanılır",
+    "hiz-bulanik": "yön bulanıklığı yerine her yöne eşit bulanıklık kullanılır",
+    "puruzlu": "kenar pürüzü yok, kart bulanıktan netleşir"
   };
   var HATA = {
     comp: "After Effects'te bir kompozisyon aç.",
@@ -679,15 +683,69 @@
       var T = Math.max(SEKME, Math.min(c.D, c.son - c.bas)), pay = Math.round(c.kontur + c.fs * 0.3);
       return { maske: { ad: "Suflo perde", ifade: perdeIfadesi(c.bas, c.bas + 0.6 * T, c.bas + T, pay) },
         katmanAnahtarlari: [{ ozellik: "konum", anahtarlar: konumKeyleri([[0, sc(14, c.olcek)], [0.6, sc(3, c.olcek)], [1, 0]], c, 1) }] };
-    } }
+    } },
+    /*
+     * AutoCaptions koleksiyonu (stil motorundaki eğrilerle aynı; yazarın izniyle). Kayışlar katman konumu + opaklık,
+     * bulanıklık "Suflo …" metin animatörünün Bulanıklığı (netles gibi), esnet / yakınlaş katman ölçeği.
+     */
+    "yumusak-kay": { ae: "tam", kutuIzler: true, kur: function (c) { return acKayis(c, [[0, 0.5], [0.3, 1]]); } },
+    "bulanik-kay": { ae: "tam", kutuIzler: true, kur: function (c) {
+      return acBulanik(acKayis(c, [[0, 0], [0.18, 1]]), "Suflo bulanık kayış", [[0, ondalik(11 * c.olcek)], [0.25, 0]], c);
+    } },
+    "titrek-kay": { ae: "tam", kutuIzler: true, kur: function (c) { return acKayis(c, [[0, 0], [0.12, 1], [0.24, 0.35], [0.4, 1]]); } },
+    "isilti-kay": { ae: "yakin", kutuIzler: true, kur: function (c) {
+      return acBulanik(acKayis(c, [[0, 0.6], [0.2, 1]]), "Suflo ışıltılı kayış", [[0, ondalik(8 * c.olcek)], [1, 0]], c);
+    } },
+    "kirpis": { ae: "tam", kur: function (c) { return { katmanAnahtarlari: [opaklikKeyleri([[0, 0], [0.25, 1], [0.5, 0.3], [1, 1]], c)] }; } },
+    "bulanik-kirpis": { ae: "tam", kur: function (c) {
+      return acBulanik({ katmanAnahtarlari: [opaklikKeyleri([[0, 0], [0.25, 1], [0.5, 0.3], [1, 1]], c)] }, "Suflo bulanık kırpış",
+        [[0, ondalik(10 * c.olcek)], [0.5, ondalik(3 * c.olcek)], [1, 0]], c);
+    } },
+    "hiz-bulanik": { ae: "yakin", kutuIzler: true, kur: function (c) {
+      var d = Math.round(c.w * 0.06);
+      return acBulanik({ katmanAnahtarlari: [{ ozellik: "konum", anahtarlar: konumKeyleri([[0, -d], [1, 0]], c, 0) }, opaklikKeyleri([[0, 0], [0.3, 1]], c)] },
+        "Suflo hız bulanıklığı", [[0, ondalik(14 * c.olcek)], [1, 0]], c);
+    } },
+    "puruzlu": { ae: "yakin", kur: function (c) {
+      return acBulanik({ katmanAnahtarlari: [{ ozellik: "olcek", anahtarlar: kartKeyleri([[0, 104], [1, 100]], c, function (v) { return [v, v]; }) },
+        opaklikKeyleri([[0, 0], [0.23, 1]], c)] }, "Suflo pürüzlü giriş", [[0, ondalik(9 * c.olcek)], [0.62, 0]], c);
+    } },
+    "esnet": { ae: "tam", kur: function (c) {
+      return { katmanAnahtarlari: [{ ozellik: "olcek", anahtarlar: kartKeyleri([[0, 130], [0.6, 97], [1, 100]], c, function (v) { return [v, 100]; }) },
+        opaklikKeyleri([[0, 0], [0.3, 1]], c)] };
+    } },
+    "yakinlas": { ae: "tam", kur: function (c) {
+      return { katmanAnahtarlari: [{ ozellik: "olcek", anahtarlar: kartKeyleri([[0, 140], [1, 100]], c, function (v) { return [v, v]; }) },
+        opaklikKeyleri([[0, 0], [0.35, 1]], c)] };
+    } },
+    "sagdan-kay": { ae: "tam", kutuIzler: true, kur: function (c) {
+      var d = Math.round(c.w * 0.08);
+      return { katmanAnahtarlari: [{ ozellik: "konum", yumusatma: 50, anahtarlar: konumKeyleri([[0, d], [0.35, Math.round(d * 0.3)], [1, 0]], c, 0) },
+        opaklikKeyleri([[0, 0], [0.5, 1]], c)] };
+    } },
+    "kelime-belir": { ae: "tam", kur: function (c) { return { animatorler: [belirme("Suflo kelime kelime", kelimePenceresi(c), c)] }; } }
   };
+  // AutoCaptions kayışı: kart aşağıdan (1080 tabanında 60 px) yavaşlayarak; opaklık eğrisi kayışa göre
+  function acKayis(c, opak) {
+    var d = sc(60, c.olcek);
+    return { katmanAnahtarlari: [{ ozellik: "konum", yumusatma: 50, anahtarlar: konumKeyleri([[0, d], [0.35, Math.round(d * 0.3)], [1, 0]], c, 1) },
+      opaklikKeyleri(opak, c)] };
+  }
+  // Plana kartın tamamına bulanıklık animatörü ekler (netles ile aynı yapı)
+  function acBulanik(p, ad, egri, c) {
+    p.animatorler = (p.animatorler || []).concat([animator(ad, "karakter", { bulaniklik: [egri[0][1], egri[0][1]] }, kartSecici(),
+      { bulaniklik: kartKeyleri(egri, c, function (v) { return [v, v]; }) })]);
+    return p;
+  }
   /*
    * Etkin kelime klasik kuraldaki gibi (kelime vurgusu açıkken) vurgu renginde kalır: önizlemede metin()'in varsayılan
    * rengini alan bütün türler (kelime / harf girişleri, kart, darbe, büyüyen, nefes). Renk / dolgu türlerinde (renk-gecis,
    * karaoke-birikimli, karaoke-dolgu, iki-ton) etkin kelimenin rengi animasyonun kendisidir: klasik etkin kelime yok.
    */
   ["kelime-pop", "yukari-suzul", "dalga", "zipla-gel", "dusus", "daktilo", "harf-belir", "netles", "yandan-kay", "aralik-acil",
-    "olcek-darbe", "sallanma", "buyuyen-vurgu", "nefes", "donerek", "kapak-cevir", "perde"].forEach(function (id) {
+    "olcek-darbe", "sallanma", "buyuyen-vurgu", "nefes", "donerek", "kapak-cevir", "perde",
+    "yumusak-kay", "bulanik-kay", "titrek-kay", "isilti-kay", "kirpis", "bulanik-kirpis", "hiz-bulanik", "puruzlu", "esnet", "yakinlas",
+    "sagdan-kay", "kelime-belir"].forEach(function (id) {
     ANIM_AE[id].etkinRenk = true;
   });
 

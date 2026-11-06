@@ -37,7 +37,10 @@
     "netles": "°", "yandan-kay": "»", "aralik-acil": "↔", "olcek-darbe": "+", "renk-gecis": "*", "sallanma": "≈",
     // Parti 5
     "karaoke-dolgu": "▸", "karaoke-birikimli": "≫", "vurgu-kutusu": "■", "vurgu-cizgi": "_", "parlama": "✧", "iki-ton": "◐",
-    "kromatik-yumusak": "≋", "buyuyen-vurgu": "⊕", "dusus": "⇣", "kapak-cevir": "⌒", "donerek": "↻", "perde": "▴", "nefes": "○"
+    "kromatik-yumusak": "≋", "buyuyen-vurgu": "⊕", "dusus": "⇣", "kapak-cevir": "⌒", "donerek": "↻", "perde": "▴", "nefes": "○",
+    // AutoCaptions koleksiyonu
+    "yumusak-kay": "⇡", "bulanik-kay": "⋰", "titrek-kay": "⇞", "isilti-kay": "✦", "kirpis": "◇", "bulanik-kirpis": "◈",
+    "hiz-bulanik": "⇉", "puruzlu": "#", "esnet": "⟷", "yakinlas": "⊙", "sagdan-kay": "«", "kelime-belir": "⁞"
   };
   var GIRIS_GLIF = { yok: "", pop: "•", fade: "°", yukari: "↑", asagi: "↓", zipla: "^" };
   var AKTIF_GLIF = { yok: "", zipla: "^", titre: "≈", glitch: "×" };

@@ -813,8 +813,8 @@ ok("galeri: çip sayısı hâlâ GORUNUMLER + ★ Şablonum, her çipte data-kat
   gCip.length === AE.GORUNUMLER.length + 1 && AE.GORUNUMLER.every(function (g, i) { return gCip[i].getAttribute("data-gorunum") === g.id &&
     gCip[i].getAttribute("data-kategori") === g.kategori && gCip[i].childNodes[1].textContent === g.ad && gCip[i].classList.contains("efekt-cip"); }) &&
   gCip[gCip.length - 1].getAttribute("data-kategori") === null);
-ok("galeri: sekmeler Tümü + altı kategori (Türkçe adlarıyla), başta Tümü seçili ve hepsi görünür",
-  sekme.map(function (b) { return b.textContent; }).join("|") === "Tümü|Viral · Shorts|Minimal|Podcast|Eğitim|Sinematik|Marka" &&
+ok("galeri: sekmeler Tümü + altı kategori + AutoCaptions (Türkçe adlarıyla), başta Tümü seçili ve hepsi görünür",
+  sekme.map(function (b) { return b.textContent; }).join("|") === "Tümü|Viral · Shorts|Minimal|Podcast|Eğitim|Sinematik|Marka|AutoCaptions" &&
   sekme.every(function (b) { return b.classList.contains("efekt-kategori") && b.getAttribute("role") === "tab"; }) &&
   sekme[0].getAttribute("aria-selected") === "true" && gorunenCipler(gk).length === gCip.length);
 ok("galeri: çip örneği yazı tipinde, yazı / kontur / vurgu rengi, kutu zemini ve yazı animasyonunun minik glifi (çeviriden muaf)", (function () {

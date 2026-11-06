@@ -1379,7 +1379,48 @@
     } },
     "kapak-cevir": { tur: "kart", kare: function () { return { frx: [[0, 70], [0.5, 12], [1, 0]], a: [[0, 0], [0.4, 1]] }; } },
     "donerek": { tur: "kart", kare: function () { return { frz: [[0, -12], [0.5, -2.5], [1, 0]], s: [[0, 85], [0.5, 98], [1, 100]], a: [[0, 0], [0.35, 1]] }; } },
-    "perde": { tur: "kart", kare: function (h) { return { perde: [[0, 0], [0.6, 0.85], [1, 1]], y: [[0, scaled(14, h)], [0.6, scaled(3, h)], [1, 0]] }; } }
+    "perde": { tur: "kart", kare: function (h) { return { perde: [[0, 0], [0.6, 0.85], [1, 1]], y: [[0, scaled(14, h)], [0.6, scaled(3, h)], [1, 0]] }; } },
+    /*
+     * AutoCaptions koleksiyonu (yazarın izniyle; js/yazi-animasyonlari.js notu). Eğriler eklentinin ön ayar verisinden:
+     * kayışlar kadrajın ~%30'u aşağıdan (1080 tabanında 60 px'e ölçeklendi) yavaşlayarak; Smooth Slide opaklığı %50'den,
+     * Blur Slide bulanıklığı ilk %25'te, Flicker Slide tek sönüş (ışığa duyarlılık), Glow Slide ışıltısı bulanık hâleyle;
+     * Flicker / Blur & Flicker 250 ms → 360 ms tek sönüş; Motion Blur soldan; Rough bulanık + %104; Stretch %197 → %130
+     * (kadraja sığar); Zoom In %183 → %140; Word by Word kelime başına anında belirme (100 ms).
+     */
+    "yumusak-kay": { tur: "kart", kare: function (h) {
+      var d = scaled(60, h);
+      return { y: [[0, d], [0.35, Math.round(d * 0.3)], [1, 0]], a: [[0, 0.5], [0.3, 1]] };
+    } },
+    "bulanik-kay": { tur: "kart", kare: function (h, w, olcek) {
+      var d = scaled(60, h);
+      return { y: [[0, d], [0.35, Math.round(d * 0.3)], [1, 0]], blur: [[0, ondalik(11 * olcek)], [0.25, 0]], a: [[0, 0], [0.18, 1]] };
+    } },
+    "titrek-kay": { tur: "kart", kare: function (h) {
+      var d = scaled(60, h);
+      return { y: [[0, d], [0.35, Math.round(d * 0.3)], [1, 0]], a: [[0, 0], [0.12, 1], [0.24, 0.35], [0.4, 1]] };
+    } },
+    "isilti-kay": { tur: "kart", kare: function (h, w, olcek) {
+      var d = scaled(60, h);
+      return { y: [[0, d], [0.35, Math.round(d * 0.3)], [1, 0]], blur: [[0, ondalik(8 * olcek)], [1, 0]], a: [[0, 0.6], [0.2, 1]] };
+    } },
+    "kirpis": { tur: "kart", kare: function () { return { a: [[0, 0], [0.25, 1], [0.5, 0.3], [1, 1]] }; } },
+    "bulanik-kirpis": { tur: "kart", kare: function (h, w, olcek) {
+      return { a: [[0, 0], [0.25, 1], [0.5, 0.3], [1, 1]], blur: [[0, ondalik(10 * olcek)], [0.5, ondalik(3 * olcek)], [1, 0]] };
+    } },
+    "hiz-bulanik": { tur: "kart", kare: function (h, w, olcek) {
+      var d = Math.round(w * 0.06);
+      return { x: [[0, -d], [1, 0]], blur: [[0, ondalik(14 * olcek)], [1, 0]], a: [[0, 0], [0.3, 1]] };
+    } },
+    "puruzlu": { tur: "kart", kare: function (h, w, olcek) {
+      return { blur: [[0, ondalik(9 * olcek)], [0.62, 0]], s: [[0, 104], [1, 100]], a: [[0, 0], [0.23, 1]] };
+    } },
+    "esnet": { tur: "kart", kare: function () { return { gx: [[0, 130], [0.6, 97], [1, 100]], a: [[0, 0], [0.3, 1]] }; } },
+    "yakinlas": { tur: "kart", kare: function () { return { s: [[0, 140], [1, 100]], a: [[0, 0], [0.35, 1]] }; } },
+    "sagdan-kay": { tur: "kart", kare: function (h, w) {
+      var d = Math.round(w * 0.08);
+      return { x: [[0, d], [0.35, Math.round(d * 0.3)], [1, 0]], a: [[0, 0], [0.5, 1]] };
+    } },
+    "kelime-belir": { tur: "kelime", kare: function () { return { a: [[0, 0], [1, 1]] }; } }
   };
   // Kelime kutusu "SufloKutu" stilini ister (ASS başlığına kutu kapalıyken de girer)
   function animKutuStili(style) { return typeof style.anim === "string" && sahip(ANIM, style.anim) && (ANIM[style.anim].tur === "kutu" || ANIM[style.anim].tur === "cizgi") && animGecerli(style.anim); }
@@ -1487,6 +1528,11 @@
       var s0 = ondalik(v("s", a, 100)), s1 = ondalik(v("s", b, 100));
       var etiket = olc(s0) + (s1 !== s0 ? "\\t(0," + ms + "," + olc(s1) + ")" : "");
       if (m) olcek = etiket; else ek += etiket;
+    } else if (kare.gx && !m) {
+      // AutoCaptions "esnet": yalnız yatay ölçek (%; kartın tamamı), uzun kelime sıkıştırmasıyla çarpılır
+      var gx = function (s) { return "\\fscx" + (sx > 0 && sx < 100 ? ondalik(s * sx / 100) : s); };
+      var gx0 = ondalik(v("gx", a, 100)), gx1 = ondalik(v("gx", b, 100));
+      ek += gx(gx0) + (gx1 !== gx0 ? "\\t(0," + ms + "," + gx(gx1) + ")" : "");
     }
     if (kare.a) {
       var A0 = Math.round(255 * (1 - v("a", a, 1))), A1 = Math.round(255 * (1 - v("a", b, 1)));

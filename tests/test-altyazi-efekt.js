@@ -297,8 +297,20 @@ ok("Kutulu görünümü motorda kutuyla, Vurucu / Zarif gölgeyle çizilir", /St
 
 /* ---------------- Parti 3: stil kütüphanesi (kategoriler, 24+ özgün görünüm, tipografi kuralları) ---------------- */
 var KAT = AE.KATEGORILER.map(function (k) { return k.id; });
-ok("KATEGORILER: altı kategori, Türkçe adlarıyla", J(AE.KATEGORILER) === J([{ id: "viral", ad: "Viral · Shorts" }, { id: "minimal", ad: "Minimal" },
-  { id: "podcast", ad: "Podcast" }, { id: "egitim", ad: "Eğitim" }, { id: "sinematik", ad: "Sinematik" }, { id: "marka", ad: "Marka" }]), J(AE.KATEGORILER));
+ok("KATEGORILER: altı Suflo kategorisi + AutoCaptions koleksiyonu, Türkçe adlarıyla", J(AE.KATEGORILER) === J([{ id: "viral", ad: "Viral · Shorts" }, { id: "minimal", ad: "Minimal" },
+  { id: "podcast", ad: "Podcast" }, { id: "egitim", ad: "Eğitim" }, { id: "sinematik", ad: "Sinematik" }, { id: "marka", ad: "Marka" },
+  { id: "autocaptions", ad: "AutoCaptions" }]), J(AE.KATEGORILER));
+// AutoCaptions koleksiyonu (ClashiVFX AutoCaptions, yazarın izniyle): 19 görünüm, hepsi kütüphanenin sonunda, koleksiyon işaretli
+var ACG = AE.GORUNUMLER.filter(function (g) { return g.kategori === "autocaptions"; });
+ok("AutoCaptions koleksiyonu: 19 görünüm, kimlikler ac-, koleksiyon: autocaptions yalnız onlarda, listenin sonunda, en az 8'i koleksiyonun animasyonlarıyla",
+  ACG.length === 19 && ACG.every(function (g) { return /^ac-[a-z]+(-[a-z]+)*$/.test(g.id) && g.koleksiyon === "autocaptions"; }) &&
+  AE.GORUNUMLER.every(function (g) { return (g.koleksiyon === "autocaptions") === (g.kategori === "autocaptions"); }) &&
+  AE.GORUNUMLER.slice(-19).every(function (g) { return g.kategori === "autocaptions"; }) &&
+  ACG.filter(function (g) { var k = g.ayar.anim && YA.bul(g.ayar.anim); return k && k.koleksiyon === "autocaptions"; }).length >= 8,
+  ACG.map(function (g) { return g.id; }).join(","));
+ok("AutoCaptions koleksiyonu: normalize meta alanı (koleksiyon) ayara girmez", ACG.every(function (g) {
+  return AE.normalize(Object.assign({ koleksiyon: "autocaptions" }, g.ayar)).koleksiyon === undefined && !("koleksiyon" in AE.overrides(g.ayar));
+}));
 ok("ilk altının kategorisi: Temiz minimal, Vurucu / Canlı / Glitch viral, Zarif sinematik, Kutulu podcast",
   J(AE.GORUNUMLER.slice(0, 6).map(function (g) { return g.kategori; })) === J(["minimal", "viral", "viral", "sinematik", "podcast", "viral"]));
 ok("her görünümün geçerli kategorisi ve tek satırlık Türkçe açıklaması var", AE.GORUNUMLER.every(function (g) {

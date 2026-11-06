@@ -8,7 +8,7 @@
  * Her kayıt:
  *   id        ascii, kebab ("kelime-pop"); stil motoru (js/style-engine.js) yalnız bu kimlikleri kabul eder
  *   ad        Türkçe görünen ad (i18n/en.js'te İngilizcesi)
- *   kategori  "kart" | "kelime" | "harf" | "karaoke" | "surekli" (seçicinin grupları)
+ *   kategori  "kart" | "kelime" | "harf" | "karaoke" | "surekli" | "autocaptions" (seçicinin grupları)
  *   aciklama  bir cümle
  *   klasik    { giris, aktif }: en yakın klasik çift. Premiere yerel çıktı (MOGRT sözleşmesi yalnız textAnim 0-5 /
  *             hlAnim 0-3 bilir), After Effects planı, eski paneller ve suflo.app/stil bununla gösterir
@@ -19,7 +19,11 @@
  *   renkler   (isteğe bağlı) animasyonun kullandığı ek renk alanları: "vurguKutuRenk" (vurgu kutusunun rengi; boşsa
  *             vurgu rengi), "vurguRenk2" (ikinci vurgu rengi; boşsa vurgu renginden türetilir: ikinciVurgu)
  *
- * Hepsi Suflo'nun kendi animasyonlarıdır; hiçbir üçüncü taraf şablonundan / ön ayarından alınmadı.
+ *   koleksiyon (isteğe bağlı) "autocaptions": AutoCaptions koleksiyonu (kategori "autocaptions"; aşağıdaki not)
+ *
+ * AutoCaptions koleksiyonu dışındakiler Suflo'nun kendi animasyonlarıdır; hiçbir üçüncü taraf şablonundan / ön ayarından
+ * alınmadı. AutoCaptions koleksiyonu ClashiVFX AutoCaptions'ın hareketlerinin yazarın izniyle yeniden kurulmuş hâlidir
+ * (THIRD_PARTY_NOTICES.md).
  * Saf veri (DOM, Premiere, dosya sistemi yok). ES5, UMD (Node 12 / CEF 74). index.html'de style-engine.js'ten ÖNCE yüklenir.
  */
 (function (root, factory) {
@@ -35,7 +39,9 @@
     { id: "harf", ad: "Harf harf" },
     { id: "kart", ad: "Kart girişi" },
     { id: "karaoke", ad: "Konuşulan kelime" },
-    { id: "surekli", ad: "Sürekli" }
+    { id: "surekli", ad: "Sürekli" },
+    // AutoCaptions koleksiyonu (ClashiVFX AutoCaptions'ın giriş hareketleri; yazarın izniyle, aşağıda)
+    { id: "autocaptions", ad: "AutoCaptions" }
   ];
 
   var ANIMASYONLAR = [
@@ -94,7 +100,51 @@
     { id: "perde", ad: "Perde", kategori: "kart", aciklama: "Kart alttan yukarı açılan bir perdenin ardından ortaya çıkar.",
       klasik: { giris: "yukari", aktif: "yok" }, ae: "yakin", sure: 450 },
     { id: "nefes", ad: "Nefes", kategori: "surekli", aciklama: "Kart sakin bir nefes gibi çok hafifçe büyüyüp küçülür; podcast için.",
-      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 1200 }
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 1200 },
+    /*
+     * AutoCaptions koleksiyonu (koleksiyon: "autocaptions"). ClashiVFX AutoCaptions eklentisinin giriş hareketleri
+     * (Smooth Slide, Smooth Blur Slide, Smooth Flicker Slide, Smooth Glow Slide, Flicker, Blur & Flicker, Motion Blur,
+     * Rough, Stretch, Zoom In, Slide from Right, Word by Word), yazarın izniyle Suflo'nun anahtar kare motorunda yeniden
+     * kuruldu: süre ve eğriler eklentinin ön ayar verisinden (styles/motion-metadata.json, premiere-motion-metadata.json),
+     * kod ya da .ffx / .prfpset dosyası alınmadı. Farklar: kırpışlar Suflo'nun ışığa duyarlılık kuralına göre tek
+     * sönüşe indirildi (eklentide 250 ms'de üç); yön bulanıklığı ve kenar pürüzü eşit bulanıklıkla yaklaşık.
+     */
+    { id: "yumusak-kay", ad: "Yumuşak kayış", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart aşağıdan yavaşlayarak yerine kayar, yarı saydamdan tam görünür olur.",
+      klasik: { giris: "yukari", aktif: "yok" }, ae: "tam", sure: 420 },
+    { id: "bulanik-kay", ad: "Bulanık kayış", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart aşağıdan kayarken bulanıktan netleşir.",
+      klasik: { giris: "yukari", aktif: "yok" }, ae: "tam", sure: 600 },
+    { id: "titrek-kay", ad: "Kırpışan kayış", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart aşağıdan kayarken bir kez kırpışıp tam görünür olur.",
+      klasik: { giris: "yukari", aktif: "yok" }, ae: "tam", sure: 540 },
+    { id: "isilti-kay", ad: "Işıltılı kayış", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart aşağıdan kayarken yumuşak bir ışıltının içinden netleşir.",
+      klasik: { giris: "yukari", aktif: "yok" }, ae: "yakin", sure: 420 },
+    { id: "kirpis", ad: "Kırpış", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart belirir, bir kez kırpışır ve yerinde kalır.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 360 },
+    { id: "bulanik-kirpis", ad: "Bulanık kırpış", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart bulanık belirir, bir kez kırpışırken netleşir.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 360 },
+    { id: "hiz-bulanik", ad: "Hız bulanıklığı", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart soldan hızla gelir, hareket bulanıklığı dinerek netleşir.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "yakin", sure: 300 },
+    { id: "puruzlu", ad: "Pürüzlü giriş", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart dağınık ve bulanık başlar, hafifçe küçülerek netleşir.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "yakin", sure: 540 },
+    { id: "esnet", ad: "Esneyerek gel", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart yatayda geniş başlar ve esneyerek normal genişliğine döner.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 340 },
+    { id: "yakinlas", ad: "Yakınlaş", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart büyük başlar ve kameraya yaklaşır gibi boyuna oturur.",
+      klasik: { giris: "pop", aktif: "yok" }, ae: "tam", sure: 380 },
+    { id: "sagdan-kay", ad: "Sağdan kay", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Kart sağdan yavaşlayarak kayıp belirir.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 380 },
+    { id: "kelime-belir", ad: "Kelime kelime belir", kategori: "autocaptions", koleksiyon: "autocaptions",
+      aciklama: "Her kelime söylendiği anda hareketsiz belirir; önceki kelimeler kalır.",
+      klasik: { giris: "fade", aktif: "yok" }, ae: "tam", sure: 100 }
   ];
 
   function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }

@@ -31,8 +31,15 @@ var BEKLENEN = ["kelime-pop", "yukari-suzul", "daktilo", "harf-belir", "dalga", 
 var PARTI5 = ["karaoke-dolgu", "karaoke-birikimli", "vurgu-kutusu", "vurgu-cizgi", "parlama", "iki-ton", "kromatik-yumusak",
   "buyuyen-vurgu", "dusus", "kapak-cevir", "donerek", "perde", "nefes"];
 ok("katalog: ilk 12 özgün animasyon", BEKLENEN.every(function (id) { return IDLER.indexOf(id) !== -1; }), IDLER.join(","));
+// AutoCaptions koleksiyonu (ClashiVFX AutoCaptions'ın giriş hareketleri, yazarın izniyle)
+var AUTOCAPTIONS = ["yumusak-kay", "bulanik-kay", "titrek-kay", "isilti-kay", "kirpis", "bulanik-kirpis", "hiz-bulanik", "puruzlu", "esnet", "yakinlas",
+  "sagdan-kay", "kelime-belir"];
 ok("katalog (parti 5): 13 yeni animasyon, toplam ≥ 24", PARTI5.every(function (id) { return IDLER.indexOf(id) !== -1; }) && IDLER.length >= 24 &&
-  IDLER.length === BEKLENEN.length + PARTI5.length, IDLER.length);
+  IDLER.length === BEKLENEN.length + PARTI5.length + AUTOCAPTIONS.length, IDLER.length);
+ok("katalog: AutoCaptions koleksiyonu 12 animasyon, kategorisi ve koleksiyon alanı autocaptions (yalnız onlarda), katalogun sonunda",
+  J(IDLER.slice(-AUTOCAPTIONS.length)) === J(AUTOCAPTIONS) && YA.ANIMASYONLAR.every(function (a) {
+    return (AUTOCAPTIONS.indexOf(a.id) !== -1) === (a.koleksiyon === "autocaptions") && (a.koleksiyon === "autocaptions") === (a.kategori === "autocaptions");
+  }) && YA.KATEGORILER[YA.KATEGORILER.length - 1].id === "autocaptions", IDLER.slice(-AUTOCAPTIONS.length).join(","));
 // Sayım testi: her kimliğin Türkçe adı, açıklaması ve İngilizce çevirisi (i18n/en.js), geçerli klasik yedeği
 var EN = (function () { var src = fs.readFileSync(path.join(KOK, "i18n", "en.js"), "utf8"); return function (tr) { return src.indexOf(J(tr) + ":") !== -1; }; })();
 var cevirisiz = [];
@@ -53,7 +60,7 @@ ok("renk yardımcıları: ikinciVurgu #rrggbb ve vurgudan belirgin; kontrastReng
 }) && YA.kontrastRengi("#1b1f2a", "#ffffff") === "#ffffff" && YA.kontrastRengi("#ffd23f", "#ffffff") === "#000000");
 ok("katalog: kimlikler ascii kebab ve tekil", IDLER.every(function (id) { return /^[a-z]+(-[a-z]+)*$/.test(id); }) &&
   IDLER.filter(function (x, i) { return IDLER.indexOf(x) === i; }).length === IDLER.length);
-var KAT = ["kart", "kelime", "harf", "karaoke", "surekli"];
+var KAT = ["kart", "kelime", "harf", "karaoke", "surekli", "autocaptions"];
 ok("katalog: her kayıt tam (ad Türkçe, kategori, açıklama, klasik çift, ae, süre)", YA.ANIMASYONLAR.every(function (a) {
   return typeof a.ad === "string" && a.ad.length > 1 && KAT.indexOf(a.kategori) !== -1 && typeof a.aciklama === "string" && a.aciklama.length > 10 &&
     SE.GIRISLER.indexOf(a.klasik.giris) !== -1 && SE.AKTIFLER.indexOf(a.klasik.aktif) !== -1 && ["tam", "yakin", "yok"].indexOf(a.ae) !== -1 &&
