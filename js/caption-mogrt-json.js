@@ -165,8 +165,19 @@
     out.sort(function (a, b) { return a.start - b.start; });
     for (var i = 0; i + 1 < out.length; i++) {
       if (out[i].end > out[i + 1].start) {
-        out[i].end = Math.max(out[i].start + 0.01, out[i + 1].start);
-        out[i].kelimeler.forEach(function (z) { z[0] = Math.min(z[0], out[i].end); z[1] = Math.min(z[1], out[i].end); });
+        var sinir = Math.max(out[i].start + 0.01, out[i + 1].start);
+        out[i].end = sinir;
+        out[i].kelimeler.forEach(function (z) { z[0] = Math.min(z[0], sinir); z[1] = Math.min(z[1], sinir); });
+        /*
+         * İki kart 10 ms'den yakın başlıyorsa (sırasız / çakışan kelime zamanı) önceki kartın en kısa süresi sonrakine
+         * taşardı: sonraki kart o sınırdan başlar (Premiere'de klipler üst üste binmez)
+         */
+        var sonraki = out[i + 1];
+        if (sonraki.start < sinir) {
+          sonraki.start = sinir;
+          sonraki.end = Math.max(sonraki.end, sinir + 0.01);
+          sonraki.kelimeler.forEach(function (z) { z[0] = Math.max(z[0], sinir); z[1] = Math.max(z[1], z[0]); });
+        }
       }
     }
     return out;

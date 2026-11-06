@@ -75,7 +75,8 @@ var YOKSAY = ["Iıı, eee, hmm, şey, yani... ıı, ee.", "Ee, ıı, hmm, yəni,
   "Français", // dil seçicide dilin kendi adı
   "Pro altyazi vitrini", "Pro animasyon vitrini", // iç katalog adı (hata günlüğü)
   "{}. {} ({}–{}, {} sn){}", // panoya kopyalanan liste
-  " (kalan kisim da tekrarla bitiyor)"]; // yalnız günlük (K.log birleştirmesi)
+  " (kalan kisim da tekrarla bitiyor)", // yalnız günlük (K.log birleştirmesi)
+  "tr+en", "müdür"]; // js/tr-kirilim.js: kırılım dil kipi ve soru eki istisnası (dil verisi, arayüzde görünmez)
 var REGEX_ONCESI = /^(return|typeof|case|in|of|do|else|void|throw|new|delete|instanceof|yield|await)$/;
 function tokenize(src) {
   var toks = [], i = 0, n = src.length, onceki = "", sonKelime = "";
@@ -236,6 +237,7 @@ function extractJs(src, file) {
     if (/^[a-z ]+$/.test(duz)) continue; // arama anahtar kelimeleri (ASCII, küçük harf)
     if (/^[a-z0-9{}_ -]+$/.test(duz) && /-/.test(duz)) continue; // CSS sınıf listesi
     if (/^(https?:|Dialogue:|Style:|;|color=)/.test(duz)) continue; // URL, ASS başlıkları, ffmpeg filtreleri
+    if (/^\.\.?\/[\w.\/-]+\.js$/.test(duz)) continue; // require yolu (UMD: "./altyazi-efekt.js")
     if (YOKSAY.indexOf(duz) !== -1) continue;
     if ((duz.match(/[{};]/g) || []).length > 8 && /[a-z-]+:[^ ]/.test(duz) && !/<[a-z]/.test(duz)) continue; // üretilen CSS
     var sonraki = toks[k + 1], onceki = toks[k - 1];

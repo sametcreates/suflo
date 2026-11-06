@@ -290,6 +290,14 @@
     return ("&H" + ("0" + a.toString(16)).slice(-2) + h.slice(4, 6) + h.slice(2, 4) + h.slice(0, 2)).toUpperCase();
   }
 
+  // "Dialogue: katman,başlangıç,bitiş,…": başlangıç bitişten önce mi (santisaniye; Dialogue olmayan satır olduğu gibi kalır)
+  function sureliOlay(satir) {
+    var m = /^Dialogue: [^,]*,(\d+):(\d\d):(\d\d)\.(\d\d),(\d+):(\d\d):(\d\d)\.(\d\d),/.exec(satir);
+    if (!m) return true;
+    function cs(a, b, c, d) { return ((Number(a) * 60 + Number(b)) * 60 + Number(c)) * 100 + Number(d); }
+    return cs(m[1], m[2], m[3], m[4]) < cs(m[5], m[6], m[7], m[8]);
+  }
+
   function timecode(seconds) {
     var cs = Math.max(0, Math.round(Number(seconds || 0) * 100));
     var h = Math.floor(cs / 360000);
@@ -1213,6 +1221,8 @@
    */
   // sx (isteğe bağlı): kartın yatay sıkıştırması (uzun kelime, efektOlcegi); ölçek girişi \fscx'i onunla çarpar
   function girisAni(gir, o, T, sx) {
+    // Sırasız / çakışan kelime zamanında olay kart başından önce başlayabilir: giriş kart başındaki hâlinden (kayma d'yi aşmaz)
+    if (!(o > 0)) o = 0;
     if (!gir || o >= T) return null;
     function x(v) { return sx > 0 && sx < 100 ? Math.round(v * sx / 100) : v; }
     var kalan = T - o, ek = "", dy = 0;
@@ -2411,6 +2421,8 @@
     }
     var basliklar = header(style, id, width, height);
     } finally { olcekRef = 0; guvenliW = 0; renkOnek = ""; efektDili = undefined; }
+    // Santisaniyeye yuvarlanınca süresi sıfır kalan olay (sıfır uzunluklu ya da çok kısa kelime) hiç görünmez; ASS'e yazılmaz
+    events = events.filter(sureliOlay);
 
     return {
       id: id,

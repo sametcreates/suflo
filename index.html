@@ -507,7 +507,7 @@
               <button type="button" id="cap-emoji-ac" class="link-btn emoji-ac" title="Emoji ekle">😊</button>
               <div id="cap-emoji-panel" class="emoji-panel" hidden>
                 <div class="emoji-ust">
-                  <input id="cap-emoji-ara" type="text" placeholder="ara: ateş, para, gülme, kalp…">
+                  <input id="cap-emoji-ara" type="text" placeholder="ara: ateş, para, gülme, kalp…" aria-label="Emoji ara">
                   <select id="cap-emoji-set" title="Emoji görünümü">
                     <option value="apple">Apple</option>
                     <option value="twitter">Twemoji</option>
@@ -713,7 +713,7 @@
                       <option value="link">Link açıklamada</option>
                       <option value="ozel">Kendi metnim…</option>
                     </select>
-                    <input id="cap-paket-cta-ozel" class="vr-odak" type="text" maxlength="40" placeholder="En çok 40 karakter" hidden>
+                    <input id="cap-paket-cta-ozel" class="vr-odak" type="text" maxlength="40" placeholder="En çok 40 karakter" aria-label="Kendi CTA metnin" hidden>
                   </div>
                   <label class="check-label" title="Ayarlar › Marka Kiti'ndeki köşe logosu"><input id="cap-paket-logo" type="checkbox" checked> Logo <span class="hint paket-not" id="cap-paket-logo-not" hidden>(Marka Kiti'nde logo yok)</span></label>
                   <label class="check-label" title="Her Short için YouTube Shorts, TikTok ve Reels başlığı, açıklaması ve hashtag'leri (AI anahtarı yoksa yapay zekâsız yedek). Klasöre .txt ve .csv olarak yazılır."><input id="cap-paket-metin" type="checkbox" checked> Paylaşım paketi</label>
@@ -746,8 +746,8 @@
             <details class="adv">
               <summary>Bul & değiştir</summary>
               <div class="row">
-                <input id="cap-find" type="text" placeholder="bul">
-                <input id="cap-replace" type="text" placeholder="yerine koy">
+                <input id="cap-find" type="text" placeholder="bul" aria-label="Bul">
+                <input id="cap-replace" type="text" placeholder="yerine koy" aria-label="Yerine koy">
                 <button id="cap-fr-go" class="btn">Uygula</button>
               </div>
               <div class="row">

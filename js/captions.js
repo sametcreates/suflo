@@ -7645,7 +7645,10 @@ window.KCaptions = (function () {
     }
     var hedef = el("cap-adim-stil") || el("cap-efekt") || el("cap-stil-grid");   // parti 4: 2. adım "Stil seç" (başından)
     if (hedef && hedef.scrollIntoView) {
-      try { hedef.scrollIntoView({ behavior: "smooth", block: hedef.id === "cap-adim-stil" ? "start" : "center" }); } catch (eS) { hedef.scrollIntoView(); }
+      // "Hareketi azalt" açıksa kaydırma anında (adım çubuğu da öyle: js/altyazi-akis.js)
+      var azalt = false;
+      try { azalt = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (eM) { azalt = false; }
+      try { hedef.scrollIntoView({ behavior: azalt ? "auto" : "smooth", block: hedef.id === "cap-adim-stil" ? "start" : "center" }); } catch (eS) { hedef.scrollIntoView(); }
     }
     // Gercek stil motoru onizlemesi ffmpeg ister; yoksa sessizce atla (DOM onizlemesi kalir)
     K.findFfmpeg().then(function (ff) {

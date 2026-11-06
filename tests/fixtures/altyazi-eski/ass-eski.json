@@ -1,0 +1,2063 @@
+{
+ "kod:temiz@16x9:vurgu": {
+  "sha": "c484ad904d8269147376",
+  "bas": "8e05f5b63e8c69ea15ba",
+  "diyalog": 5,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:temiz@16x9:uzun": {
+  "sha": "a18ee75153d2a17cd41d",
+  "bas": "8e05f5b63e8c69ea15ba",
+  "diyalog": 17,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:temiz@9x16:vurgu": {
+  "sha": "3395765eeb3d03c82b5c",
+  "bas": "229579325155a5de3f8d",
+  "diyalog": 5,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:temiz@9x16:uzun": {
+  "sha": "e0df74ab02e4780bb4ab",
+  "bas": "229579325155a5de3f8d",
+  "diyalog": 17,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:temiz@1x1:vurgu": {
+  "sha": "e96598f4584520fe8bbe",
+  "bas": "8c29e00a8a65ed82731e",
+  "diyalog": 5,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:temiz@1x1:uzun": {
+  "sha": "214acdd3a96fda50def3",
+  "bas": "8c29e00a8a65ed82731e",
+  "diyalog": 17,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:vurucu@16x9:vurgu": {
+  "sha": "cfaa907e51b6d54cb140",
+  "bas": "8c819bce59ee51bf74be",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:vurucu@16x9:uzun": {
+  "sha": "00c0c35848f5aaff7071",
+  "bas": "8c819bce59ee51bf74be",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:vurucu@9x16:vurgu": {
+  "sha": "ebf30c95b77e61dd1659",
+  "bas": "3e227950116b817b53c0",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:vurucu@9x16:uzun": {
+  "sha": "937c2547dae5b078c046",
+  "bas": "3e227950116b817b53c0",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:vurucu@1x1:vurgu": {
+  "sha": "1bc3c445bfcf4c9f30bc",
+  "bas": "e045b6b4808921f568fc",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:vurucu@1x1:uzun": {
+  "sha": "ce6bb4a83b4f3d01109e",
+  "bas": "e045b6b4808921f568fc",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:canli@16x9:vurgu": {
+  "sha": "98f34461bfe4791e8d4b",
+  "bas": "8cc89b55161bbff74142",
+  "diyalog": 20,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:canli@16x9:uzun": {
+  "sha": "aa4f1ab791094735eaa4",
+  "bas": "8cc89b55161bbff74142",
+  "diyalog": 68,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:canli@9x16:vurgu": {
+  "sha": "150b9e7e16012e45c056",
+  "bas": "c10360b99b8dee62d887",
+  "diyalog": 20,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:canli@9x16:uzun": {
+  "sha": "49b79861515065f07f9e",
+  "bas": "c10360b99b8dee62d887",
+  "diyalog": 68,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:canli@1x1:vurgu": {
+  "sha": "8bf2821c06a973d55a75",
+  "bas": "9bc8e716219870dbcaab",
+  "diyalog": 20,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:canli@1x1:uzun": {
+  "sha": "2b32a2860172ca168ff4",
+  "bas": "9bc8e716219870dbcaab",
+  "diyalog": 68,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:zarif@16x9:vurgu": {
+  "sha": "7878afcbf219b2399745",
+  "bas": "741760427854a17b85c2",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:zarif@16x9:uzun": {
+  "sha": "bb061eddf337df2cc278",
+  "bas": "741760427854a17b85c2",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:zarif@9x16:vurgu": {
+  "sha": "6010b55a3aeeff1198d6",
+  "bas": "6ec9d83be403ddc97a77",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:zarif@9x16:uzun": {
+  "sha": "818781f332216b217d14",
+  "bas": "6ec9d83be403ddc97a77",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:zarif@1x1:vurgu": {
+  "sha": "4ea85f340ba879dc0323",
+  "bas": "91977dd537bfaac2019b",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:zarif@1x1:uzun": {
+  "sha": "1530ef58b2a0764d6f7f",
+  "bas": "91977dd537bfaac2019b",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:kutulu@16x9:vurgu": {
+  "sha": "9c583f0bf5b9ae747299",
+  "bas": "f4518dfadf688f818228",
+  "diyalog": 6,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:kutulu@16x9:uzun": {
+  "sha": "b4b43424e1537f7898d7",
+  "bas": "f4518dfadf688f818228",
+  "diyalog": 20,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:kutulu@9x16:vurgu": {
+  "sha": "6eb81aeae669c57d11c8",
+  "bas": "a82c2607e91a6b4546c4",
+  "diyalog": 6,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:kutulu@9x16:uzun": {
+  "sha": "84e7fa8fbe24352b19b9",
+  "bas": "a82c2607e91a6b4546c4",
+  "diyalog": 20,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:kutulu@1x1:vurgu": {
+  "sha": "19674ab51d6e913e5a3b",
+  "bas": "0c0179422e3cac8275d9",
+  "diyalog": 6,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:kutulu@1x1:uzun": {
+  "sha": "68291ebf8ba93e5e5927",
+  "bas": "0c0179422e3cac8275d9",
+  "diyalog": 20,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:glitch@16x9:vurgu": {
+  "sha": "212a96f4b973b4d4d162",
+  "bas": "0f27f9aaa0945a563300",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:glitch@16x9:uzun": {
+  "sha": "988e9179e637e7f140eb",
+  "bas": "0f27f9aaa0945a563300",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:glitch@9x16:vurgu": {
+  "sha": "b75e2f75e9066fd85557",
+  "bas": "d4b2399a186513b476b7",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:glitch@9x16:uzun": {
+  "sha": "f1d0c8524d89ee3813f1",
+  "bas": "d4b2399a186513b476b7",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:glitch@1x1:vurgu": {
+  "sha": "3fa4ddf87775dd4ef913",
+  "bas": "b0f92e41bb169b881773",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:glitch@1x1:uzun": {
+  "sha": "1db48fc4c7c3625a23f3",
+  "bas": "b0f92e41bb169b881773",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:temiz+golge@16x9:vurgu": {
+  "sha": "98601634568f1e1c2be3",
+  "bas": "8e05f5b63e8c69ea15ba",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:temiz+golge@16x9:uzun": {
+  "sha": "cf65888f596d412f1cf1",
+  "bas": "8e05f5b63e8c69ea15ba",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:temiz+golge@9x16:vurgu": {
+  "sha": "2935ecf8d3e1be45d10d",
+  "bas": "229579325155a5de3f8d",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:temiz+golge@9x16:uzun": {
+  "sha": "5dc0c5e88e81ffd1d0d1",
+  "bas": "229579325155a5de3f8d",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:temiz+golge@1x1:vurgu": {
+  "sha": "5a99bbfac1c8f647a3db",
+  "bas": "8c29e00a8a65ed82731e",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:temiz+golge@1x1:uzun": {
+  "sha": "22b2b32b0231d59de1eb",
+  "bas": "8c29e00a8a65ed82731e",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:vurucu+kutu@16x9:vurgu": {
+  "sha": "cb802a59a470e9a15a63",
+  "bas": "f7606a6c098c29537695",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:vurucu+kutu@16x9:uzun": {
+  "sha": "a78179651b49857132d3",
+  "bas": "f7606a6c098c29537695",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:vurucu+kutu@9x16:vurgu": {
+  "sha": "2798e51a5911ffc79d21",
+  "bas": "46cb83b4944b758dce75",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:vurucu+kutu@9x16:uzun": {
+  "sha": "ff17cb23a68b209688c7",
+  "bas": "46cb83b4944b758dce75",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:vurucu+kutu@1x1:vurgu": {
+  "sha": "0690a73d65b53525878b",
+  "bas": "5f6c7eeaabc9c4718da9",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:vurucu+kutu@1x1:uzun": {
+  "sha": "f423e2a00be8e01c2ab2",
+  "bas": "5f6c7eeaabc9c4718da9",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:zarif+serbest@16x9:vurgu": {
+  "sha": "f1443264cd492b2fabc2",
+  "bas": "741760427854a17b85c2",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:zarif+serbest@16x9:uzun": {
+  "sha": "836759f6f9a1c485a314",
+  "bas": "741760427854a17b85c2",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:zarif+serbest@9x16:vurgu": {
+  "sha": "efc3af1c23b253a8f570",
+  "bas": "6ec9d83be403ddc97a77",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:zarif+serbest@9x16:uzun": {
+  "sha": "4a9068d885482d8ed47e",
+  "bas": "6ec9d83be403ddc97a77",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:zarif+serbest@1x1:vurgu": {
+  "sha": "78de3b81b303d9558b4b",
+  "bas": "91977dd537bfaac2019b",
+  "diyalog": 10,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:zarif+serbest@1x1:uzun": {
+  "sha": "f0569257f92d6bc5d470",
+  "bas": "91977dd537bfaac2019b",
+  "diyalog": 34,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:canli+metin+yazar@16x9:vurgu": {
+  "sha": "1a60d94e5d84d08ff47e",
+  "bas": "462b57574b7d3ed839af",
+  "diyalog": 20,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:canli+metin+yazar@16x9:uzun": {
+  "sha": "e60c49f1b028c4a8bb7a",
+  "bas": "462b57574b7d3ed839af",
+  "diyalog": 68,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:canli+metin+yazar@9x16:vurgu": {
+  "sha": "08c316c5617e4228f69f",
+  "bas": "8846dbf28f501a1a73f5",
+  "diyalog": 20,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:canli+metin+yazar@9x16:uzun": {
+  "sha": "4ab921d06837b6f8f8fb",
+  "bas": "8846dbf28f501a1a73f5",
+  "diyalog": 68,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:canli+metin+yazar@1x1:vurgu": {
+  "sha": "56ebdc86de8f61277fba",
+  "bas": "ffd2f4daf4a5bf6c9b66",
+  "diyalog": 20,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:canli+metin+yazar@1x1:uzun": {
+  "sha": "7d8260933a6b7529c15a",
+  "bas": "ffd2f4daf4a5bf6c9b66",
+  "diyalog": 68,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:glitch+italik@16x9:vurgu": {
+  "sha": "5292305fd2ad0ec97bd7",
+  "bas": "4b63fcc0baf1679e70de",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:glitch+italik@16x9:uzun": {
+  "sha": "a15406b5e30bfbad6504",
+  "bas": "4b63fcc0baf1679e70de",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:glitch+italik@9x16:vurgu": {
+  "sha": "87ead7b6bb45dbd9c33b",
+  "bas": "3d7c0a8effa5fabf8440",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:glitch+italik@9x16:uzun": {
+  "sha": "47e4a50e497a6d92c184",
+  "bas": "3d7c0a8effa5fabf8440",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:glitch+italik@1x1:vurgu": {
+  "sha": "3ceaa602a04d64ccb74a",
+  "bas": "b95cbc3e034d6099ceac",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:glitch+italik@1x1:uzun": {
+  "sha": "3a41b72d084c80b902b2",
+  "bas": "b95cbc3e034d6099ceac",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:neon (3.2)@16x9:vurgu": {
+  "sha": "3b41d7d0d501b0e54e78",
+  "bas": "a7f9cee50240f73585a1",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:neon (3.2)@16x9:uzun": {
+  "sha": "2b544f0f48b8dcc47376",
+  "bas": "a7f9cee50240f73585a1",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:neon (3.2)@9x16:vurgu": {
+  "sha": "382639ed34e41869ba56",
+  "bas": "1cf3ba16a4ab8afbf9bc",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:neon (3.2)@9x16:uzun": {
+  "sha": "1ed192329836ab491510",
+  "bas": "1cf3ba16a4ab8afbf9bc",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:neon (3.2)@1x1:vurgu": {
+  "sha": "ccd5834da165e7d63104",
+  "bas": "2f255673332024858283",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:neon (3.2)@1x1:uzun": {
+  "sha": "cb237cd16f77d99e1fd3",
+  "bas": "2f255673332024858283",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:mrbeast (3.2)@16x9:vurgu": {
+  "sha": "cfaa907e51b6d54cb140",
+  "bas": "8c819bce59ee51bf74be",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:mrbeast (3.2)@16x9:uzun": {
+  "sha": "00c0c35848f5aaff7071",
+  "bas": "8c819bce59ee51bf74be",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:mrbeast (3.2)@9x16:vurgu": {
+  "sha": "ebf30c95b77e61dd1659",
+  "bas": "3e227950116b817b53c0",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:mrbeast (3.2)@9x16:uzun": {
+  "sha": "937c2547dae5b078c046",
+  "bas": "3e227950116b817b53c0",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kod:mrbeast (3.2)@1x1:vurgu": {
+  "sha": "1bc3c445bfcf4c9f30bc",
+  "bas": "e045b6b4808921f568fc",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kod:mrbeast (3.2)@1x1:uzun": {
+  "sha": "ce6bb4a83b4f3d01109e",
+  "bas": "e045b6b4808921f568fc",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "suflo-stil@16x9:vurgu": {
+  "sha": "8bb786529208d117486b",
+  "bas": "e33530a861f2877bae69",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "suflo-stil@16x9:uzun": {
+  "sha": "05d904a11b9aab5e6c91",
+  "bas": "e33530a861f2877bae69",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "suflo-stil@9x16:vurgu": {
+  "sha": "8a6f1f7308ebe44c4e7d",
+  "bas": "e8099f768aeab543cd65",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "suflo-stil@9x16:uzun": {
+  "sha": "052d681e972c50873482",
+  "bas": "e8099f768aeab543cd65",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "suflo-stil@1x1:vurgu": {
+  "sha": "690704e9fe9563f4c161",
+  "bas": "32c81e6ea484754646b1",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "suflo-stil@1x1:uzun": {
+  "sha": "2ac70c48de0b69117e15",
+  "bas": "32c81e6ea484754646b1",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:temiz@16x9:vurgu": {
+  "sha": "5ac8e59274cc5a21f16f",
+  "bas": "9bd0c4980e6905961777",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:temiz@16x9:uzun": {
+  "sha": "e993974c3e15595163dc",
+  "bas": "9bd0c4980e6905961777",
+  "diyalog": 38,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:temiz@9x16:vurgu": {
+  "sha": "18caa50938b77993a01b",
+  "bas": "32045a0f777ff81f35c4",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:temiz@9x16:uzun": {
+  "sha": "457e01f79a65b49e667a",
+  "bas": "32045a0f777ff81f35c4",
+  "diyalog": 38,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:temiz@1x1:vurgu": {
+  "sha": "4f967ff5fba9f165caaa",
+  "bas": "786e8c0a3e33e1479f99",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:temiz@1x1:uzun": {
+  "sha": "495ca338f44e099cffd3",
+  "bas": "786e8c0a3e33e1479f99",
+  "diyalog": 38,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın",
+   "en eski fırınında sabah dörtte",
+   "neler olduğunu anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:vurucu@16x9:vurgu": {
+  "sha": "1fff6046f508c5aa738f",
+  "bas": "9ddfe16adce308bf406e",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:vurucu@16x9:uzun": {
+  "sha": "1bc573ddffba154413e3",
+  "bas": "9ddfe16adce308bf406e",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:vurucu@9x16:vurgu": {
+  "sha": "630f50fd5e29c4a31f3d",
+  "bas": "8ed2f23188b557151ae1",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:vurucu@9x16:uzun": {
+  "sha": "3ea9f895593ffeb75d9a",
+  "bas": "8ed2f23188b557151ae1",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:vurucu@1x1:vurgu": {
+  "sha": "9d41fe27ee40438f4a57",
+  "bas": "abeef0d4751572580d0d",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:vurucu@1x1:uzun": {
+  "sha": "c4388222267e25a6126b",
+  "bas": "abeef0d4751572580d0d",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:canli@16x9:vurgu": {
+  "sha": "28ba066c53e2ba867867",
+  "bas": "e3a953581f193420adc4",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:canli@16x9:uzun": {
+  "sha": "e604a0119c1f38d4b076",
+  "bas": "e3a953581f193420adc4",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:canli@9x16:vurgu": {
+  "sha": "adff062d131c3a1e44f9",
+  "bas": "badcb1c58ba498d826a5",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:canli@9x16:uzun": {
+  "sha": "a0d3b49bdf6870ac81b0",
+  "bas": "badcb1c58ba498d826a5",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:canli@1x1:vurgu": {
+  "sha": "7ae114ac3b3feb1eefb9",
+  "bas": "92a0dcc2fca3772611e7",
+  "diyalog": 42,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:canli@1x1:uzun": {
+  "sha": "ac9f06e3f20830d37ca1",
+  "bas": "92a0dcc2fca3772611e7",
+  "diyalog": 142,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:zarif@16x9:vurgu": {
+  "sha": "7e3da3bbb601053eb75d",
+  "bas": "2fb669d75016a796fc21",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:zarif@16x9:uzun": {
+  "sha": "adae19f748c5bb90bc0b",
+  "bas": "2fb669d75016a796fc21",
+  "diyalog": 37,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:zarif@9x16:vurgu": {
+  "sha": "871e56752c089eaced23",
+  "bas": "345cc8da69d84fd112f4",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:zarif@9x16:uzun": {
+  "sha": "fc6e09040593aaa48db7",
+  "bas": "345cc8da69d84fd112f4",
+  "diyalog": 37,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:zarif@1x1:vurgu": {
+  "sha": "5b604c7ca69c9f0f0fc0",
+  "bas": "6f79023257cb3b4f05c8",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:zarif@1x1:uzun": {
+  "sha": "234c4e3e483f0b113deb",
+  "bas": "6f79023257cb3b4f05c8",
+  "diyalog": 37,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:kutulu@16x9:vurgu": {
+  "sha": "cedfc98b7bb100a934eb",
+  "bas": "3292bc33634b1dbdb555",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:kutulu@16x9:uzun": {
+  "sha": "9a5633e9ca8ff16c3f6d",
+  "bas": "3292bc33634b1dbdb555",
+  "diyalog": 37,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:kutulu@9x16:vurgu": {
+  "sha": "70fbcec86edff180ac91",
+  "bas": "efdda87f04e702597552",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:kutulu@9x16:uzun": {
+  "sha": "5b98ff9a215e77fc3e12",
+  "bas": "efdda87f04e702597552",
+  "diyalog": 37,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:kutulu@1x1:vurgu": {
+  "sha": "5f9baee1f39f2aae3e24",
+  "bas": "0970f68e1aabdaabd46b",
+  "diyalog": 11,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:kutulu@1x1:uzun": {
+  "sha": "f774a16123c9fbe03d61",
+  "bas": "0970f68e1aabdaabd46b",
+  "diyalog": 37,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:glitch@16x9:vurgu": {
+  "sha": "441de4df08f43febd550",
+  "bas": "c1f28b3b7b2e8d856f52",
+  "diyalog": 22,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:glitch@16x9:uzun": {
+  "sha": "e1d9580e14685701fe17",
+  "bas": "c1f28b3b7b2e8d856f52",
+  "diyalog": 74,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:glitch@9x16:vurgu": {
+  "sha": "24aa1129cc36f038a23f",
+  "bas": "988b07a011b3cf50038e",
+  "diyalog": 22,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:glitch@9x16:uzun": {
+  "sha": "2bba4f1285b98b0dfd75",
+  "bas": "988b07a011b3cf50038e",
+  "diyalog": 74,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "kit:glitch@1x1:vurgu": {
+  "sha": "88b6449c0dbdb8d97c34",
+  "bas": "60186278f04e33bbc69e",
+  "diyalog": 22,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "kit:glitch@1x1:uzun": {
+  "sha": "db654206d1ed45625094",
+  "bas": "60186278f04e33bbc69e",
+  "diyalog": 74,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "sablonum@16x9:vurgu": {
+  "sha": "80914c9c28b83386de2a",
+  "bas": "0d504adfeedcc5068680",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "sablonum@16x9:uzun": {
+  "sha": "2a323f77277656ac143e",
+  "bas": "0d504adfeedcc5068680",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "sablonum@9x16:vurgu": {
+  "sha": "bdbf2fe01a505b2349e2",
+  "bas": "444a6f045382ae972357",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "sablonum@9x16:uzun": {
+  "sha": "d37bb9476aad89aa968a",
+  "bas": "444a6f045382ae972357",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "sablonum@1x1:vurgu": {
+  "sha": "33d25b53d1a9bfbbd8a1",
+  "bas": "7c129de60cc997b431cc",
+  "diyalog": 15,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "sablonum@1x1:uzun": {
+  "sha": "b86fa6f8141ddbd362c0",
+  "bas": "7c129de60cc997b431cc",
+  "diyalog": 51,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:canli@16x9:vurgu": {
+  "sha": "9c46e408cda30e150bd9",
+  "bas": "b1d73d94bf851ea479b3",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:canli@16x9:uzun": {
+  "sha": "0b8b965f77c8dd51a694",
+  "bas": "b1d73d94bf851ea479b3",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:canli@9x16:vurgu": {
+  "sha": "d01e2a5e1c6614ca9fbb",
+  "bas": "d1dbc70ac4d60f3fdd3b",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:canli@9x16:uzun": {
+  "sha": "0b85712968235270f904",
+  "bas": "d1dbc70ac4d60f3fdd3b",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:canli@1x1:vurgu": {
+  "sha": "81e02eeea664f2cdff13",
+  "bas": "ece1fbdafe06f8882453",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:canli@1x1:uzun": {
+  "sha": "1810da3b494c00988c15",
+  "bas": "ece1fbdafe06f8882453",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:kutulu@16x9:vurgu": {
+  "sha": "9c583f0bf5b9ae747299",
+  "bas": "f4518dfadf688f818228",
+  "diyalog": 6,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:kutulu@16x9:uzun": {
+  "sha": "b4b43424e1537f7898d7",
+  "bas": "f4518dfadf688f818228",
+  "diyalog": 20,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:kutulu@9x16:vurgu": {
+  "sha": "6eb81aeae669c57d11c8",
+  "bas": "a82c2607e91a6b4546c4",
+  "diyalog": 6,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:kutulu@9x16:uzun": {
+  "sha": "84e7fa8fbe24352b19b9",
+  "bas": "a82c2607e91a6b4546c4",
+  "diyalog": 20,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:kutulu@1x1:vurgu": {
+  "sha": "19674ab51d6e913e5a3b",
+  "bas": "0c0179422e3cac8275d9",
+  "diyalog": 6,
+  "kartlar": [
+   "Bunu gören herkes şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:kutulu@1x1:uzun": {
+  "sha": "68291ebf8ba93e5e5927",
+  "bas": "0c0179422e3cac8275d9",
+  "diyalog": 20,
+  "kartlar": [
+   "Bugün size bu küçük kasabanın en",
+   "eski fırınında sabah dörtte neler olduğunu",
+   "anlatacağım ve sonunda gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:hormozi (3.2)@16x9:vurgu": {
+  "sha": "6c04d967255da03ef0c0",
+  "bas": "79bd9ffe52882f3c0b61",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:hormozi (3.2)@16x9:uzun": {
+  "sha": "490c335f7dbd722aa47d",
+  "bas": "79bd9ffe52882f3c0b61",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:hormozi (3.2)@9x16:vurgu": {
+  "sha": "15c2526085e26e8ce73c",
+  "bas": "dc0e2aae6b0749efed42",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:hormozi (3.2)@9x16:uzun": {
+  "sha": "c3af2c061210ca82658a",
+  "bas": "dc0e2aae6b0749efed42",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ },
+ "prefs:hormozi (3.2)@1x1:vurgu": {
+  "sha": "0212ea4fd7e2abf934e4",
+  "bas": "173ef7e4b74d7146e734",
+  "diyalog": 40,
+  "kartlar": [
+   "Bunu gören herkes",
+   "şaşırdı bugün"
+  ],
+  "zaman": [
+   0.2,
+   2.64
+  ]
+ },
+ "prefs:hormozi (3.2)@1x1:uzun": {
+  "sha": "66e4a4a1b716aa98d769",
+  "bas": "173ef7e4b74d7146e734",
+  "diyalog": 136,
+  "kartlar": [
+   "Bugün size bu",
+   "küçük kasabanın en",
+   "eski fırınında sabah",
+   "dörtte neler olduğunu",
+   "anlatacağım ve sonunda",
+   "gerçekten şaşıracaksınız"
+  ],
+  "zaman": [
+   0.2,
+   6.62
+  ]
+ }
+}

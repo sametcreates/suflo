@@ -31,7 +31,10 @@ function agac(html) {
       ust().children.push(dugum);
       i = p + 1;
       if (HAM[etiket]) {
-        var son = html.toLowerCase().indexOf("</" + etiket, i);
+        // toLowerCase() kullanılmaz: "İ" küçülünce iki kod birimi olur ve dizin kayar (sonraki öğeler yanlış ataya düşerdi)
+        var kapanis = new RegExp("</" + etiket, "ig");
+        kapanis.lastIndex = i;
+        var km = kapanis.exec(html), son = km ? km.index : -1;
         dugum.text = html.slice(i, son < 0 ? n : son);
         i = son < 0 ? n : html.indexOf(">", son) + 1;
         continue;

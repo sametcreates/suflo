@@ -2253,8 +2253,8 @@
 
   /* ============ Brand kit, style fine-tuning, shareable style codes (captions.js, js/marka-kiti-ui.js, js/style-share.js) ============ */
   add({
-    "Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon Altyazı Efektlerine uygulanır": "Settings › Brand kit: your font, colors and logo are applied to Caption Effects",
-    "Marka kiti açık": "Brand kit on",
+    "Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon Altyazı Efektlerine uygulanır": "Settings › Brand Kit: your font, colors and logo are applied to Caption Effects",
+    "Marka kiti açık": "Brand Kit on",
     "Bu stil paylaşılan bir koddan geldi": "This style came from a shared code",
     "Stil:": "Style:",
     "Stil kodu yapıştır (SFL1.…)": "Paste a style code (SFL1.…)",
@@ -2265,19 +2265,19 @@
     "stil kodu · .suflo-stil · şablonum": "style code · .suflo-stil · my template",
     "9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar": "On 9:16, keeps the text clear of the icon column on the right in TikTok, Reels and Shorts",
     "Platform arayüzünden kaçın": "Avoid platform UI",
-    "Seçili görünüme dön (Marka Kiti açıksa kitle birlikte)": "Go back to the selected look (with the brand kit if it's on)",
+    "Seçili görünüme dön (Marka Kiti açıksa kitle birlikte)": "Go back to the selected look (with the Brand Kit if it's on)",
     "Varsayılana dön": "Reset to default",
     "Adın (isteğe bağlı, kodda görünür)": "Your name (optional, shown in the code)",
     "Paylaşımda görünecek adın": "Name shown when you share",
     "Stil kodunu ve suflo.app/stil bağlantısını panoya kopyalar": "Copies the style code and the suflo.app/stil link to the clipboard",
     "Stili paylaş": "Share style",
     "Stili masaüstüne .suflo-stil dosyası olarak kaydeder": "Saves the style to your desktop as a .suflo-stil file",
-    "Marka kiti açık: yazı tipi ve renkler kitten gelir (Ayarlar › Marka Kiti).": "Brand kit on: font and colors come from the kit (Settings › Brand kit).",
-    "Marka Kiti": "Brand kit",
+    "Marka kiti açık: yazı tipi ve renkler kitten gelir (Ayarlar › Marka Kiti).": "Brand Kit on: font and colors come from the kit (Settings › Brand Kit).",
+    "Marka Kiti": "Brand Kit",
     "yazı tipi · renkler · logo": "font · colors · logo",
     "Yazı tipin, renklerin ve logon Altyazı Efektlerine ve kanca başlığına kendiliğinden uygulanır. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro.":
       "Your font, colors and logo are applied automatically to Caption Effects and to hook titles. Editing and previewing are free; adding to the timeline is Pro.",
-    "Marka kitini her stile ve kanca başlığına uygula": "Apply the brand kit to every style and hook title",
+    "Marka kitini her stile ve kanca başlığına uygula": "Apply the Brand Kit to every style and hook title",
     "Stilin kendi yazı tipi": "Style's own font",
     "Stilin kendi konumu": "Style's own position",
     "Marka renklerini kullan": "Use brand colors",
@@ -2300,7 +2300,7 @@
     "Stil kodu uygulandı: {}": "Style code applied: {}",
     "{n} geçersiz ayar atlandı": "{} invalid settings skipped",
     "Bu bir .suflo-stil dosyası değil (çok büyük).": "This isn't a .suflo-stil file (too large).",
-    "Marka Kiti logosu bulunamadı; katman logosuz eklendi. Ayarlar › Marka Kiti'nden logoyu yeniden seç.": "Brand kit logo not found; the layer was added without it. Pick the logo again in Settings › Brand kit.",
+    "Marka Kiti logosu bulunamadı; katman logosuz eklendi. Ayarlar › Marka Kiti'nden logoyu yeniden seç.": "Brand Kit logo not found; the layer was added without it. Pick the logo again in Settings › Brand Kit.",
     "Katman modülü yüklenemedi.": "The layer module failed to load.",
     "Başlık katmanı üretilemedi:": "Couldn't render the title layer:",
     "Altyazı katmanı hazırlanıyor…": "Rendering caption layer…",
@@ -2310,7 +2310,7 @@
     "Logo dosyası çok büyük (en çok 20 MB).": "The logo file is too large (20 MB max).",
     "Logo dosyası okunamadı.": "Couldn't read the logo file.",
     "Sistem yazı tipi kite alınmadı: yalnız Suflo ile gelen yazı tipleri her bilgisayarda aynı görünür.": "The system font wasn't added to the kit: only fonts bundled with Suflo look the same on every computer.",
-    "Doldu. Kullanmak için \"Marka kitini her stile ve kanca başlığına uygula\"yı aç.": "Filled. To use it, turn on \"Apply the brand kit to every style and hook title\".",
+    "Doldu. Kullanmak için \"Marka kitini her stile ve kanca başlığına uygula\"yı aç.": "Filled. To use it, turn on \"Apply the Brand Kit to every style and hook title\".",
     "Şimdiki ayarlar kite alındı.": "Current settings copied into the kit.",
     "Stil kimliği geçersiz.": "Invalid style ID.",
     "Stil kodu boş.": "The style code is empty.",
@@ -4045,7 +4045,7 @@
     "YouTube'dan indir": "Download from YouTube",
     "Ayarlar › Motor": "Settings › Engine",
     "Ayarlar › Arayüz dili": "Settings › Interface language",
-    "Ayarlar › Marka Kiti": "Settings › Brand kit",
+    "Ayarlar › Marka Kiti": "Settings › Brand Kit",
     "Önce sessizlikleri bul.": "Find silences first.",
     // 3.4 actions (Curves tab, cut options, safe removal, Doctor, AI bridge)
     "Önce kesimleri uygula.": "Apply the cuts first.",
@@ -4327,7 +4327,7 @@
     "Metin katmanı olarak ekle": "Add as text layers",
     "Altyazı Efektleriyle ekle": "Add with Caption Effects",
     "Her altyazı kompozisyonda düzenlenebilir bir metin katmanı olur. Düz ekleme ücretsiz; Altyazı Efektleri (renk, kontur, gölge, giriş ve etkin kelime animasyonu) Pro (deneme hakkı yok).":
-      "Each caption becomes an editable text layer in the composition. Plain captions are free; Caption Effects (colour, stroke, shadow, intro and active-word animation) are Pro (no free tries).",
+      "Each caption becomes an editable text layer in the composition. Plain captions are free; Caption Effects (color, stroke, shadow, intro and active-word animation) are Pro (no free tries).",
     "Yalnız Suflo'nun eklediği altyazı katmanlarını siler (tek adımda geri alınır)": "Deletes only the caption layers Suflo added (undone in one step)",
     "Suflo altyazılarını kaldır": "Remove Suflo captions",
     "After Effects bağlantısı": "After Effects connection",
@@ -4373,7 +4373,7 @@
     "Suflo karaoke dolgu": "Suflo karaoke fill",
     "Suflo kelime pop": "Suflo word pop",
     "Suflo netleş": "Suflo focus in",
-    "Suflo renk geçişi": "Suflo colour shift",
+    "Suflo renk geçişi": "Suflo color shift",
     "Suflo sallanma": "Suflo wiggle",
     "Suflo süzül konum": "Suflo glide position",
     "Suflo süzül opaklık": "Suflo glide opacity",
@@ -4387,7 +4387,7 @@
     "Bu kompozisyonda Suflo altyazısı yok.": "There are no Suflo captions in this composition.",
     "Suflo deneme filigranı": "Suflo trial watermark",
     // js/ae-plan.js warnings and layer reasons
-    "Titre ve Glitch kelime hareketleri After Effects çıktısında henüz yok; etkin kelime yalnız vurgu rengini alır.": "The Shake and Glitch word motions aren't available in After Effects output yet; the active word only gets the highlight colour.",
+    "Titre ve Glitch kelime hareketleri After Effects çıktısında henüz yok; etkin kelime yalnız vurgu rengini alır.": "The Shake and Glitch word motions aren't available in After Effects output yet; the active word only gets the highlight color.",
     "Zıpla kelime hareketi After Effects'te etkin kelimeyi büyüterek gösterilir.": "In After Effects the Bounce word motion is shown by enlarging the active word.",
     "«{}» yazı animasyonu After Effects çıktısında yok; en yakın klasik giriş ve vurgu animasyonuyla eklendi.":
       "The “{}” text animation isn't available in After Effects output; it was added with the closest classic entrance and highlight animation.",
@@ -4400,7 +4400,7 @@
     "düşüşü kartın tamamı yapar, kelimeler sırayla belirir": "the whole card makes the drop and the words appear one after another",
     "harfler iç içe geçmeden birbiri ardına belirir": "letters appear one after another without overlapping",
     "dolgu harf harf ilerler, önceki kelime anında normale döner": "the fill moves letter by letter and the previous word returns to normal at once",
-    "renk değişimi yumuşak geçişsiz, anında": "the colour changes instantly, without a soft transition",
+    "renk değişimi yumuşak geçişsiz, anında": "the color changes instantly, without a soft transition",
     "anahtar kelime yanındakileri itmeden büyür": "the key word grows without pushing its neighbours aside",
     "kart 3B katman olarak X ekseninde döner, perspektif kompozisyonun kamerasına bağlı": "the card turns on the X axis as a 3D layer; the perspective depends on the composition camera",
     "perde maskesi yazıyla birlikte yükselir": "the curtain mask rises together with the text",
@@ -4427,7 +4427,7 @@
   add({
     "Altyazı adımları": "Caption steps",
     "Oluştur": "Create",
-    "Stil seç": "Pick style",
+    "Stil seç": "Choose style",
     "bekliyor": "waiting",
     "şu an": "now",
     "hazır ✓": "ready ✓",
@@ -4437,7 +4437,7 @@
     "Diğer araçlar": "More tools",
     "çeviri · bölümler · viral anlar · B-roll · bul & değiştir": "translation · chapters · viral moments · B-roll · find & replace",
     "Özelleştir": "Customize",
-    "renk · yazı tipi · boyut · konum · stil kodu": "colour · font · size · position · style code",
+    "renk · yazı tipi · boyut · konum · stil kodu": "color · font · size · position · style code",
     "Premiere şablonları (17)": "Premiere templates (17)",
     "MOGRT · animasyonlu": "MOGRT · animated",
     "Önce altyazı oluştur. Timeline'a uygulama ve dosya olarak indirme altyazı hazır olunca açılır.":
@@ -4447,7 +4447,15 @@
     "Düz altyazı izi · ücretsiz": "Plain caption track · free",
     "Timeline'a uygula": "Apply to timeline",
     "Dosya olarak indir": "Download as a file",
-    "Önce 2. adımda bir stil seç": "Pick a style in step 2 first"
+    "Önce 2. adımda bir stil seç": "Choose a style in step 2 first"
+  });
+
+  /* ================= Captions: accessible names for fields that only had a placeholder (batch 9) ================= */
+  add({
+    "Emoji ara": "Search emoji",
+    "Kendi CTA metnin": "Your own CTA text",
+    "Bul": "Find",
+    "Yerine koy": "Replace with"
   });
 
   var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE", "AFTER EFFECTS",

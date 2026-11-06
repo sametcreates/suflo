@@ -105,7 +105,10 @@ var gerekli = ["panel/index.html", "panel/CSXS/manifest.xml", "panel/js/captions
                "panel/jsx/host.jsx", "panel/fonts/Lora.ttf", "panel/fonts/Montserrat.ttf",
                "panel/fonts/OFL-Lora.txt", "panel/fonts/OFL-Montserrat.txt",
                "panel/assets/style-previews/viral.webm", "panel/assets/style-previews/pop.webm",
-               "panel/assets/style-previews/doc.webm", "panel/assets/style-previews/premium.webm"];
+               "panel/assets/style-previews/doc.webm", "panel/assets/style-previews/premium.webm",
+               // altyazı yenilemesi (3.5 taslak): eksikse kırılım / animasyon / stil kodu / galeri / akış / küfür maskesi sessizce eskiye düşer
+               "panel/js/tr-kirilim.js", "panel/js/yazi-animasyonlari.js", "panel/js/stil-kodu.js", "panel/js/stil-galeri.js",
+               "panel/js/altyazi-akis.js", "panel/js/kufur-maske.js", "panel/js/altyazi-efekt.js", "panel/jsx/host-ae.jsx"];
 var eksik = gerekli.filter(function (g) {
   return !kayitlar.some(function (k) { return k.ad === g; });
 });
