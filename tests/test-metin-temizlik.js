@@ -38,6 +38,21 @@ ok("girdi değişmez", seg.text === "ııı bugün eee *çok* başlıyoruz" && s
 ok("segmentleriKur dolguSil: yeni transkriptte dolgu yok, kapalıyken aynen",
   C.segmentleriKur([{ start: 0, end: 2, text: "ııı merhaba dünya" }], "c42", { dolguSil: true }).segments[0].text === "merhaba dünya" &&
   C.segmentleriKur([{ start: 0, end: 2, text: "ııı merhaba dünya" }], "c42", {}).segments[0].text === "ııı merhaba dünya");
+// Doğrulama: tek "em" ("get 'em", Portekizce "em casa") dolgu değil; um / uh yalnız tr / az / en / bilinmeyen dilde dolgu
+// (Almanca "um 8 Uhr", Portekizce "um dia" gerçek sözcük — düzeltmeden önce atılıyordu)
+ok("dolgu: tek 'em' ve \"'em\" dolgu değil; 'emm', 'ehm' dolgu", !C.dolguMu("em") && !C.dolguMu("'em") && !C.dolguMu("Em") && C.dolguMu("emm") && C.dolguMu("ehm"));
+ok("dolgu: Almanca / Portekizce metinde 'um' / 'uh' sözcük kalır, Türkçe / İngilizce / bilinmeyen dilde dolgu",
+  !C.dolguMu("um", "de") && !C.dolguMu("um", "pt") && !C.dolguMu("Uh", "de") && C.dolguMu("um", "en") && C.dolguMu("um", "tr-TR") && C.dolguMu("uh", "az") && C.dolguMu("um") &&
+  C.dolguMu("ııı", "de") && C.dolguMu("hmm", "pt"));
+ok("dolgulariAt dil: 'Treffen um 8 Uhr' (de) ve 'em casa um dia' (pt) aynen",
+  C.dolgulariAt([{ start: 0, end: 2, text: "Treffen um 8 Uhr, hmm" }], "de").segments[0].text === "Treffen um 8 Uhr," &&
+  C.dolgulariAt([{ start: 0, end: 2, text: "Fiquei em casa um dia" }], "pt").segments[0].text === "Fiquei em casa um dia" &&
+  C.dolgulariAt([{ start: 0, end: 2, text: "Fiquei em casa um dia" }], "pt").sayi === 0,
+  J(C.dolgulariAt([{ start: 0, end: 2, text: "Treffen um 8 Uhr, hmm" }], "de").segments));
+ok("dolgulariAt dil: ölçülmüş kelimeler de aynı dil kuralıyla (um kalır, hmm gider)", (function () {
+  var r2 = C.dolgulariAt([{ start: 0, end: 2, text: "um acht hmm", words: [{ text: "um", start: 0, end: 0.5 }, { text: "acht", start: 0.5, end: 1 }, { text: "hmm", start: 1, end: 2 }] }], "de");
+  return r2.segments[0].text === "um acht" && r2.segments[0].words.length === 2 && r2.segments[0].words[0].text === "um";
+})());
 var kw = C.segmentleriKur([seg], "k1", { dolguSil: true }).segments;
 ok("kelime modunda (k1) dolgu kelimeleri cue olmaz", kw.map(function (s) { return s.text; }).join(" ").indexOf("ııı") === -1 && kw.length === 3, J(kw.map(function (s) { return s.text; })));
 
@@ -48,6 +63,12 @@ var ec = C.emojisizCueler([
 ok("emojisizCueler: emoji düşer, kelimeler birlikte ayıklanır, vurgu kapanışı korunur, yalnız emoji satırı düşer",
   J(ec.map(function (c) { return c.text; })) === J(["Harika *iş*", "*harika*", "düz satır"]) && ec[0].words.length === 2 && ec[0].words[1].text === "iş" && !C.emojiVar(ec.map(function (c) { return c.text; }).join(" ")),
   J(ec));
+// Doğrulama: emojiden sonra yalnız noktalama kalan sözcük ("👍.") tek başına "." olarak kalmasın; nokta önceki sözcüğe
+// geçer, kelime sayısı metinle tutar (düzeltmeden önce "tamam ." ve 2 kelime)
+var ecN = C.emojisizCueler([{ start: 0, end: 1, text: "tamam 👍.", words: [{ text: "tamam", start: 0, end: 0.5 }, { text: "👍.", start: 0.5, end: 1 }] },
+  { start: 1, end: 2, text: "Harika (🔥) oldu" }, { start: 2, end: 3, text: "Harika 🔥 — oldu ..." }]);
+ok("emojisizCueler: emojiden sonra yalnız noktalama kalırsa sözcük düşer, nokta öncekine geçer; emojisiz '—' kalır",
+  J(ecN.map(function (c) { return c.text; })) === J(["tamam.", "Harika oldu", "Harika — oldu ..."]) && ecN[0].words.length === 1 && ecN[0].words[0].text === "tamam", J(ecN));
 
 /* ---------------- noktalama (Nizami düzelt) ---------------- */
 function N(t) { return Q.normalizeText(t, "tr"); }
@@ -96,6 +117,10 @@ var grp = html.slice(html.indexOf('id="grp-altyazi"'), html.indexOf('id="grp-mar
 ok("index.html: Ayarlar › Altyazı'da iki anahtar, ikisi de varsayılan kapalı",
   /<input id="set-dolgu-sil" type="checkbox">/.test(grp) && />Dolgu seslerini altyazıdan çıkar</.test(grp) &&
   /<input id="set-kufur-maske" type="checkbox">/.test(grp) && />Küfürleri maskele</.test(grp));
+// Doğrulama: süre / birleştirme ipucu kendi ayarlarının hemen altında kalır (yeni anahtarlar araya girip ipucunu
+// "Küfürleri maskele"nin açıklaması gibi gösteriyordu)
+ok("Ayarlar: 'Satır modlarında…' ipucu 'Kısa parçaları birleştir'in hemen altında, yeni anahtarlardan önce",
+  /Kısa parçaları birleştir<\/span>\s*<\/label>\s*<p class="hint">Satır modlarında/.test(grp) && grp.indexOf("Satır modlarında") < grp.indexOf('id="set-dolgu-sil"'));
 ok("captions.js: kurSecenekleri dolguSil'i taşır", /dolguSil: s\.dolguSil === true,/.test(govde(cap, "function kurSecenekleri(")));
 
 // captions.js: Otomatik emoji seçenekleri + dolguları çıkar

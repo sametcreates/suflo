@@ -19,6 +19,11 @@ ok("masum sozcukler maskelenmez (sikke, amca, götür, boks, assess, siklon…)"
 ok("Turkce sinir: kesme isaretinden sonraki ek kokle birlikte maskelenmez", M.maskele("orospu'nun oğlu") === "o*****'nun oğlu", M.maskele("orospu'nun oğlu"));
 ok("Ingilizce buyuk harf ('SHIT', 'FUCKING') — Türkçe katlama 'I'yi 'ı' yapsa da", M.maskele("SHIT happens, FUCKING hell") === "S*** happens, F****** hell", M.maskele("SHIT happens, FUCKING hell"));
 ok("Turkce buyuk harf ('SİKTİR')", M.maskele("SİKTİR") === "S*****", M.maskele("SİKTİR"));
+// Doğrulama: Türkçe kalıplar düz küçük harfle denenince büyük "I" "i" olur: masum "SIKTI" (sıktı), "SIKIŞ", "SIKIM"
+// küfür sanılıp "S****" yazılıyordu. İngilizce kalıplar iki katlamayla da denenmeye devam eder.
+ok("buyuk harfli masum Turkce sozcukler ('CANIM SIKTI', 'SIKIŞ', 'SIKIM') maskelenmez",
+  M.maskele("CANIM SIKTI, SIKIŞ SIKIM") === "CANIM SIKTI, SIKIŞ SIKIM" && !M.kufurMu("SIKTI") && !M.kufurMu("SIKSIN"), M.maskele("CANIM SIKTI, SIKIŞ SIKIM"));
+ok("Ingilizce buyuk harf ('BITCH', 'SHITTY') hala maskelenir", M.maskele("BITCH SHITTY") === "B**** S*****", M.maskele("BITCH SHITTY"));
 ok("eslesme yoksa metin aynen", M.maskele("Bugün harika bir gün!") === "Bugün harika bir gün!" && !M.varMi("Bugün harika bir gün!") && M.varMi("bok gibi"));
 ok("sozcuk sayisi degismez (kelime zamanlari tutar)", M.maskele("bu bok gibi iş").split(/\s+/).length === 4);
 // *vurgu* yolu: stil motoru "b**" sonundaki yıldızları kapanış sanmasın
@@ -51,6 +56,24 @@ ok("cueler: stilli yol vurguyu korur, kelimeler maskeli ve sayisi ayni", stilli.
   JSON.stringify(stilli));
 ok("transkript (segments) degismez", seg[0].text === "bu *bok* gibi" && seg[0].words[1].text === "bok" && seg[0].orig === "this is shit");
 ok("TXT disa aktarma ve onizleme de maskeyi kullanir", (src.match(/styleText\(kufurMaskele\(CT\.stripEmphasis\(/g) || []).length >= 3);
+// Doğrulama: Çok dilli SRT paketi (kaynak + çevrilmiş SRT'ler) de SRT çıktısıdır; maskesiz yazılıyordu
+function paketOrtam(ayar) {
+  return new Function("AYAR", "KM", [
+    "var K = { settings: function () { return AYAR; } }, window = { SufloKufurMaske: KM };",
+    "var DOM = { 'cap-case': { value: 'none' }, 'cap-punct': { checked: true } };",
+    "function el(id) { return DOM[id]; }",
+    kes("function tc("), kes("function paketStil("), kes("function paketSrt("), kes("function kufurMaskesiAcik("), kes("function kufurMaskele("),
+    "return paketSrt;"
+  ].join("\n"))(ayar, M);
+}
+var pz = [{ i: 0, start: 0, end: 1 }, { i: 1, start: 1, end: 2 }];
+var paketAcik = paketOrtam({ kufurMaske: true })(pz, ["bu bok gibi", "what the fuck"], "tr");
+var paketKapali = paketOrtam({})(pz, ["bu bok gibi", "what the fuck"], "tr");
+ok("cok dilli SRT paketi: ayar acikken maskeli, kapaliyken aynen", /bu b\*\* gibi/.test(paketAcik) && /what the f\*\*\*/.test(paketAcik) && !/\u200B/.test(paketAcik) &&
+  /bu bok gibi/.test(paketKapali) && /what the fuck/.test(paketKapali), JSON.stringify(paketAcik));
+// Doğrulama: paket denetimi modülü zorunlu tutar (eksikse anahtar açıkken çıktı sessizce maskesiz kalırdı)
+ok("verify-release: js/kufur-maske.js paket icin zorunlu",
+  /'\(\^\|\/\)js\/kufur-maske\\\.js\$'/.test(fs.readFileSync(path.join(__dirname, "..", "tools", "verify-release.ps1"), "utf8")));
 ok("index.html: kufur-maske.js captions.js'ten once yuklenir", (function () {
   var h = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   var a = h.indexOf('<script src="js/kufur-maske.js"></script>'), b = h.indexOf('<script src="js/captions.js"></script>');

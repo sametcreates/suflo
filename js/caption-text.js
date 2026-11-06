@@ -928,11 +928,12 @@
   /*
    * Değer sözlüğü: vurgulanmaya en değer sözcükler, öncelik sırasıyla (kat: 3 > 2 > 1). Her biri kendi
    * kalıbıyla (ek serbestliği sözcüğe göre) eşleşir; iki sözcüklüler ("en iyi") tek aralık olur.
+   * "hata" yalnız şehir adı Hatay'ı ("Hatay", "Hatay'da") dışlar; "hatayı", "hataya", "hataydı" vurgulanır.
    */
   var DEGER = [
     { kat: 3, re: /^ücretsiz/ }, { kat: 3, re: /^bedava/ }, { kat: 3, re: /^garanti/ }, { kat: 3, re: /^asla$/ },
     { kat: 3, re: /^mutlaka$/ }, { kat: 3, re: /^kesinlikle$/ }, { kat: 3, re: /^yasak/ },
-    { kat: 2, re: /^gizli(?!lik)/ }, { kat: 2, re: /^(sır|sırr[ıi]n?[ıi]?|sırlar[ıi]?(n[ıi])?)$/ }, { kat: 2, re: /^hata(?!y)/ },
+    { kat: 2, re: /^gizli(?!lik)/ }, { kat: 2, re: /^(sır|sırr[ıi]n?[ıi]?|sırlar[ıi]?(n[ıi])?)$/ }, { kat: 2, re: /^hata(?!y$|y['’])/ },
     { kat: 2, on: "en", re: /^iyi(si|sini|ler|lerden)?$/ }, { kat: 2, on: "en", re: /^kötü(sü|sünü|ler|lerden)?$/ },
     { kat: 1, re: /^ilk(i|ini)?$/ }, { kat: 1, re: /^son$/, degil: "olarak" }
   ];
@@ -1098,7 +1099,10 @@
       if (!emojiVar(c.text)) return y;
       var r = sozcukAyikla(String(c.text || ""), function (w) {
         var kalan = w.replace(EMOJI_TUMU, "");
-        return kalan.replace(/\*/g, "") ? kalan : null;   // null: sözcük düşer
+        if (kalan === w) return w;   // emojisiz sözcük ("—", "...") aynen kalır
+        // null: sözcük düşer. Emojiden sonra yalnız noktalama kalırsa ("tamam 👍.") o da düşer; cümle sonu
+        // noktalaması önceki sözcüğe taşınır ("tamam."), tek başına "." sözcüğü kalmaz
+        return kalan.replace(/[*\s.,!?;:…"'’“”«»()\[\]\-–—]/g, "") ? kalan : null;
       });
       y.text = r.text;
       if (c.words && c.words.length) {
@@ -1158,16 +1162,21 @@
 
   /*
    * Dolgu sesleri (Ayarlar › Altyazı › "Dolgu seslerini altyazıdan çıkar", editörde "Dolguları çıkar"):
-   * tek başına söylenen ııı, ıı, eee, ee, ehm, hmm, ımm ve İngilizce um / uh. "Eh", "e" gibi anlamlı
-   * ünlemler ve büyük I'lardan oluşan sözcük (Roma rakamı III) dolgu sayılmaz.
+   * tek başına söylenen ııı, ıı, eee, ee, ehm, emm, hmm, ımm ve İngilizce um / uh / erm. "Eh", "e" gibi
+   * anlamlı ünlemler, büyük I'lardan oluşan sözcük (Roma rakamı III) ve tek "em" ("get 'em", Portekizce
+   * "em") dolgu sayılmaz. um / uh / erm yalnız Türkçe, Azerice, İngilizce ya da dili bilinmeyen metinde
+   * dolgudur: Almanca "um 8 Uhr", Portekizce "um dia" gerçek sözcüktür.
    */
-  var DOLGU = /^(ı{2,}h?m*|ı+m{2,}|ı+hm+|e{2,}h?m*|eh?m{1,}|e+hm+|hm{1,}|h{1,}m{2,}|um{1,}|u+h{1,}m?|uhm+|erm+)$/;
-  function dolguMu(w) {
+  var DOLGU = /^(ı{2,}h?m*|ı+m{2,}|ı+hm+|e{2,}h?m*|e+hm+|em{2,}|hm{1,}|h{1,}m{2,})$/;
+  var DOLGU_EN = /^(um+|u+h+m?|uhm+|erm+)$/;
+  function dolguMu(w, dil) {
     var ham = String(w == null ? "" : w).replace(/[\s*.,!?;:…"'’“”«»()\[\]\-–—]/g, "");
     if (!ham || /^I+$/.test(ham)) return false;
     var s = ham.replace(/İ/g, "i").replace(/I/g, "ı");
     try { s = s.toLocaleLowerCase("tr"); } catch (e) { s = s.toLowerCase(); }
-    return DOLGU.test(s);
+    if (DOLGU.test(s)) return true;
+    var l = String(dil || "").toLowerCase().slice(0, 2);
+    return DOLGU_EN.test(s) && (!l || l === "tr" || l === "az" || l === "en");
   }
 
   /*
@@ -1181,7 +1190,7 @@
     (segs || []).forEach(function (s) {
       if (!s) return;
       var metin = String(s.text == null ? "" : s.text);
-      var r = sozcukAyikla(metin, function (w) { return dolguMu(w) ? null : w; });
+      var r = sozcukAyikla(metin, function (w) { return dolguMu(w, loc) ? null : w; });
       var atilanBu = r.sayi - r.kalanlar.length;
       if (!atilanBu) { out.push(s); return; }
       atilan += atilanBu;
@@ -1195,7 +1204,7 @@
         });
       }
       if (kelimeli(s)) {
-        var ws = s.words.filter(function (w) { return !dolguMu(w && w.text); });
+        var ws = s.words.filter(function (w) { return !dolguMu(w && w.text, loc); });
         if (ws.length) {
           y.words = ws;
           var a = Number(ws[0].start), b = Number(ws[ws.length - 1].end);

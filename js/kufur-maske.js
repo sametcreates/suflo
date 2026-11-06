@@ -30,8 +30,10 @@
     /^kahpe[a-zçğıöşü]*$/,
     /^ibne[a-zçğıöşü]*$/,
     /^pezevenk[a-zçğıöşü]*$/,
-    /^şerefsiz[a-zçğıöşü]*$/,
-    // English
+    /^şerefsiz[a-zçğıöşü]*$/
+  ];
+  // İngilizce kalıplar ayrı: "SHIT" Türkçe katlamada "shıt" olur, bunlar düz küçük harfle de denenir
+  var KALIPLAR_EN = [
     /^(mother)?fu+c?k+(s|ed|er|ers|ing|in)?$/,
     /^shit(s|ty|ting|ted|head)?$/,
     /^bitch(es|y|ing)?$/,
@@ -50,12 +52,17 @@
     return s.replace(/\u0307/g, "");
   }
 
-  // Sözcük listede mi? (Türkçe ve düz küçük harfle iki kez denenir: "SHIT" Türkçe katlamada "shıt" olur)
+  /*
+   * Sözcük listede mi? Türkçe kalıplar YALNIZ Türkçe katlamayla denenir: düz küçük harf büyük "I"yı "i"
+   * yapar ve masum "SIKTI" (sıktı), "SIKIŞ", "SIKIM" küfür sanılırdı. İngilizce kalıplar iki katlamayla da
+   * denenir ("SHIT" Türkçe katlamada "shıt" olur).
+   */
   function kufurMu(sozcuk) {
     var w = String(sozcuk == null ? "" : sozcuk);
     if (!w) return false;
-    var a = trKucuk(w), b = w.toLowerCase();
-    for (var i = 0; i < KALIPLAR.length; i++) if (KALIPLAR[i].test(a) || KALIPLAR[i].test(b)) return true;
+    var a = trKucuk(w), b = w.toLowerCase(), i;
+    for (i = 0; i < KALIPLAR.length; i++) if (KALIPLAR[i].test(a)) return true;
+    for (i = 0; i < KALIPLAR_EN.length; i++) if (KALIPLAR_EN[i].test(a) || KALIPLAR_EN[i].test(b)) return true;
     return false;
   }
 

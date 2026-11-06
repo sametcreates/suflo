@@ -118,6 +118,8 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/stil-galeri\.js$',
             # Parti 4: uc adimli altyazi akisi (Olustur / Stil sec / Uygula; tek uygula dugmesi)
             '(^|/)js/altyazi-akis\.js$',
+            # Parti 6: Kufurleri maskele (eksikse anahtar acik oldugu halde cikti sessizce maskesiz kalir)
+            '(^|/)js/kufur-maske\.js$',
             # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
             '(^|/)js/youtube-indir\.js$',
             '(^|/)js/youtube-indir-ui\.js$',

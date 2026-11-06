@@ -147,6 +147,11 @@ ok("5 kelimelik satirda en cok 1 vurgu (degerli sozcuklerden yalniz biri)", C.em
 ok("sayi gruplari siniri doldurunca anahtar kelime eklenmez", av("Bu yöntemle 3 ayda 10 bin takipçi ücretsiz") === "Bu yöntemle *3 ayda* *10 bin* takipçi ücretsiz");
 ok("'son olarak' dolgu, 'son şans' deger", av("Son olarak şunu söyleyeyim size") .indexOf("*Son") === -1 && av("Bu son şans") === "Bu *son* şans");
 ok("Hatay / sonra / ilkokul deger sozlugune takilmaz", !/\*(Hatay|sonra|ilkokul)\*/.test(av("Hatay sonra ilkokul")), av("Hatay sonra ilkokul"));
+// Doğrulama: değer sözlüğünün "hata" kalıbı yalnız şehir adını dışlamalı; /^hata(?!y)/ "hatayı / hataya / hataydı"yı da dışlıyordu
+ok("deger sozlugu: 'hatayı', 'hataya', 'hataydı' vurgulanır; 'Hatay'da' vurgulanmaz",
+  av("Bu hatayı sakın yapma") === "Bu *hatayı* sakın yapma" && av("Kimse hataya düşmesin lütfen") === "Kimse *hataya* düşmesin lütfen" &&
+  av("Bu bir hataydı") === "Bu bir *hataydı*" && av("Hatay'da gezdik biz") .indexOf("*Hatay") === -1,
+  [av("Bu hatayı sakın yapma"), av("Kimse hataya düşmesin lütfen"), av("Bu bir hataydı"), av("Hatay'da gezdik biz")].join(" | "));
 ["Bu yöntemle 3 ayda 10 bin takipçi kazandım", "Yüzde elli indirim fırsatı kaçmaz", "Bunu asla yapma, en iyi yol bu değil, ilk adım şu", "Bu tamamen ücretsiz!", "1 milyonluk ev aldı"].forEach(function (x) {
   var a = av(x);
   ok("idempotent ve geri donuslu  [" + x + "]", av(a) === a && C.stripEmphasis(a) === x && E.stripEmphasis(a) === x, a);

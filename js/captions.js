@@ -4793,7 +4793,8 @@ window.KCaptions = (function () {
     var out = [], no = 0;
     zaman.forEach(function (z, k) {
       // bos satir SRT'yi bozar: once stil, bos kalani atla; metindeki bos satirlari kapat
-      var metin = paketStil(String(metinler[k] || "").replace(/\r?\n\s*\n+/g, "\n").trim(), dil);
+      // Küfürleri maskele (Ayarlar › Altyazı): kaynak ve çevrilmiş SRT'ler de çıktıdır (çeviriye maskesiz metin gider)
+      var metin = paketStil(kufurMaskele(String(metinler[k] || "").replace(/\r?\n\s*\n+/g, "\n").trim()), dil);
       if (!metin.trim()) return;
       out.push(String(++no));
       out.push(tc(z.start, true) + " --> " + tc(z.end, true));

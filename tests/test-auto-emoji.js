@@ -57,6 +57,11 @@ chk("'doğru' cevap olarak ✅ ('Doğru!', 'çok doğru', 'doğru mu')",
   p("Doğru!") === "✅" && p("Bu çok doğru") === "✅" && p("Bu doğru mu?") === "✅", [p("Doğru!"), p("Bu çok doğru"), p("Bu doğru mu?")].join(","));
 chk("'doğruyu', 'doğrudan' yön/edat: emoji yok", p("doğrudan söyleyeyim") === null && p("eve doğru gidelim") === null);
 chk("'Hatay' sehri ⚠️ almaz (hata kokunun haric listesi)", p("Hatay çok güzel bir şehir") !== "⚠️" && p("HATAY") === null, p("Hatay çok güzel bir şehir"));
+// Doğrulama: "hatay" dışlaması yalnız TAM sözcük olmalı; önek dışlama "hatayı / hataya / hatayla"yı (çok sık) da yutuyordu
+chk("'Hatay'da' ⚠️ almaz ama 'hatayı', 'hataya', 'hatayla', 'hataydı' ⚠️ alır",
+  p("Hatay'da çektik") === null && p("Hatay’ın sokakları") === null &&
+  ["Bu hatayı herkes yapıyor", "Kimse hataya düşmesin", "Hatayla yüzleşmek lazım", "Bu bir hataydı"].every(function (t) { return p(t) === "⚠️"; }),
+  ["Hatay'da çektik", "Bu hatayı herkes yapıyor", "Kimse hataya düşmesin", "Hatayla yüzleşmek lazım", "Bu bir hataydı"].map(p).join(","));
 chk("'hata' hala ⚠️, 'hatırladım' ⚠️ degil", p("Büyük bir hata yaptım") === "⚠️" && p("Şimdi hatırladım") === null);
 chk("'Kazanan biz olduk' -> 🏆 (ozgul kok genelden once)", p("Kazanan biz olduk") === "🏆" && p("Şampiyon olduk") === "🏆", p("Kazanan biz olduk"));
 chk("'para kazandım' hala 💰", p("para kazandım") === "💰" && p("Bütün paraları harcadım") === "💰");

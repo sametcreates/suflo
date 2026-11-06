@@ -22,7 +22,8 @@
    * Sıra önceliktir: üstteki kural önce kazanır. Bu yüzden özgül kökler genel olanlardan
    * önce gelir ("kazanan" 🏆, "kazan" 💰'dan önce; aynı emoji birden çok kuralda olabilir).
    * ek (isteğe bağlı):
-   *   haric: kökle başlayan ama başka anlamdaki sözcük başları ("hata" → "hatay" şehir, "sakın" → "sakınca")
+   *   haric: kökle başlayan ama başka anlamdaki sözcük başları ("sakın" → "sakınca"); sonu boşlukla biten
+   *          yalnız TAM sözcüğü dışlar ("hatay " şehir, "Hatay'da" dahil; "hatayı" / "hataya" ⚠️ alır)
    *   tam:   yalnız TAM sözcük olarak eşleşen kökler (ek almaz)
    *   fiil:  -yor öncesi ünlü daralması olan fiil kökleri ("başla" → "başlıyor", "bekle" → "bekliyor");
    *          kökün kendisi de normal kök gibi eşleşir
@@ -39,7 +40,7 @@
       ["🚀", ["hızlı", "roket", "uçuyor", "uçtu", "lansman"], { fiil: ["başla", "fırla", "patla"] }],
       ["🔥", ["ateş", "sıcak", "efsane", "harika", "muhteşem", "çılgın", "viral", "trend"]],
       ["💡", ["fikir", "ipucu", "tüyo", "öneri", "püf", "akıl", "çözüm"], { haric: ["akıl almaz"] }],
-      ["⚠️", ["dikkat", "uyarı", "tehlike", "sakın", "hata", "yanlış"], { haric: ["hatay", "hatasız", "sakınca", "dikkate değer", "dikkat çekici"] }],
+      ["⚠️", ["dikkat", "uyarı", "tehlike", "sakın", "hata", "yanlış"], { haric: ["hatay ", "hatasız", "sakınca", "dikkate değer", "dikkat çekici"] }],
       ["✅", ["başar", "bitir", "hallet", "kesinlikle"], { haric: ["başarısız"] }],
       ["✅", ["doğru"], { tam: ["doğru"], baglam: function (s) { return DOGRU_CEVAP.test(s); } }],
       ["❌", ["hayır", "asla", "yasak", "olmaz", "yapma "]],
