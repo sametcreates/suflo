@@ -140,7 +140,7 @@ function capOrtam(o) {
     window: { SufloAutoEmoji: AE, SufloKufurMaske: null, SufloStyleEngine: o.motor || null }
   };
   var kod = [
-    "var segments = SEG, emojiAtlaBirKez = false, emojisizCikti = false, secilenMogrt = null, scope = 'clip', segmentsMode = 'plain';",
+    "var segments = SEG, emojiAtlaBirKez = false, emojisizCikti = false, secilenMogrt = null, scope = 'clip', segmentsMode = 'plain', katmanIptal = null;",
     "var ceviriDili = '', algilananDil = 'tr';",
     "function ceviriVar() { return false; } function cevrimdisiEn() { return false; } function arayuzDili() { return 'tr'; }",
     "function styleLocale() { return 'tr-TR'; } function styleText(t) { return t; } function motorCueTuru() { return 'lines'; }",

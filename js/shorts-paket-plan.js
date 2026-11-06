@@ -640,12 +640,14 @@
   }
 
   function hataMetni(e) { return e && e.message ? e.message : String(e || "?"); }
+  function iptalHatasi() { var e = new Error("İptal edildi"); e.iptal = true; return e; }
 
   /*
    * İşi çalıştır. deps (hepsi async olabilir):
    *   makeShorts(k, job) → { ok, id, dikeyId, hata }        (1. evre, her an için)
    *   activate(k, job)   → { ok, paket: [katman adları], miras: { altyazi }, mirasKapatilan, width, height, end, fps, hata }
-   *   altyazi / kanca / cerceve (k, ctx, job) → { ok } | { atla: neden } | { ok: false, hata }
+   *   altyazi / kanca / cerceve (k, ctx, job) → { ok } | { atla: neden } | { ok: false, hata } | { iptal: true }
+   *     (ya da e.iptal'li hata fırlatır: adım "bekliyor" kalır, iş "iptal" durumunda biter)
    *   metin(k, job)      → { ok, paylasim }
    *   kaydet(job), ilerleme(job, i, adim), iptalMi(), anaSekansaDon(job)
    * Bir adımın hatası diğer Shorts'u durdurmaz; ana sekans hata olsa da geri açılır.
@@ -697,11 +699,14 @@
               continue;
             }
             var sonuc = await deps[s.adim](k, ctx, job);
+            if (sonuc && sonuc.iptal) throw iptalHatasi();
             if (sonuc && sonuc.atla) markSkip(job, s.i, s.adim, sonuc.atla);
             else if (!sonuc || !sonuc.ok) throw new Error((sonuc && (sonuc.hata || sonuc.error)) || "?");
             else markDone(job, s.i, s.adim, sonuc);
           }
         } catch (e) {
+          // kullanıcı İptal'e bastı, katman render'ı durdu: adım "bekliyor" kalır (hata değil), "Devam et" oradan sürer
+          if (e && e.iptal) { job.durum = "iptal"; kaydet(); ilerle(s.i, s.adim); break; }
           markFail(job, s.i, s.adim, hataMetni(e));
           // sekans değişmiş olabilir: bu Short'un sonraki adımı onu yeniden açar
           if (PREMIERE_ADIMLARI.indexOf(s.adim) !== -1) aktif = -1;

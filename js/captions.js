@@ -1939,6 +1939,8 @@ window.KCaptions = (function () {
       if (hint) hint.textContent = "Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Animasyonlu ekleme için yukarıda bir görünüm seç ya da efekti ayarla.";
       if (styleBtn) { styleBtn.disabled = true; styleBtn.textContent = "Görünüm seçerek ekle"; }
     }
+    // stilli katman çizilirken kapalı kalır (İptal yanında; ikinci render başlamasın)
+    if (styleBtn && katmanIptal) styleBtn.disabled = true;
     // üç adımlı akış (js/altyazi-akis.js): stil durumu ve tek düğmenin etiketi
     if (typeof SufloAltyaziAkis !== "undefined" && SufloAltyaziAkis.guncelle) SufloAltyaziAkis.guncelle();
   }
@@ -2130,6 +2132,11 @@ window.KCaptions = (function () {
    * Yalnız kullanıcı etkileşiminde çağrılır (panel açılışında Premiere / ffmpeg çağrısı yok).
    */
   var efektSaat = null, efektTekrar = false;
+  /*
+   * Ayar değişiminden sonra gerçek önizlemenin beklediği sakinlik: kaydırıcı / renk seçici 450 ms; görünüm çipi
+   * ve kod yükleme ("hemen") 200 ms (çiplerde hızlı gezinmede her tık ayrı ffmpeg başlatıp öldürmesin).
+   */
+  var ONIZLEME_SAKIN_MS = 450, ONIZLEME_SAKIN_KISA_MS = 200;
   function efektOnizlemeTazele(hemen) {
     if (efektSaat) clearTimeout(efektSaat);
     efektSaat = setTimeout(function () {
@@ -2137,7 +2144,7 @@ window.KCaptions = (function () {
       if (secilenMogrt || secilenMotorStili !== EFEKT) return;
       if (!K.nodeOK) { onizlemeOynatDom(); return; }
       motorCizimiBaslat(function () { return secilenMotorStili === EFEKT && !secilenMogrt; });
-    }, hemen ? 0 : 450);
+    }, hemen ? ONIZLEME_SAKIN_KISA_MS : ONIZLEME_SAKIN_MS);
   }
 
   // En çok kelime kutusu 1-10 (boş / bozuk değer görünümün değerine döner)
@@ -5200,6 +5207,7 @@ window.KCaptions = (function () {
 
   function onizlemeDurdur() {
     onizlemeNesil++;   // süren gerçek çizimin sonucu artık gösterilmez
+    onizlemeCiziminiKes();   // ... ve ffmpeg'i de boşuna çizmesin
     if (onizlemeSaat) { clearTimeout(onizlemeSaat); onizlemeSaat = null; }
     var video = el("cap-render-onizleme");
     if (video) {
@@ -5593,6 +5601,17 @@ window.KCaptions = (function () {
    * Her çizimin ASS, font ve logo kopyası kendi alt klasöründe: üst üste binen iki çizim birbirinin
    * fontunu silemez (libass sessizce başka fonta düşerdi).
    */
+  /*
+   * Süren önizleme çiziminin ffmpeg'i (iptal jetonu). Ayar değişince eski çizim nesille atılıyordu ama süreç
+   * sonuna kadar çiziyordu: art arda değişikliklerde CPU'yu yeni çizimle paylaşıyordu. Artık öldürülür.
+   */
+  var onizlemeIptal = null;
+  function onizlemeCiziminiKes() {
+    var j = onizlemeIptal;
+    onizlemeIptal = null;
+    if (j && !j.iptalEdildi) j.iptal();
+  }
+
   async function motorOnizlemeOynat() {
     var nesil = ++onizlemeNesil;
     var st = stil();
@@ -5646,9 +5665,12 @@ window.KCaptions = (function () {
         kare: onizlemeKareYol && K.fs.existsSync(onizlemeKareYol) ? onizlemeKareYol : "",
         ekVf: guvenli ? guvenliAlanFiltresi(ob.w, ob.h) : "", out: cikti
       });
-      var r = await K.run(ff, args, { timeout: 120000, cwd: isDizini });
-      // Çizim sürerken seçim / ayar değişti (ya da MOGRT seçildi): eski görünüm gösterilmez
-      if (nesil !== onizlemeNesil || secilenMogrt) {
+      var jeton = K.iptalJetonu ? K.iptalJetonu() : null;
+      onizlemeIptal = jeton;
+      var r = await K.run(ff, args, { timeout: 120000, cwd: isDizini, iptal: jeton || undefined });
+      if (onizlemeIptal === jeton) onizlemeIptal = null;
+      // Çizim sürerken seçim / ayar değişti (ya da MOGRT seçildi; ya da süreç bu yüzden öldürüldü): eski görünüm gösterilmez
+      if (nesil !== onizlemeNesil || secilenMogrt || (r && r.iptal)) {
         try { K.fs.unlinkSync(cikti); } catch (eE) {}
         return "eski";
       }
@@ -5671,16 +5693,22 @@ window.KCaptions = (function () {
       K.log("[stil önizleme] " + e.message);
       return false;
     } finally {
-      try { K.fs.unlinkSync(assYol); } catch (e1) {}
-      kopyalar.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
-      try { K.fs.rmdirSync(isDizini); } catch (e3) {}
+      var temizle = function () {
+        try { K.fs.unlinkSync(assYol); } catch (e1) {}
+        kopyalar.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
+        try { K.fs.rmdirSync(isDizini); } catch (e3) {}
+      };
+      temizle();
+      // Windows'ta öldürülen ffmpeg dosyaları bir an kilitli tutabilir: bir kez daha dene
+      if (K.fs.existsSync && K.fs.existsSync(isDizini)) setTimeout(temizle, 1500);
       if (btn && btn.disabled) btn.disabled = false;
     }
   }
 
   // Gerçek çizimi başlat; sürerken gelen istek (efektTekrar) bitince bir kez daha çizer
   function motorCizimiBaslat(domYedegi) {
-    if (onizlemeRenderCalisiyor) { efektTekrar = true; return; }
+    // Süren çizim eski ayarlarla: süreci öldür (sonucu "eski" döner), bitince yenisi bir kez çizilir
+    if (onizlemeRenderCalisiyor) { efektTekrar = true; onizlemeCiziminiKes(); return; }
     if (onizlemeSaat) { clearTimeout(onizlemeSaat); onizlemeSaat = null; }
     onizlemeRenderCalisiyor = true;
     motorOnizlemeOynat().then(function (ok) {
@@ -6119,6 +6147,33 @@ window.KCaptions = (function () {
   var kaliteOnayBekleyen = "";
   var UYGULA_ETIKET = "Normal altyazı izi ekle";
 
+  /*
+   * Stilli katman render'ı sürerken 3. adımda "İptal" (#cap-uygula-iptal; #cap-cancel düzeni): ffmpeg (parçalı
+   * render'da bütün parça süreçleri) öldürülür, yarım çıktı ve geçici klasörler silinir, timeline'a dokunulmaz,
+   * deneme hakkı düşmez (Pro.denemeHarca yalnız yerleştirmeden sonra). Render sürerken stil düğmesi kapalı:
+   * ikinci tık ikinci render başlatmasın. katmanIptal: süren render'ın jetonu (yoksa null).
+   */
+  var katmanIptal = null;
+  var katmanIptalAcilis = 0;   // düğmenin göründüğü an: çift tıkın ikinci tıkı işi hemen iptal etmesin
+  function katmanIptalGoster(goster) {
+    var b = el("cap-uygula-iptal");
+    if (b) { b.hidden = !goster; b.disabled = false; }
+    katmanIptalAcilis = goster ? Date.now() : 0;
+    var st = el("cap-apply-style");
+    if (goster && st) st.disabled = true;
+    else if (!goster) uygulamaIpucunuGuncelle();
+  }
+  function katmanIptalEt(ev) {
+    var j = katmanIptal;
+    if (!j || j.iptalEdildi) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, katmanIptalAcilis)) return;
+    var b = el("cap-uygula-iptal");
+    if (b) b.disabled = true;
+    if (K.log) K.log("[katman] kullanici iptal etti");
+    status("İptal ediliyor…", "warn");
+    j.iptal();
+  }
+
   function uygulaEtiketiniSifirla() {
     onayBekleyen = null;
     kaliteOnayBekleyen = "";
@@ -6459,6 +6514,8 @@ window.KCaptions = (function () {
    * mükemmel sıkıştırıyor. Uyumsuzluk çıkarsa ProRes 4444 yedeği var.
    */
   async function overlayUygula() {
+    // Katman zaten çiziliyor: ikinci tık ikinci render başlatmaz (İptal düğmesi görünür)
+    if (katmanIptal) { status("Altyazı katmanı zaten hazırlanıyor: bitmesini bekle ya da İptal'e bas.", "warn"); return; }
     // Pro: animasyonlu katman (ucretsizde kanca basligiyla ortak 3 deneme hakki; deneme ciktisi filigranli)
     if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { overlayUygula().then(uygulaEtiketiniSifirla); } })) return;
     // Deneme yalniz Altyazi Efektleri icin: tercihlerden geri yuklenen bir MOGRT stili deneme kapisindan sizmasin
@@ -6566,11 +6623,28 @@ window.KCaptions = (function () {
        */
       var fontDosyalari = (stilDerlemesi ? stilDerlemesi.fontFiles : [FONTLAR[st.font]]).filter(Boolean);
       var cikti = K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
-      var katman = await window.SufloOverlayRender.render(K, {
-        ass: ass, fontFiles: fontDosyalari, g: g, y: y, fps: fps, sure: sure, cikti: cikti,
-        fontDizini: K.path.join(uzantiDizini(), "fonts"), logo: logo,
-        durum: function (m) { status(m); }
-      });
+      // İptal: render boyunca (yüzde ve kalan süreyle); yerleştirme başladıktan sonra iptal yok
+      var jeton = K.iptalJetonu ? K.iptalJetonu() : null;
+      katmanIptal = jeton || { iptalEdildi: false, iptal: function () {} };
+      katmanIptalGoster(!!jeton);
+      var katman;
+      try {
+        katman = await window.SufloOverlayRender.render(K, {
+          ass: ass, fontFiles: fontDosyalari, g: g, y: y, fps: fps, sure: sure, cikti: cikti,
+          fontDizini: K.path.join(uzantiDizini(), "fonts"), logo: logo, iptal: jeton || undefined,
+          durum: function (m) { if (!jeton || !jeton.iptalEdildi) status(m); }
+        });
+      } finally {
+        katmanIptal = null;
+        katmanIptalGoster(false);
+      }
+      // render bittiği anda basılan İptal: katman konmaz, dosya silinir (timeline'a dokunulmaz, hak düşmez)
+      if (jeton && jeton.iptalEdildi) {
+        try { K.fs.unlinkSync(cikti); } catch (eI) {}
+        var eIptal = new Error("İptal edildi");
+        eIptal.iptal = true;
+        throw eIptal;
+      }
       if (katman && katman.logoAtlandi) KApp.toast("Marka Kiti logosu bulunamadı; katman logosuz eklendi. Ayarlar › Marka Kiti'nden logoyu yeniden seç.", "warn", 9000);
 
       status("Timeline'a yerleştiriliyor…");
@@ -6593,7 +6667,8 @@ window.KCaptions = (function () {
         (yer.newTrack ? " (yeni katman açıldı)" : "") + " · " + mb + " MB", "good", 8000);
       yildizIste();
     } catch (e) {
-      status("✕ " + K.hataYardimi(e), "bad");
+      if (e && e.iptal) status("İptal edildi", "warn");
+      else status("✕ " + K.hataYardimi(e), "bad");
     } finally {
       emojisizCikti = false;
     }
@@ -7022,6 +7097,7 @@ window.KCaptions = (function () {
   function init() {
     el("cap-go").addEventListener("click", go);
     if (el("cap-cancel")) el("cap-cancel").addEventListener("click", iptalEt);
+    if (el("cap-uygula-iptal")) el("cap-uygula-iptal").addEventListener("click", katmanIptalEt);
     el("cap-apply").addEventListener("click", function () { apply(false); });
     el("cap-apply-style").addEventListener("click", function () { apply(true); });
     el("cap-save").addEventListener("click", saveAs);

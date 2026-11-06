@@ -472,7 +472,7 @@ function yerelUi(pro, o) {
   dom["cap-efekt-cikti"].value = "yerel";
   dom["cap-yerel-font-not"].hidden = true;
   var f = new Function("el", "CMJ", "AE", "Pro", "window", "AYAR", "KURULU", "BEKLEYEN",
-    "var secilenMogrt = null, secilenMotorStili = 'efekt', EFEKT = 'efekt', kaliteOnayBekleyen = '';\n" +
+    "var secilenMogrt = null, secilenMotorStili = 'efekt', EFEKT = 'efekt', kaliteOnayBekleyen = '', katmanIptal = null;\n" +
     "var yerelBekleyenFontlar = BEKLEYEN;\n" +
     "function efektAyari() { return AE.normalize(AYAR); }\n" +
     "function sistemFontDosyalari() { return KURULU; }\n" +

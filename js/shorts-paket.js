@@ -19,6 +19,14 @@ window.KShortsPaket = (function () {
   var AE = window.SufloAltyaziEfekt || null;
   var CT = window.SufloCaptionText, OR = window.SufloOverlayRender, MK = window.SufloMarkaKiti;
   var calisiyorMu = false, iptalIstendi = false, sonKlasor = "";
+  /*
+   * Katman render'larının (altyazı, kanca, çerçeve) iptal jetonu: İptal süren ffmpeg'i hemen öldürür. O adım
+   * "bekliyor" kalır (hata sayılmaz), yarım dosya silinir; "Devam et" o adımdan sürer. Premiere adımları
+   * (sekans oluşturma) bölünemez: onlar eskisi gibi sıradaki adımdan önce durur.
+   */
+  var katmanJetonu = null;
+  function yeniKatmanJetonu() { katmanJetonu = K.iptalJetonu ? K.iptalJetonu() : null; return katmanJetonu; }
+  function katmanIptali() { return katmanJetonu || undefined; }
   // Paketin başladığı Viral anlar aramasının nesli: yalnız o arama hâlâ ekrandaysa kaynak sekansa
   // bağlanır ("Devam et" ya da yeni arama sonrası null / farklı: bağlanmaz)
   var bagNesli = null;
@@ -397,7 +405,7 @@ window.KShortsPaket = (function () {
         var sure = CT.katmanSuresi(cc.cues[cc.cues.length - 1].end, Number(ctx.end) || 0, fps, false);
         var yol = cikti("altyazi", k);
         await OR.render(K, { ass: der.ass, fontFiles: der.fontFiles, g: W, y: H, fps: fps, sure: sure, cikti: yol,
-          onek: "overlay-paket-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 1800000 });
+          onek: "overlay-paket-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 1800000, iptal: katmanIptali() });
         var yer = await K.call("KS_placeOverlay", { path: yol, at: 0, name: P.KATMAN.altyazi, expectSeqId: ctx.id }, 120000);
         if (!yer || !yer.ok) { sil(yol); return { ok: false, hata: (yer && yer.error) || "?" }; }
         return { ok: true };
@@ -405,7 +413,9 @@ window.KShortsPaket = (function () {
 
       kanca: async function (k, ctx) {
         if (!window.KKanca) return { ok: false, hata: "Kanca modülü yüklenemedi." };
-        var r = await KKanca.ekle({ text: k.kanca, at: 0, stil: job.kancaStil, dur: job.kancaSure, expectSeqId: ctx.id, ad: P.KATMAN.kanca, sessiz: true });
+        var r = await KKanca.ekle({ text: k.kanca, at: 0, stil: job.kancaStil, dur: job.kancaSure, expectSeqId: ctx.id, ad: P.KATMAN.kanca, sessiz: true,
+          iptal: katmanIptali() });
+        if (r && r.iptal) return { ok: false, iptal: true, hata: "İptal edildi" };
         return r && r.ok ? { ok: true } : { ok: false, hata: (r && r.hata) || "Kanca başlığı eklenemedi." };
       },
 
@@ -425,7 +435,7 @@ window.KShortsPaket = (function () {
         var yol = cikti("cerceve", k);
         var katman = await OR.render(K, { ass: ass, fontFiles: cp.cta ? cp.cta.fontFiles : [], g: W, y: H, fps: fps,
           sure: CT.katmanSuresi(dur, Number(ctx.end) || 0, fps, true), cikti: yol, assAd: "cerceve.ass", onek: "overlay-paket-",
-          fontDizini: K.path.join(uzantiDizini(), "fonts"), logo: cp.logo, timeout: 1800000 });
+          fontDizini: K.path.join(uzantiDizini(), "fonts"), logo: cp.logo, timeout: 1800000, iptal: katmanIptali() });
         if (katman && katman.logoAtlandi) k.notlar.logo = "logo-yok";
         var yer = await K.call("KS_placeOverlay", { path: yol, at: 0, name: P.KATMAN.cerceve, expectSeqId: ctx.id }, 120000);
         if (!yer || !yer.ok) { sil(yol); return { ok: false, hata: (yer && yer.error) || "?" }; }
@@ -552,6 +562,7 @@ window.KShortsPaket = (function () {
     }
     calisiyorMu = true;   // ilk await'ten ÖNCE: çift tıklama iki paket başlatmasın
     iptalIstendi = false;
+    yeniKatmanJetonu();
     bagNesli = null;
     guncelle();
     var basladi = false;
@@ -623,6 +634,7 @@ window.KShortsPaket = (function () {
     if (!job) { guncelle(); return; }
     P.resumeJob(job);
     iptalIstendi = false;
+    yeniKatmanJetonu();
     // ekrandaki arama bu işin olmayabilir: kaynak sekansa bağlanmaz; altyazı kaydı işin kendi transkriptinden
     bagNesli = null;
     await calistir(job);
@@ -631,6 +643,7 @@ window.KShortsPaket = (function () {
   function iptal() {
     if (!calisiyorMu) return;
     iptalIstendi = true;
+    if (katmanJetonu) katmanJetonu.iptal();   // süren katman render'ı hemen durur
     durum(T("Sıradaki adımdan önce durduruluyor…"), "warn");
   }
 

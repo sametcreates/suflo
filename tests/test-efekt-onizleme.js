@@ -22,7 +22,7 @@ var OR = require(path.join(KOK, "js", "overlay-render.js"));
 function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms || 0); }); }
 
 function ortam() {
-  var dosyalar = {}, silinen = [], calistirmalar = [], domYedegi = 0;
+  var dosyalar = {}, silinen = [], calistirmalar = [], domYedegi = 0, eszamanli = { simdi: 0, enCok: 0 };
   function dugum(ek) {
     var d = { hidden: false, disabled: false, textContent: "", src: "", loop: false, checked: false, style: {}, attrs: {} };
     d.removeAttribute = function (k) { delete d.attrs[k]; if (k === "src") d.src = ""; };
@@ -50,22 +50,29 @@ function ortam() {
   var K = {
     nodeOK: true, path: path, fs: sahteFs, tmpDir: function () { return "/tmp/suflo"; }, log: function () {},
     findFfmpeg: function () { return Promise.resolve("ffmpeg"); },
+    // bridge.js iptalJetonu ile aynı arayüz; iptalde "süreç" öldürülür (c.olduruldu) ve { code: -2, iptal: true } döner
+    iptalJetonu: function () { return OR.yerelJeton(); },
     run: function (ff, args, o) {
-      var c = { args: args, cwd: o.cwd, bitti: null, fontlar: Object.keys(dosyalar).filter(function (k) { return /\.ttf$/.test(k) && k.indexOf(o.cwd) === 0; }) };
+      var c = { args: args, cwd: o.cwd, bitti: null, olduruldu: false, fontlar: Object.keys(dosyalar).filter(function (k) { return /\.ttf$/.test(k) && k.indexOf(o.cwd) === 0; }) };
       calistirmalar.push(c);
+      eszamanli.simdi++;
+      eszamanli.enCok = Math.max(eszamanli.enCok, eszamanli.simdi);
       return new Promise(function (r) {
-        c.bitti = function () { dosyalar[args[args.length - 1]] = "webm"; r({ code: 0 }); };
+        var kapandi = false;
+        function kapat(x) { if (kapandi) return; kapandi = true; eszamanli.simdi--; r(x); }
+        c.bitti = function () { if (kapandi) return; dosyalar[args[args.length - 1]] = "webm"; kapat({ code: 0 }); };
+        if (o.iptal) o.iptal.dinle(function () { c.olduruldu = true; kapat({ code: -2, iptal: true }); });
       });
     }
   };
   var durum = { stil: { aile: "efekt", yogunluk: "balanced", font: "Montserrat", boyut: 76, renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffd23f",
     kontur: 5, konum: 2, kutu: false, animasyon: "efekt", guvenli: false, giris: "fade", aktif: "yok", vurgu: true, kalin: true, italik: false, satir: 2, kelime: 5 } };
-  var kod = [govde("function onizlemeDurdur("), govde("async function motorOnizlemeOynat("), govde("function motorCizimiBaslat("),
+  var kod = [govde("function onizlemeDurdur("), "var onizlemeIptal = null;", govde("function onizlemeCiziminiKes("), govde("async function motorOnizlemeOynat("), govde("function motorCizimiBaslat("),
     govde("function efektOnizlemeTazele("), govde("function onizlemeOynat(")].join("\n");
   var api = new Function("K", "window", "el", "KApp", "durum", "say",
     "var EFEKT = 'efekt', secilenMogrt = null, secilenMotorStili = 'efekt';\n" +
     "var onizlemeSaat = null, onizlemeKareYol = null, onizlemeRenderYol = null, onizlemeRenderCalisiyor = false, onizlemeNesil = 0;\n" +
-    "var efektSaat = null, efektTekrar = false;\n" +
+    "var efektSaat = null, efektTekrar = false, ONIZLEME_SAKIN_MS = 450, ONIZLEME_SAKIN_KISA_MS = 200;\n" +
     "function stil() { return JSON.parse(JSON.stringify(durum.stil)); } function motorStiliMi(id) { return window.SufloStyleEngine.has(id); }\n" +
     "function motorOnizlemeCueleri() { return [{ start: 0.15, end: 0.7, text: 'Bunu' }, { start: 0.77, end: 1.3, text: 'gören' }]; }\n" +
     "function onizlemeBoyutu() { return { w: 960, h: 540, dikey: false }; } function konusmaciRenkleri(o) { return o; }\n" +
@@ -81,7 +88,7 @@ function ortam() {
     " kodUygula: function (st) { durum.stil = st; onizlemeDurdur(); efektOnizlemeTazele(true); }," +
     " durum: function () { return { calisiyor: onizlemeRenderCalisiyor, tekrar: efektTekrar, renderYol: onizlemeRenderYol }; } };")(
     K, { SufloStyleEngine: SE, SufloOverlayRender: OR }, function (id) { return dom[id] || null; }, { ctx: function () { return {}; } }, durum, { get dom() { return domYedegi; }, set dom(v) { domYedegi = v; } });
-  return { api: api, dom: dom, dosyalar: dosyalar, silinen: silinen, run: calistirmalar, domYedegi: function () { return domYedegi; }, durum: durum };
+  return { api: api, dom: dom, dosyalar: dosyalar, silinen: silinen, run: calistirmalar, domYedegi: function () { return domYedegi; }, durum: durum, eszamanli: eszamanli };
 }
 
 (async function () {
@@ -89,6 +96,8 @@ function ortam() {
   var a = ortam();
   a.api.tazele(true);
   await bekle(5);
+  ok("görünüm çipi / kod: 200 ms sakinlik beklenir (hızlı gezinmede her tık ffmpeg başlatmaz)", a.run.length === 0, a.run.length);
+  await bekle(230);
   ok("ayar değişince gerçek çizim başlar (tek ffmpeg)", a.run.length === 1 && a.api.durum().calisiyor === true, a.run.length);
   a.api.mogrtSec({ path: "/x.mogrt" });
   a.dom["cap-mogrt-onizleme"].hidden = false;   // mogrtStiliniSec → onizlemeCiz şablon görselini açar
@@ -97,21 +106,22 @@ function ortam() {
   var v = a.dom["cap-render-onizleme"];
   ok("çizim bitmeden MOGRT seçildi: eski efekt videosu şablon önizlemesinin üstüne çıkmaz", v.hidden === true && v.src === "" &&
     a.dom["cap-mogrt-onizleme"].hidden === false && a.dom["cap-onizleme-not"].textContent.indexOf("seçili ayarlarla") === -1, v.src);
-  ok("atılan çizimin çıktısı silinir, DOM yedeğine düşülmez, bayrak iner", a.silinen.some(function (p) { return /preview-.*\.webm$/.test(p); }) &&
+  ok("MOGRT seçimi süren ffmpeg'i öldürür; çıktı kalmaz, DOM yedeğine düşülmez, bayrak iner", a.run[0].olduruldu === true &&
+    !Object.keys(a.dosyalar).some(function (p) { return /preview-.*\.webm$/.test(p); }) &&
     a.domYedegi() === 0 && a.api.durum().calisiyor === false && a.api.durum().renderYol === null, a.silinen.join(" | "));
 
-  /* ---- 2) çizim sürerken stil kodu uygulandı ---- */
+  /* ---- 2) çizim sürerken stil kodu uygulandı: eski ffmpeg öldürülür, yenisi sakinlikten sonra ---- */
   var b = ortam();
   b.api.tazele(true);
-  await bekle(5);
+  await bekle(230);
   var yeniStil = Object.assign({}, b.durum.stil, { font: "Anton", giris: "pop", aktif: "zipla", kalin: false });
   b.api.kodUygula(yeniStil);
   await bekle(5);
-  ok("çizim sürerken kod uygulandı: ikinci ffmpeg ilki bitmeden başlamaz, yeni çizim sıraya girer", b.run.length === 1 && b.api.durum().tekrar === true &&
-    b.api.durum().calisiyor === true);
-  b.run[0].bitti();
-  await bekle(5);
-  ok("ilk (eski görünüm) çizim gösterilmez; kodun görünümü yeniden çizilir", b.run.length === 2 && b.dom["cap-render-onizleme"].src === "", b.run.length);
+  ok("çizim sürerken kod uygulandı: eski ayarlı ffmpeg hemen öldürülür, çıktısı silinir", b.run.length === 1 && b.run[0].olduruldu === true &&
+    b.api.durum().calisiyor === false && b.silinen.some(function (p) { return /preview-.*\.webm$/.test(p) || /[\/]is-/.test(p); }), JSON.stringify(b.api.durum()));
+  await bekle(230);
+  ok("eski (öldürülen) çizim gösterilmez; kodun görünümü yeniden çizilir; iki ffmpeg hiç aynı anda yok", b.run.length === 2 && b.dom["cap-render-onizleme"].src === "" &&
+    b.eszamanli.enCok === 1, b.run.length + " / " + b.eszamanli.enCok);
   b.run[1].bitti();
   await bekle(5);
   var cikti2 = b.run[1].args[b.run[1].args.length - 1];
@@ -126,21 +136,27 @@ function ortam() {
   var c = ortam();
   c.durum.stil.kalin = false;
   c.api.tazele(true);
-  await bekle(5);
+  await bekle(230);
   ok("kalın kapalı Montserrat önizlemesi Montserrat-Regular.ttf ile çizilir", c.run[0].fontlar.map(function (f) { return path.basename(f); }).join() === "Montserrat-Regular.ttf",
     c.run[0].fontlar.join());
 
-  /* ---- 3) Durdur çizimi keser ama ikinci ffmpeg'e yol açmaz ---- */
+  /* ---- 3) Durdur çizimi keser (süreç de ölür), ikinci ffmpeg ancak o kapanınca ---- */
   var d = ortam();
   d.api.oynat();
   await bekle(5);
   d.api.oynat();   // Durdur
   d.api.tazele(true);   // hemen ardından ayar değişti
   await bekle(5);
-  ok("Durdur'dan sonra gelen ayar değişikliği süren çizimin bitmesini bekler (eşzamanlı iki ffmpeg yok)", d.run.length === 1 && d.api.durum().tekrar === true);
-  d.run[0].bitti();
-  await bekle(5);
-  ok("durdurulan çizim gösterilmez, sıradaki çizim başlar", d.dom["cap-render-onizleme"].src === "" && d.run.length === 2);
+  ok("Durdur süren ffmpeg'i öldürür; ayar değişikliği yeni çizimi sakinlikten sonra başlatır", d.run.length === 1 && d.run[0].olduruldu === true);
+  await bekle(230);
+  ok("durdurulan çizim gösterilmez, sıradaki çizim başlar; iki ffmpeg aynı anda yok", d.dom["cap-render-onizleme"].src === "" && d.run.length === 2 && d.eszamanli.enCok === 1);
+
+  /* ---- 3b) art arda kaydırıcı değişiklikleri: 450 ms sakinlik, tek çizim ---- */
+  var e = ortam();
+  for (var i = 0; i < 6; i++) { e.api.tazele(); await bekle(60); }
+  ok("kaydırıcı sürüklenirken (60 ms arayla 6 değişiklik) hiç çizim başlamaz", e.run.length === 0, e.run.length);
+  await bekle(480);
+  ok("sakinlikten sonra tek çizim", e.run.length === 1, e.run.length);
 
   /* ---- 4) stil kodu uygulama süren çizimi "Durdur" saymaz ---- */
   var sk = govde("function stilKoduUygula(");

@@ -132,6 +132,7 @@ window.KKanca = (function () {
    *   ek.expectSeqId — katman yalniz bu sekansa konur (KS_placeOverlay reddeder)
    *   ek.ad — katmanin adi (varsayilan "Suflo Kanca · <metin>")
    *   ek.sessiz — bildirim / durum satiri yok; hata da { ok: false, hata } olarak doner
+   *   ek.iptal — K.iptalJetonu() (Shorts paketi): render'i durdurur; sessizde { ok: false, iptal: true }
    * Doner: basarida { ok: true, yer, dur } (eski cagiranlar icin truthy), hatada false
    */
   async function ekle(ek) {
@@ -171,7 +172,7 @@ window.KKanca = (function () {
         ass: filigranli ? window.SufloFiligran.ekle(built.ass, { width: b.w, height: b.h }) : built.ass,
         fontFiles: built.fontFiles, g: b.w, y: b.h, fps: b.fps, sure: built.dur, cikti: cikti,
         assAd: "kanca.ass", onek: "overlay-kanca-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 300000,
-        hataOneki: "Başlık katmanı üretilemedi: "
+        hataOneki: "Başlık katmanı üretilemedi: ", iptal: (ek && ek.iptal) || undefined
       });
       yaz("Timeline'a yerleştiriliyor…");
       var at = typeof o.at === "number" && isFinite(o.at) ? Math.max(0, o.at) : "playhead";
@@ -191,6 +192,12 @@ window.KKanca = (function () {
       }
       return { ok: true, yer: yer, dur: built.dur };
     } catch (e) {
+      // İptal (Shorts paketi jetonu): hata değil; timeline'a dokunulmadı, hak düşmedi
+      if (e && e.iptal) {
+        if (sessiz) return { ok: false, iptal: true, hata: "İptal edildi" };
+        durum("İptal edildi", "warn");
+        return false;
+      }
       if (sessiz) return bitmedi(K.hataYardimi(e));
       durum("✕ " + K.hataYardimi(e), "bad");
       KApp.toast("Kanca başlığı eklenemedi: " + K.hataYardimi(e), "bad");
