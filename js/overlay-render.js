@@ -263,6 +263,12 @@
    * Sıra önemli: özel olan önce. Font: Windows derlemeleri her çizimde "Fontconfig error: Cannot load
    * default config file" yazar (başarıda da); yalnız gerçek yükleme hatası ya da son satır font diyorsa.
    */
+  /*
+   * libass'in başarılı çizimde de yazdığı bilgi satırları (font eşlemesi, emoji için yedek font arayışı). ffmpeg
+   * mesajsız çökerse / öldürülürse son satır bunlardan biri olur: "font" sayılmamalı (yanlış "yeniden kur" önerisi).
+   */
+  var FONT_BILGI = /^fontselect: \(.*\) -> |^Glyph 0x[0-9a-f]+ not found, selecting one more font|^Using font provider|^Loading font file|^Font info:|^Shaper:|^Added subtitle file/i;
+
   function hataSinifi(stderr, kod) {
     var s = String(stderr || "");
     if (Number(kod) === -2) return "iptal";
@@ -271,8 +277,9 @@
     if (/No such filter: '?(subtitles|ass)'?|Unknown filter '?(subtitles|ass)'?/i.test(s)) return "filtre";
     if (/Permission denied|EACCES|EPERM|Operation not permitted|Access is denied/i.test(s)) return "izin";
     if (/Invalid (frame |video )?size|Picture size \d+x\d+ is invalid|(width|height) (must be|not) divisible by 2|Unable to parse option value "?\d*x?\d*"? as image size/i.test(s)) return "boyut";
+    var son = sonSatir(s);
     if (/Error opening (memory )?font|No usable fontconfig configuration|Error initializing fontconfig|fontconfig_init failed/i.test(s) ||
-      /font|glyph/i.test(sonSatir(s))) return "font";
+      (/font|glyph/i.test(son) && !FONT_BILGI.test(son))) return "font";
     return "bilinmiyor";
   }
 
@@ -498,8 +505,10 @@
       if (rb.iptal || (c.jeton && c.jeton.iptalEdildi)) return { iptal: true };
       if (rb.code !== 0 || !K.fs.existsSync(c.cikti)) {
         var sb = hataSinifi(rb.stderr, rb.code);
+        // disk dolu burada tekrarlanır: birleştirme parçalar + çıktı (2 kat) yer ister; parça klasörleri silindikten
+        // sonra tek süreç yalnız çıktı kadar yerle sığabilir
         return { ok: false, r: rb, neden: "birleştirme: " + sonSatir(rb.stderr) + " (kod " + rb.code + ")",
-          tekrarlanmaz: ["zaman", "disk", "izin"].indexOf(sb) !== -1 };
+          tekrarlanmaz: ["zaman", "izin"].indexOf(sb) !== -1 };
       }
       return { ok: true };
     } finally {
@@ -517,7 +526,8 @@
    *      parcaZorla? (≥ 2: parçalı yolu eşiksiz zorla; test), cpus? (çekirdek sayısı; verilmezse K.os) }
    * Döner: { path, g, y, fps, sure, kare, parca, logo: bool, logoAtlandi: bool }.
    * Hata: Error (hataMetni); iptalde e.iptal = true. Geçici klasör ve (başarısızlıkta) yarım çıktı her durumda silinir.
-   * Süre sınırı katmanla büyür: en az 10 dk, katman süresinin 3 katı (o.timeout daha büyükse o).
+   * Süre sınırı katmanla büyür: katman süresinin 3 katı; altı o.timeout (verilmezse eskisi gibi 1 saat), en az 10 dk.
+   *   (Yavaş bilgisayarda ağır efektli 4K katman gerçek zamanın birkaç katı sürebilir: 1 saatlik eski taban düşürülmez.)
    */
   async function render(K, o) {
     o = o || {};
@@ -563,7 +573,7 @@
       if (logo) dosyalar.push(logo.name);
       if (typeof o.durum === "function") o.durum((o.durumMetni || "Altyazı katmanı hazırlanıyor…") + " (" + Math.round(sure) + " sn)");
 
-      var timeout = Math.max(Number(o.timeout) || 0, 600000, Math.round(sure * 3000));
+      var timeout = Math.max(Number(o.timeout) > 0 ? Number(o.timeout) : 3600000, 600000, Math.round(sure * 3000));
       var kare = kareSayisi(sure, fps);
       var basMs = Date.now(), sonPct = -1, sonAn = 0;
       var ilerlet = function (p) {

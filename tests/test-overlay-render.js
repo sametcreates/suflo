@@ -288,6 +288,12 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
   ok("hata: font yüklenemedi (gerçek hata ya da son satır)", HS("[Parsed_subtitles_0 @ 0x1] Error opening memory font: Anton.ttf\nfoo", 1) === "font" &&
     HS("x\n[Parsed_subtitles_0 @ 0x1] fontselect: failed to find any fallback with glyph", 1) === "font" &&
     /^Yazı tipi yüklenemedi/.test(HM("No usable fontconfig configuration file found", 1, bag)));
+  // doğrulama: ffmpeg mesajsız çöktü / öldürüldü; son satır libass'in başarıda da yazdığı bilgi satırı → font DEĞİL
+  ok("hata: libass bilgi satırı (fontselect eşlemesi, emoji yedek fontu) son satırsa font sayılmaz",
+    HS("Input #0, lavfi\n[Parsed_subtitles_1 @ 0x55d0] fontselect: (Inter, 700, 0) -> /tmp/x/Inter-Bold.ttf, 0, Inter-Bold\n", 1) === "bilinmiyor" &&
+    HS("[Parsed_subtitles_1 @ 0x5] Glyph 0x1F525 not found, selecting one more font for (Inter, 700, 0)\n", 137) === "bilinmiyor" &&
+    /^Altyazı katmanı üretilemedi: fontselect: \(Inter/.test(HM("[Parsed_subtitles_1 @ 0x5] fontselect: (Inter, 700, 0) -> /x.ttf, 0, Inter", 1, bag)),
+    HS("[Parsed_subtitles_1 @ 0x55d0] fontselect: (Inter, 700, 0) -> /tmp/x/Inter-Bold.ttf, 0, Inter-Bold", 1));
   ok("hata: Windows'un her çizimdeki fontconfig uyarısı tek başına font hatası sayılmaz",
     HS("Fontconfig error: Cannot load default config file: No such file: (null)\nConversion failed!", 1) === "bilinmiyor" &&
     HM("Fontconfig error: Cannot load default config file\nConversion failed!", 1, bag) === "Altyazı katmanı üretilemedi: Conversion failed!");
@@ -330,7 +336,11 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
   var aa = Ka.calisan[0];
   ok("render: -progress pipe:1 -nostats ve kesin kare (-frames:v 50)", aa.args.join(" ").indexOf("-frames:v 50 -nostats -progress pipe:1 " + path.join(srt, "a.mov")) !== -1 && ra.kare === 50 && ra.parca === 1, aa.args.join(" "));
   ok("render: ilerleme durum satırına (%25)", dz.indexOf("Altyazı katmanı çiziliyor · %25") !== -1, dz.join(" | "));
-  ok("render: süre sınırı katmanla büyür (en az 10 dk, 3 × süre)", aa.timeout === 600000, aa.timeout);
+  // doğrulama: çağıran sınır vermezse eski 1 saatlik taban korunur (yavaş bilgisayarda ağır 4K katman 10 dk'yı aşabilir)
+  ok("render: süre sınırı verilmezse eskisi gibi 1 saat (3 × süre daha büyükse o)", aa.timeout === 3600000, aa.timeout);
+  var Kt5 = akisK({});
+  await OR.render(Kt5, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 5, cikti: path.join(srt, "t5.mov"), timeout: 300000 });
+  ok("render: çağıranın küçük sınırı (kanca 5 dk) en az 10 dk'ya çıkar", Kt5.calisan[0].timeout === 600000, Kt5.calisan[0].timeout);
   var Kt = akisK({});
   await OR.render(Kt, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 3600, cikti: path.join(srt, "t.mov") });
   var Kt2 = akisK({});
@@ -388,6 +398,12 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
   try { await OR.render(Kpd, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "pd.mov") }); } catch (e) { hpd = e; }
   ok("parça hatası disk dolu: tek süreçle yeniden denenmez, anlaşılır hata", hpd && /^Diskte yer kalmadı/.test(hpd.message) && Kpd.calisan.every(function (c) { return /parca-/.test(c.cwd); }),
     hpd && hpd.message);
+  // doğrulama: birleştirmede disk dolu (parçalar + çıktı = 2 kat yer): parça klasörleri silinince tek süreç sığabilir → yeniden dener
+  var Kcd = akisK({ cpus: 4, hata: function (c) { return c.args.indexOf("concat") !== -1 ? { code: 1, stderr: "[out @ 0x1] Error writing trailer: No space left on device\n" } : null; } });
+  var rcd = await OR.render(Kcd, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "cd.mov") });
+  var sonCd = Kcd.calisan[Kcd.calisan.length - 1];
+  ok("birleştirmede disk dolu: parçalar silinip tek süreçle yeniden çizilir", rcd.parca === 1 && Kcd.calisan.length === 5 && sonCd.cwd.indexOf("parca-") === -1 &&
+    sonCd.args.indexOf("concat") === -1 && sonCd.args.indexOf("1250") !== -1, Kcd.calisan.length);
   ok("parça hataları sonrası geçici klasör yok", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
   ok("geçici render klasörleri temizlendi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
 
