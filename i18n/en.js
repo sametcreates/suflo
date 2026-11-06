@@ -3629,6 +3629,8 @@
     "Kontur kalınlığı": "Outline width",
     "0 = kontur yok": "0 = no outline",
     "Satır sayısı": "Lines",
+    // Caption Effects line count is a maximum (quality engine): a short card that fits on one line is not split
+    "Kartın en çok kaç satıra bölüneceği: kadraja tek satırda sığan kısa kart bölünmez": "The most lines a card is split into: a short card that fits on one line stays on one line",
     "En çok kelime": "Max words",
     "Ekranda aynı anda en çok kaç kelime görünür (1-10)": "Most words shown on screen at once (1-10)",
     "Paylaş ve kaydet": "Share and save",

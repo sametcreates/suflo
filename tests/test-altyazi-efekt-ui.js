@@ -330,6 +330,12 @@ ok("index.html: oluşturucunun kontrolleri (giriş, vurgu animasyonu, kelime vur
   ["cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-vurgu", "cap-efekt-kalin", "cap-efekt-italik", "cap-efekt-satir", "cap-efekt-kelime", "cap-renk-vurgu", "cap-renk",
     "cap-renk-kontur", "cap-font", "cap-boyut", "cap-kontur", "cap-konum"].every(function (id) { return html.indexOf('id="' + id + '"') !== -1; }) &&
   /<option value="glitch">Glitch<\/option>/.test(html) && /<option value="yukari">Yukarı kay<\/option>/.test(html));
+// Kalite motoru: satır sayısı bir üst sınır (sığan kısa kart bölünmez); seçicinin ipucu bunu söyler, İngilizcesi var
+var satirIpucu = /<select id="cap-efekt-satir" title="([^"]+)">/.exec(html);
+var enKaynak = fs.readFileSync(path.join(KOK, "i18n", "en.js"), "utf8");
+ok("index.html: Satır sayısı seçicisinin ipucu 'en çok' (üst sınır) der; i18n/en.js'te karşılığı var",
+  !!satirIpucu && /en çok/.test(satirIpucu[1]) && /bölünmez/.test(satirIpucu[1]) && enKaynak.indexOf(JSON.stringify(satirIpucu[1]) + ":") !== -1,
+  satirIpucu && satirIpucu[1]);
 var ou = govde("async function overlayUygula(");
 ok("timeline'a ekleme Pro.gate('overlay') (3 deneme), efekt katmanı 'Suflo Altyazı Efekti' adıyla", /Pro\.gate\("overlay", \{ deneme: true/.test(ou) &&
   /"Suflo Altyazı Efekti"/.test(ou) && /Deneme yalnız Altyazı Efektleri için/.test(ou));

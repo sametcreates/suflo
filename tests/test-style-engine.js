@@ -573,6 +573,35 @@ ok("efektSatirlari / efektKonumlari ornek.dil'i kullanır (önizleme, yerel çı
   engine.efektSatirlari({ cues: dilKel, cueKind: "words", dil: "de" }, { kelime: 4 }).map(function (k) { return k.kelimeler.length; }).join() === "3,2" &&
   engine.efektSatirlari({ cues: dilKel, cueKind: "words", dil: "tr" }, { kelime: 4 }).map(function (k) { return k.kelimeler.length; }).join() === "2,3");
 /*
+ * Önizleme = çıktı: kırılım kararı yuvarlanmamış punto / alanla (efektOlcusu). Önceden scaled()'ın tam sayı yuvarlaması
+ * küçük önizlemede (320 × 400, 4:5) "teşekkür oldu bir" kartını iki satıra, 1080 × 1350 çıktıda tek satıra koyuyordu.
+ */
+var onzKel = kelimeler("teşekkür oldu bir");
+var onzK = kartMetinleri(efK(engine, onzKel, [320, 400], { boyut: 80, satir: 2, kelime: 5 }));
+var cikK = kartMetinleri(efK(engine, onzKel, [1080, 1350], { boyut: 80, satir: 2, kelime: 5 }));
+ok("efekt önizleme (320 × 400) ile çıktı (1080 × 1350) aynı satır kırılımı (yuvarlama eşiği)",
+  onzK.length === 1 && JSON.stringify(onzK) === JSON.stringify(cikK), JSON.stringify([onzK, cikK]));
+(function () {
+  var sozluk = "bu çok güzel bir gün oldu arkadaşlar hepinize teşekkür ediyorum kesinlikle muhteşem anlatılmaz olağanüstü ve sonra eve döndük".split(" ");
+  var tohum = 7, fark = 0, toplam = 0, ilk = "";
+  function rnd() { tohum = (tohum * 1103515245 + 12345) & 0x7fffffff; return tohum / 0x7fffffff; }
+  // önizleme boyutu (captions.js onizlemeBoyutu) ↔ sekans: 16:9, 9:16, 1:1, 4:5; güvenli açık / kapalı
+  var ciftler = [[960, 540, 1920, 1080], [320, 568, 1080, 1920], [320, 320, 1080, 1080], [320, 400, 1080, 1350]];
+  for (var it = 0; it < 1600; it++) {
+    var n = 2 + Math.floor(rnd() * 5), cs = [], t = 0;
+    for (var i = 0; i < n; i++) { cs.push({ start: t, end: t + 0.3, text: sozluk[Math.floor(rnd() * sozluk.length)] }); t += 0.32; }
+    var ov = { boyut: [60, 70, 80, 90, 100, 110, 120][Math.floor(rnd() * 7)], satir: 2 + (it % 2), kelime: 5, guvenli: it % 3 === 0 };
+    var c = ciftler[it % 4];
+    var imza = function (w, h) {
+      return JSON.stringify(engine.efektSatirlari({ cues: cs, cueKind: "words" }, ov, { width: w, height: h }).map(function (k) { return [k.kelimeler.length, k.kir]; }));
+    };
+    var a = imza(c[0], c[1]), b = imza(c[2], c[3]);
+    toplam++;
+    if (a !== b) { fark++; if (!ilk) ilk = c.join("x") + " " + cs.map(function (x) { return x.text; }).join(" ") + " " + a + " ≠ " + b; }
+  }
+  ok("efekt kartları ve satır kırılımı önizleme boyutundan bağımsız (1600 rastgele kart, 4 oran, güvenli açık / kapalı)", fark === 0, fark + "/" + toplam + " " + ilk);
+})();
+/*
  * Kart / zaman değişmezleri: kartlar üst üste binmez, her kelime bir kez ve sırasıyla, *vurgu* işareti korunur.
  * Kelime sayısı 1-10, satır 1-3, üç kadraj, güvenli açık / kapalı; boş transkript ve tek kelime.
  */

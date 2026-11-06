@@ -1036,8 +1036,17 @@
    * Kartın ölçüsü (efektSigdir'in tahmini): kullanılabilir genişlik alanW × %88 (9:16 + "Platform arayüzünden kaçın"
    * dahil), satır genişliği karakter × punto × fontun katsayısı × 1,08. genislik: katsayı yerine (yerel çıktı Arial'a düşünce).
    */
+  /*
+   * Kırılım KARARI (kart / satır sayısı, uzun kelime) yuvarlanmamış punto ve alanla verilir: punto kısa kenarla, alan
+   * genişlikle orantılı olduğundan karar yalnız kadrajın oranına bağlıdır. Küçük önizleme (960 × 540, 320 × 568) ile
+   * çıktı (1920 × 1080, 1080 × 1920; yerel çıktı, AE) böylece aynı kartları kurar; scaled()'ın tam sayı yuvarlaması
+   * (320'de %1'e varan) eşikteki kartı önizlemede iki, çıktıda tek satır yapıyordu. Çizilen punto yine fs0 / efektOlcegi.
+   */
   function efektOlcusu(style, width, fs0, genislik) {
-    return { fs0: fs0, k: genislik > 0 ? genislik : (KARAKTER_GENISLIK[style.font] || .62), maxW: alanW(width) * .88 };
+    var boyut = Number(style && style.boyut);
+    var fsKarar = olcekRef > 0 && boyut > 0 ? boyut * olcekRef / 1080 : fs0;
+    var alan = guvenliW ? Math.min(width, width * 0.74) : width;
+    return { fs0: fsKarar, k: genislik > 0 ? genislik : (KARAKTER_GENISLIK[style.font] || .62), maxW: alan * .88 };
   }
   function olcuGenislik(olcu, karakter, fs) { return karakter * (fs || olcu.fs0) * olcu.k * 1.08; }
   // Kelime tek başına taban puntoda kullanılabilir genişliği aşıyor mu (o zaman kendi kartına alınır)
