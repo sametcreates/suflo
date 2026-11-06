@@ -112,14 +112,31 @@ ok("bozuk kod: SS.decode'un hatası aynen", J(SK.decode("SFL1.bozuk!!", izin)) =
 /* ---------------- 4b) parti 5: vurgu kutusu rengi ve ikinci vurgu rengi ---------------- */
 var renkTarif = { styleId: "efekt", overrides: Object.assign(AE.overrides(AE.gorunum("temiz").ayar), { anim: "vurgu-kutusu", vurguKutuRenk: "#FF00AA", vurguRenk2: "#00cc88" }) };
 var rk = SK.encode(renkTarif), rj = ham(rk);
-ok("parti 5 encode: renkler overrides'ta yok, ek'te (küçük harf); anim yanında", !("vurguKutuRenk" in rj.overrides) && !("vurguRenk2" in rj.overrides) &&
-  J(rj.ek) === J({ anim: "vurgu-kutusu", vurguKutuRenk: "#ff00aa", vurguRenk2: "#00cc88" }), J(rj.ek));
+// Doğrulama: kod yalnız animasyonun KULLANDIĞI rengi taşır (vurgu kutusu → vurguKutuRenk; vurguRenk2 onda kullanılmaz)
+ok("parti 5 encode: renkler overrides'ta yok, ek'te (küçük harf); yalnız animasyonun kullandığı renk", !("vurguKutuRenk" in rj.overrides) && !("vurguRenk2" in rj.overrides) &&
+  J(rj.ek) === J({ anim: "vurgu-kutusu", vurguKutuRenk: "#ff00aa" }), J(rj.ek));
 var rd = SK.decode(rk, izin);
-ok("parti 5 decode: renkler gidip gelir (overrides + recipe.ek), uyarı yok", rd.ok && rd.recipe.overrides.vurguKutuRenk === "#ff00aa" &&
-  rd.recipe.overrides.vurguRenk2 === "#00cc88" && rd.recipe.overrides.anim === "vurgu-kutusu" && rd.warnings.length === 0, J(rd.warnings));
-var yalnizRenk = SK.decode(SK.encode({ styleId: "efekt", overrides: { vurguRenk2: "#123456" } }), izin);
-ok("parti 5: animasyonsuz kodda da renk taşınır (klasikte kullanılmaz)", yalnizRenk.ok && yalnizRenk.recipe.overrides.vurguRenk2 === "#123456" &&
-  yalnizRenk.recipe.overrides.anim === undefined && yalnizRenk.warnings.length === 0);
+ok("parti 5 decode: renk gidip gelir (overrides + recipe.ek), uyarı yok", rd.ok && rd.recipe.overrides.vurguKutuRenk === "#ff00aa" &&
+  rd.recipe.overrides.vurguRenk2 === undefined && rd.recipe.overrides.anim === "vurgu-kutusu" && rd.warnings.length === 0, J(rd.warnings));
+var ikiTon = SK.decode(SK.encode({ styleId: "efekt", overrides: { anim: "iki-ton", vurguRenk2: "#123456", vurguKutuRenk: "#654321" } }), izin);
+ok("parti 5: iki ton ikinci vurgu rengini taşır, kullanmadığı kutu rengini taşımaz", ikiTon.ok && ikiTon.recipe.overrides.vurguRenk2 === "#123456" &&
+  ikiTon.recipe.overrides.vurguKutuRenk === undefined && ikiTon.recipe.overrides.anim === "iki-ton" && ikiTon.warnings.length === 0, J(ikiTon));
+/*
+ * Doğrulama (regresyon): panelde bir kez renk seçip Klasik'e (ya da rengi kullanmayan animasyona) dönen kullanıcının
+ * kodu, kullanılmayan renk yüzünden "ek" taşımamalı: eski paneller ve suflo.app/stil klasik bir kodda "1 geçersiz ayar
+ * atlandı" uyarısı gösterirdi. Klasik kod SS.encode'unkiyle bayt bayt aynı kalır.
+ */
+var klasikRenkli = { styleId: "efekt", overrides: Object.assign(AE.overrides(AE.gorunum("temiz").ayar), { vurguKutuRenk: "#ff00aa", vurguRenk2: "#123456" }), text: { maxlen: "c32", kase: "normal", punct: true } };
+var klasikTemiz = { styleId: "efekt", overrides: AE.overrides(AE.gorunum("temiz").ayar), text: { maxlen: "c32", kase: "normal", punct: true } };
+ok("parti 5: animasyonsuz kodda kullanılmayan renk koda girmez (SS.encode ile bayt bayt aynı, eski çözücüde uyarı yok)",
+  SK.encode(klasikRenkli) === SS.encode(klasikTemiz) && ham(SK.encode(klasikRenkli)).ek === undefined &&
+  SS.decode(SK.encode(klasikRenkli), izin).warnings.length === 0);
+ok("parti 5: rengi kullanmayan animasyonda renk koda girmez (yalnız anim)",
+  J(ham(SK.encode({ styleId: "efekt", overrides: { anim: "dalga", vurguKutuRenk: "#ff00aa", vurguRenk2: "#123456" } })).ek) === J({ anim: "dalga" }));
+// Çözücü ileriye uyumlu kalır: elle yazılmış ek'te animasyonsuz renk de kabul edilir (motor klasikte kullanmaz)
+var yalnizRenk = SK.decode(ekli({ vurguRenk2: "#123456" }), izin);
+ok("parti 5: çözücü animasyonsuz ek rengini uyarısız kabul eder (klasikte kullanılmaz)", yalnizRenk.ok && yalnizRenk.recipe.overrides.vurguRenk2 === "#123456" &&
+  yalnizRenk.recipe.overrides.anim === undefined && yalnizRenk.warnings.length === 0, J(yalnizRenk));
 var eskiRk = SS.decode(rk, izin);
 ok("parti 5, eski çözücü (SS.decode): kabul eder, renkleri görmez, klasik çift (yalnız 'ek' uyarısı)", eskiRk.ok && !("vurguKutuRenk" in eskiRk.recipe.overrides) &&
   !("vurguRenk2" in eskiRk.recipe.overrides) && eskiRk.recipe.overrides.giris === YA.klasik("vurgu-kutusu").giris && J(eskiRk.warnings) === J(["ek"]), J(eskiRk));

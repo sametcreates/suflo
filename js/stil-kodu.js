@@ -13,8 +13,9 @@
  * decode(code, izinliStiller): SS.decode; ardından "ek" burada doğrulanır (beyaz liste, katalog kimliği, tür, boyut
  *   sınırı; __proto__ ve iç içe nesneler yok sayılır). Geçerli anim recipe.overrides.anim'e (yalnız "efekt") ve
  *   recipe.ek'e girer; "ek" uyarı listesinden düşer, geçersiz alt alan "ek.<alan>" uyarısı olur. Asla fırlatmaz.
- * Parti 5: vurguKutuRenk ve vurguRenk2 (#rrggbb; yalnız "efekt") da "ek"te taşınır: encode overrides'tan çıkarır, decode
- *   doğrulayıp overrides'a geri koyar. Eski çözücü bunları görmez (alanlar boşken animasyon renkleri türetilir; klasik
+ * Parti 5: vurguKutuRenk ve vurguRenk2 (#rrggbb; yalnız "efekt") da "ek"te taşınır: encode overrides'tan çıkarır (koda
+ *   yalnız seçili animasyonun kullandığı renk girer: YA.renkAlanlari; animasyonsuz kod SS.encode'unkiyle aynı kalır), decode
+ *   doğrulayıp overrides'a geri koyar (ileriye uyumlu: animasyonsuz ek rengi de kabul). Eski çözücü bunları görmez (alanlar boşken animasyon renkleri türetilir; klasik
  *   görünümde hiç kullanılmazlar).
  *
  * Saf, ES5, UMD (Node 12 / CEF 74). index.html'de style-share.js ve yazi-animasyonlari.js'ten SONRA yüklenir.
@@ -48,7 +49,14 @@
     var anim = r.styleId === EFEKT && own(ov, "anim") && animGecerli(ov.anim) ? ov.anim : "";
     var ekNesne = {};
     if (anim) ekNesne.anim = anim;
-    RENK_ALANLARI.forEach(function (k) { if (r.styleId === EFEKT && own(ov, k) && typeof ov[k] === "string" && RENK6.test(ov[k])) ekNesne[k] = ov[k].toLowerCase(); });
+    /*
+     * Renk yalnız animasyon onu KULLANIYORSA (YA.renkAlanlari): panelde seçilip Klasik'e / rengi kullanmayan animasyona
+     * dönülünce kalan renk "ek" açmasın (klasik kod SS.encode'unkiyle aynı; eski paneller ve site uyarı göstermez)
+     */
+    var kullanilan = anim && YA && YA.renkAlanlari ? YA.renkAlanlari(anim) : [];
+    RENK_ALANLARI.forEach(function (k) {
+      if (kullanilan.indexOf(k) !== -1 && own(ov, k) && typeof ov[k] === "string" && RENK6.test(ov[k])) ekNesne[k] = ov[k].toLowerCase();
+    });
     var kopya = {};
     Object.keys(r).forEach(function (k) { kopya[k] = r[k]; });
     var temiz = {};

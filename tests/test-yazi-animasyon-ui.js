@@ -358,8 +358,9 @@ ok("parti 5: ★ Şablonum renkleri saklar ve geri getirir", rr.ayar.userPreset.
 var rkod = rr.api.stilKodu().kod;
 var rAl = ortam();
 rAl.api.efektAnimSeciminiDoldur();
-ok("parti 5: stil kodu renkleri taşır (ek), uygulanınca uyarısız gelir", rAl.api.stilKoduUygula(rkod) === true && rAl.api.stil().vurguKutuRenk === "#1b1f2a" &&
-  rAl.api.stil().vurguRenk2 === "#00aa55" && rAl.toastlar.some(function (t) { return /^Stil kodu uygulandı/.test(t) && !/geçersiz ayar/.test(t); }), rAl.toastlar.join(" | "));
+// Kod yalnız animasyonun kullandığı rengi taşır: vurgu kutusu → kutu rengi; kullanmadığı ikinci vurgu türetilmişe döner
+ok("parti 5: stil kodu animasyonun kullandığı rengi taşır (ek), uygulanınca uyarısız gelir", rAl.api.stilKoduUygula(rkod) === true && rAl.api.stil().vurguKutuRenk === "#1b1f2a" &&
+  rAl.api.stil().vurguRenk2 === null && rAl.dom["cap-efekt-vurgu2"].getAttribute("data-oto") === "1" && rAl.toastlar.some(function (t) { return /^Stil kodu uygulandı/.test(t) && !/geçersiz ayar/.test(t); }), rAl.toastlar.join(" | "));
 ok("parti 5: eski çözücü aynı kodu klasik karşılıkla açar (renkler yok)", (function () {
   var b = SS.decode(rkod, function (id) { return SE.has(id); });
   return b.ok && !("vurguKutuRenk" in b.recipe.overrides) && b.recipe.overrides.giris === "yok" && J(b.warnings) === J(["ek"]);
