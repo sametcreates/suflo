@@ -519,8 +519,8 @@
   /*
    * Kimlik → plan(c). c: { bas, son, D (sn, Dengeli), kel ([[kb, ks]] kelime pencereleri), kelimeler (metinler), anahtar
    * ([bool] *anahtar* kelime), fs, olcek (kısa kenar / 1080), w, h, konum, kontur, vurgu ve vurgu2 ([r, g, b] 0-1) }.
-   * Döner: { animatorler, katmanAnahtarlari, gruplama, ucBoyut, maske, etkinRenk (klasik etkin kelime rengi kalsın mı),
-   * ikiTon (*anahtar* kelimelerin rengi sırayla vurgu / vurgu2) }. Burada olmayan kimlik "yok" (klasik çift).
+   * Döner: { animatorler, katmanAnahtarlari, gruplama, ucBoyut, maske, ikiTon (*anahtar* kelimelerin rengi sırayla vurgu /
+   * vurgu2) }. Klasik etkin kelime rengi tanımın etkinRenk alanından (aşağıda). Burada olmayan kimlik "yok" (klasik çift).
    */
   var ANIM_AE = {
     "kelime-pop": { ae: "yakin", kur: function (c) {
@@ -585,14 +585,14 @@
     } },
     "olcek-darbe": { ae: "tam", kur: function (c) {
       var s = etkinSecim(c);
-      return { gruplama: "kelime", etkinRenk: true, animatorler: [animator("Suflo ölçek darbesi", "kelime", { olcek: [122, 122, 100] },
+      return { gruplama: "kelime", animatorler: [animator("Suflo ölçek darbesi", "kelime", { olcek: [122, 122, 100] },
         { birim: "indeks", sekil: "kare", baslangicAnahtarlari: s.baslangicAnahtarlari, sonAnahtarlari: s.sonAnahtarlari, tut: ["baslangic", "son"],
           miktarAnahtarlari: darbeMiktari(c, [[0, 0], [0.45, 100], [1, 0]]) })] };
     } },
     "sallanma": { ae: "tam", kur: function (c) {
       // \frz pozitif saat yönünün tersi; AE'de pozitif saat yönü: değer −5°
       var s = etkinSecim(c);
-      return { gruplama: "kelime", etkinRenk: true, animatorler: [animator("Suflo sallanma", "kelime", { donme: -5 },
+      return { gruplama: "kelime", animatorler: [animator("Suflo sallanma", "kelime", { donme: -5 },
         { birim: "indeks", sekil: "kare", baslangicAnahtarlari: s.baslangicAnahtarlari, sonAnahtarlari: s.sonAnahtarlari, tut: ["baslangic", "son"],
           miktarAnahtarlari: darbeMiktari(c, [[0, 0], [0.125, 100], [0.375, -100], [0.625, 100], [0.875, -100], [1, 0]]) })] };
     } },
@@ -631,8 +631,13 @@
       var anahtar = [];
       c.anahtar.forEach(function (v, i) { if (v && i < c.kelimeler.length) anahtar.push(i); });
       if (!anahtar.length) {
-        var en = 0;
-        c.kelimeler.forEach(function (w, i) { if (harfSayisi(w) > harfSayisi(c.kelimeler[en])) en = i; });
+        // Önizlemeyle aynı seçim (stil motoru): hitap / dolgu sözcüğü ("arkadaşlar", "gerçekten") en uzun sayılmaz; hepsi öyleyse eski seçim
+        var se = SE(), anlamsiz = se && se.anlamsizKelime ? se.anlamsizKelime : function () { return false; }, en = -1;
+        c.kelimeler.forEach(function (w, i) { if (!anlamsiz(w) && (en < 0 || harfSayisi(w) > harfSayisi(c.kelimeler[en]))) en = i; });
+        if (en < 0) {
+          en = 0;
+          c.kelimeler.forEach(function (w, i) { if (harfSayisi(w) > harfSayisi(c.kelimeler[en])) en = i; });
+        }
         anahtar.push(en);
       }
       var p = kelimePenceresi(c), out = [];
@@ -647,37 +652,42 @@
         out.push(animator("Suflo büyüyen giriş", "kelime", { olcek: [0, 0, 100] },
           { birim: "indeks", sekil: "kare", baslangic: i, son: i + 1, miktarAnahtarlari: m }));
       });
-      return { gruplama: "kelime", etkinRenk: true, animatorler: out };
+      return { gruplama: "kelime", animatorler: out };
     } },
     "nefes": { ae: "tam", kur: function (c) {
       // Kart %100 ↔ %103, periyot kartı tam sayıda nefese bölecek kadar esner (en az 0,7 sn); son 0,15 sn durağan
       var sure = c.son - c.bas - 0.15, adet = sure >= c.D * 0.6 && sure >= 0.7 ? Math.max(1, Math.round(sure / c.D)) : 0;
       while (adet > 1 && sure / adet < 0.7) adet--;
-      if (!adet) return { etkinRenk: true };
+      if (!adet) return {};
       var P = sure / adet, k = [];
       for (var j = 0; j < adet; j++) { anahtarEkle(k, c.bas + j * P, [100, 100]); anahtarEkle(k, c.bas + (j + 0.5) * P, [103, 103]); }
       anahtarEkle(k, c.bas + adet * P, [100, 100]);
-      return { etkinRenk: true, katmanAnahtarlari: [{ ozellik: "olcek", anahtarlar: k }] };
+      return { katmanAnahtarlari: [{ ozellik: "olcek", anahtarlar: k }] };
     } },
     "donerek": { ae: "tam", kur: function (c) {
-      return { etkinRenk: true, katmanAnahtarlari: [
+      return { katmanAnahtarlari: [
         { ozellik: "donme", anahtarlar: kartKeyleri([[0, 12], [0.5, 2.5], [1, 0]], c, function (v) { return v; }) },
         { ozellik: "olcek", anahtarlar: kartKeyleri([[0, 85], [0.5, 98], [1, 100]], c, function (v) { return [v, v]; }) },
         opaklikKeyleri([[0, 0], [0.35, 1]], c)] };
     } },
     "kapak-cevir": { ae: "yakin", kur: function (c) {
-      return { etkinRenk: true, ucBoyut: true, katmanAnahtarlari: [
+      return { ucBoyut: true, katmanAnahtarlari: [
         { ozellik: "xDonme", anahtarlar: kartKeyleri([[0, 70], [0.5, 12], [1, 0]], c, function (v) { return v; }) },
         opaklikKeyleri([[0, 0], [0.4, 1]], c)] };
     } },
     "perde": { ae: "yakin", kur: function (c) {
       var T = Math.max(SEKME, Math.min(c.D, c.son - c.bas)), pay = Math.round(c.kontur + c.fs * 0.3);
-      return { etkinRenk: true, maske: { ad: "Suflo perde", ifade: perdeIfadesi(c.bas, c.bas + 0.6 * T, c.bas + T, pay) },
+      return { maske: { ad: "Suflo perde", ifade: perdeIfadesi(c.bas, c.bas + 0.6 * T, c.bas + T, pay) },
         katmanAnahtarlari: [{ ozellik: "konum", anahtarlar: konumKeyleri([[0, sc(14, c.olcek)], [0.6, sc(3, c.olcek)], [1, 0]], c, 1) }] };
     } }
   };
-  // Kelime ve harf girişlerinde (kart / kelime türleri) etkin kelime klasik kuraldaki gibi vurgu renginde kalır
-  ["kelime-pop", "yukari-suzul", "dalga", "zipla-gel", "dusus", "daktilo", "harf-belir", "netles", "yandan-kay", "aralik-acil"].forEach(function (id) {
+  /*
+   * Etkin kelime klasik kuraldaki gibi (kelime vurgusu açıkken) vurgu renginde kalır: önizlemede metin()'in varsayılan
+   * rengini alan bütün türler (kelime / harf girişleri, kart, darbe, büyüyen, nefes). Renk / dolgu türlerinde (renk-gecis,
+   * karaoke-birikimli, karaoke-dolgu, iki-ton) etkin kelimenin rengi animasyonun kendisidir: klasik etkin kelime yok.
+   */
+  ["kelime-pop", "yukari-suzul", "dalga", "zipla-gel", "dusus", "daktilo", "harf-belir", "netles", "yandan-kay", "aralik-acil",
+    "olcek-darbe", "sallanma", "buyuyen-vurgu", "nefes", "donerek", "kapak-cevir", "perde"].forEach(function (id) {
     ANIM_AE[id].etkinRenk = true;
   });
 

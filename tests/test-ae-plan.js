@@ -378,6 +378,35 @@ ok("uzun transkript: 600 kart planı hızlı ve her kartın anahtarı kendi keli
 ok("klasik görünümde yazı animasyonu alanları boş (eski çıktı aynı)", s.katmanlar.every(function (k) { return k.animasyon === "" && !k.animatorler.length && !k.katmanAnahtarlari.length &&
   k.maske === null && k.ucBoyut === false && k.kutu === null && k.gruplama === "kelime"; }));
 
+/*
+ * Parti 7 doğrulama: önizlemede (js/style-engine.js animKarti) etkin kelime, renk / dolgu türleri (renk-gecis,
+ * karaoke-birikimli, iki-ton, karaoke-dolgu: rengi animasyonun kendisi) dışında bütün türlerde kelime vurgusu açıkken
+ * vurgu rengindedir (metin()'in varsayılanı). AE planı da etkin kelime animatörünü (aktif) aynı türlerde kurmalı; önce
+ * ölçek darbesi, sallanma, büyüyen vurgu, nefes, dönerek, kapak çevir ve perdede renk düşüyordu (kur'un etkinRenk'i ölüydü).
+ */
+var renkTuru = ["renk-gecis", "karaoke-birikimli", "iki-ton", "karaoke-dolgu"], etkinHata = [];
+YA.ANIMASYONLAR.forEach(function (kayit) {
+  if (P.aeDestegi(kayit.id) === "yok") return;
+  var acik = aPlan(kayit.id).katmanlar[0], kapali = aPlan(kayit.id, { vurgu: false }).katmanlar[0];
+  var bekle = renkTuru.indexOf(kayit.id) === -1;
+  var var_ = !!(acik.aktif && acik.aktif.renk && js(acik.aktif.renk) === js([1, 0.8235, 0.2471]) && acik.aktif.olcek === null);
+  if (var_ !== bekle) etkinHata.push(kayit.id + (bekle ? " etkin renk yok" : " fazladan etkin renk"));
+  if (kapali.aktif !== null) etkinHata.push(kayit.id + " vurgu kapalıyken etkin kelime");
+});
+ok("AE: etkin kelime vurgu renginde (kelime vurgusu açıkken) renk / dolgu türleri dışındaki bütün yerel animasyonlarda; kapalıyken yok",
+  etkinHata.length === 0, etkinHata.join(" | "));
+
+// Büyüyen vurgu: *anahtar* yoksa önizlemeyle aynı kelime (hitap / dolgu sözcüğü en uzun sayılmaz; hepsi öyleyse eski seçim)
+function buyuyenSecim(metin) {
+  var ws = metin.split(" "), t = 1;
+  var pl = P.plan([{ start: 1, end: 1 + ws.length * 0.4, text: metin, words: ws.map(function (w) { var o = { start: t, end: t + 0.4, text: w }; t += 0.4; return o; }) }],
+    { mod: "stilli", ayar: aAyar("buyuyen-vurgu"), cueKind: "lines", w: 1920, h: 1080, fps: 25, sure: 60, isId: "a" });
+  return pl.katmanlar[0].animatorler.map(function (a) { return a.secici.baslangic; });
+}
+ok("büyüyen vurgu: anahtar yoksa hitap / dolgu sözcüğü atlanır (önizlemenin seçimi); hepsi dolguysa en uzun",
+  js(buyuyenSecim("arkadaşlar bu iş kolay")) === "[3,3]" && js(buyuyenSecim("bu deneme iş")) === "[1,1]" &&
+  js(buyuyenSecim("evet arkadaşlar")) === "[1,1]", js([buyuyenSecim("arkadaşlar bu iş kolay"), buyuyenSecim("evet arkadaşlar")]));
+
 ok("MIN_SURUM manifestteki AEFT alt sınırıyla aynı", new RegExp('<Host Name="AEFT" Version="\\[' + P.MIN_SURUM + '\\.0,').test(require("fs").readFileSync(path.join(ROOT, "CSXS", "manifest.xml"), "utf8")));
 
 console.log("\n" + passed + " passed, " + failed + " failed");
