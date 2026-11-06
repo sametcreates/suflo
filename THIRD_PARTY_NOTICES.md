@@ -235,6 +235,22 @@ SOFTWARE.
   The templates name fonts (SF Pro, Apple Garamond, Akira Expanded, Tempting, Ocean Delight, Inter) that
   are not bundled; Premiere substitutes missing fonts and the user can pick another font in Essential Graphics.
   Kaynak: ClashiVFX'in beş MOGRT başlık şablonu, yazarın izniyle Suflo Pro içeriğinde; önizlemeler küçük resimlerinden.
+- The "AutoCaptions" collection in Altyazı Efektleri recreates caption styles and entrance motions from
+  ClashiVFX AutoCaptions (After Effects panel 0.1.0, Premiere panel 1.0.0), included with the author's
+  permission. It has 19 looks in `js/altyazi-efekt.js` (category `autocaptions`, ids `ac-*`) and 12 text
+  animations in `js/yazi-animasyonlari.js` (category `autocaptions`). They are rebuilt for Suflo's own
+  style engine (`js/style-engine.js`) and After Effects plan (`js/ae-plan.js`) from values read out of the
+  plugin's preset data: colors from its preview images, shadow / glow values from its style presets,
+  durations and curves from its motion metadata. No code, `.ffx`, `.mogrt`, `.prfpset` or preview files
+  from the plugin are in this repository.
+  The plugin's engine, license / copy-protection components and bundled third-party binaries were not
+  taken: whisper.cpp / ggml (MIT), SDL2 (zlib), parakeet, Anton and Inter fonts (OFL-1.1), React (MIT).
+  Suflo already ships its own copies of Anton and Inter from google/fonts (see above).
+  The plugin's paid template files (14 Premiere-editable and 14 After Effects caption MOGRTs, 2 `.prfpset`,
+  39 `.ffx`) are prepared as a separate Pro content add-on outside this repository and are not in the
+  public package.
+  Kaynak: ClashiVFX AutoCaptions, yazarın izniyle; stiller ve hareketler Suflo motorunda yeniden kuruldu,
+  eklentiden kod / şablon dosyası alınmadı; ücretli şablonlar depo dışındaki Pro içerik ekinde.
 - `js/CSInterface.js` is Suflo's own minimal wrapper around Adobe's CEP runtime; Adobe CEP
   itself is provided by the host application under Adobe's terms.
 
