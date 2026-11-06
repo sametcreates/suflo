@@ -60,6 +60,8 @@ function altyaziKur(o) {
     "var undoStack = [], redoStack = [], UNDO_MAX = 50, kaliteOnayBekleyen = null, onayBekleyen = null, uygulananSekans = {};",
     "function render() {} function refreshUndoUI() {} function renderHistory() {} function uygulaEtiketiniSifirla() {} function shortsDugmesi() {}",
     "function clearRevert() {} function hideRestore() {} function applyGlossary() {} function cancelDraft() {}",
+    // senkron doğrulama: belge numarası (belgeBagla artırır, geri al taşır) ve rapor satırı
+    "var senkronBelgeSayac = 0, senkronBelgeNo = 0; function senkronRaporGizle() {}",
     // o.K verilirse taslak yazımı gerçek: writeDraft / shortsKaydiGuncelle (Shorts belgesi ana taslağı ezmesin)
     o.K ? "var scope = 'entire', WW = window.SufloWhisperWords;\n" + govde("function writeDraft(") + "\n" + govde("function shortsKaydiGuncelle(") +
       "\nfunction saveDraftNow() { kayit.taslak++; writeDraft(); } function saveDraftSoon() { kayit.taslak++; writeDraft(); }"

@@ -146,6 +146,8 @@ function Test-Archive([string]$path, [string]$kind) {
             # Senkron dogrulama: ses zarfi / konusma baslangiclari ve kelime-kart hizalama motoru (saf moduller)
             '(^|/)js/ses-zarf\.js$',
             '(^|/)js/senkron\.js$',
+            # Senkron dogrulama arayuzu: rapor satiri, ses dalgasi seridi, sinir tasima (Caption Editor)
+            '(^|/)js/senkron-ui\.js$',
             # 3.4 Yumusatma motoru (Rebound MIT uyarlamasi) ve anahtar kare kayitlari: Egri, Gecis, Zoom, Hareket bunlara dayanir
             '(^|/)js/ease-curve\.js$',
             '(^|/)js/key-records\.js$',

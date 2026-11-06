@@ -378,6 +378,12 @@
               <i></i>
               <span>Hassas kelime zamanlaması (DTW, biraz daha yavaş)</span>
             </label>
+            <!-- Senkron doğrulama (js/senkron-ui.js): Oluştur'dan sonra kelime / kart zamanları ses dalgasına oturtulur; ücretsiz -->
+            <label class="switch cap-senkron" id="cap-senkron-sar" title="Altyazı oluşturulunca kelime ve kart zamanları sesin dalga formuyla karşılaştırılır ve konuşmanın gerçek başlangıç / bitişine oturtulur. Gürültülü seste zamanlara dokunulmaz.">
+              <input id="cap-senkron" type="checkbox" checked>
+              <i></i>
+              <span>Sesle senkron doğrulama (ses dalgasıyla)</span>
+            </label>
             <p class="hint" id="cap-dtw-not" hidden>Bu model ve motor derlemesinde DTW zamanı gelmedi, otomatik kapatıldı; kelime zamanı belirteç zamanından geliyor. <a href="#" id="cap-dtw-yeniden" class="link-btn">Yeniden dene</a></p>
 
             <div class="field">
@@ -423,6 +429,11 @@
         </button>
         <div id="cap-progress" class="progress-line" hidden><i></i></div>
         <div id="cap-status" class="inline-status"></div>
+        <!-- Senkron doğrulama raporu (js/senkron-ui.js raporMetni): tek satır; "Geri al" düzeltmeyi tek adımda geri alır -->
+        <div id="cap-senkron-rapor" class="senkron-rapor" role="status" hidden>
+          <span id="cap-senkron-rapor-metin" class="senkron-rapor-metin"></span>
+          <button type="button" id="cap-senkron-geri" class="link-btn" hidden title="Senkron düzeltmesini geri al: zamanlar motorun verdiği gibi olur">Geri al</button>
+        </div>
         <button type="button" id="cap-emoji-atla" class="btn tiny" hidden title="Emojiler yalnız bu stilli katmanda çizilmez; transkriptteki emojiler kalır">Emojileri bu katmanda atla</button>
         <!-- Canlı transkripsiyon (js/whisper-akis.js): motor çalışırken akan geçici satırlar; salt okunur,
              taslağa / geri al yığınına girmez, nihai satırlar gelince silinir -->
@@ -530,6 +541,24 @@
             <button id="cap-undo" class="link-btn" title="Geri al (Ctrl+Z)" disabled>↶</button>
             <button id="cap-redo" class="link-btn" title="Yinele (Ctrl+Y)" disabled>↷</button>
             <button id="cap-revert" class="link-btn" hidden>çeviriyi geri al</button>
+          </div>
+          <!-- Ses dalgası şeridi (js/senkron-ui.js serit): seçili kartın çevresindeki ses, kelime sınırları sürüklenir;
+               ←/→ 10 ms, Shift ile 1 kare. Dinle yalnız Premiere'de (After Effects'te gizli). -->
+          <div id="cap-dalga" class="dalga" hidden>
+            <div class="dalga-ust">
+              <span id="cap-dalga-baslik" class="dalga-baslik">Ses dalgası</span>
+              <span class="dalga-btns">
+                <button type="button" id="cap-dalga-dinle" class="btn tiny" data-yalniz-premiere title="Playhead'i kartın başına götürür ve Premiere'de kartı oynatır">▶ Dinle</button>
+                <button type="button" id="cap-dalga-yasla" class="btn tiny" title="Bütün kelime ve kart zamanlarını ses dalgasına yeniden oturtur (tek adımda geri alınır)">Hepsini sese yasla</button>
+                <button type="button" id="cap-dalga-geri" class="btn tiny" title="Son değişikliği geri al (Ctrl+Z)" disabled>Geri al</button>
+              </span>
+            </div>
+            <div id="cap-dalga-alan" class="dalga-alan">
+              <canvas id="cap-dalga-tuval" class="dalga-tuval" aria-hidden="true"></canvas>
+              <div id="cap-dalga-tutamaklar" class="dalga-tutamaklar" role="group" aria-label="Kelime ve kart sınırları"></div>
+            </div>
+            <p id="cap-dalga-bos" class="dalga-bos" hidden>Bu altyazının sesi analiz edilmedi. <button type="button" id="cap-dalga-analiz" class="link-btn">Seçili klibin sesini analiz et</button></p>
+            <p class="dalga-ipucu">Sınırı sürükle · ←/→ tuşu 10 ms, Shift ile 1 kare kaydırır</p>
           </div>
           <div id="cap-segments" class="segments"></div>
           <div class="caption-editor-shortcuts">
@@ -3009,6 +3038,7 @@
   <script src="js/whisper-words.js"></script>
   <script src="js/ses-zarf.js"></script>
   <script src="js/senkron.js"></script>
+  <script src="js/senkron-ui.js"></script>
   <script src="js/caption-text.js"></script>
   <script src="js/whisper-akis.js"></script>
   <script src="js/sessiz-ses.js"></script>

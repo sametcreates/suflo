@@ -1522,6 +1522,58 @@ function KS_setPlayerPosition(encoded) {
 }
 
 /*
+ * Senkron doğrulama "Dinle" (Caption Editor ses dalgası şeridi): playhead kartın başına gider ve Program Monitor
+ * oynatılır. Premiere'in belgeli DOM'unda Program Monitor'ü oynatan işlev yok; QE DOM'un oynatıcısı denenir
+ * (qe.project.getActiveSequence().player.play(1) ya da qe.startPlayback()). Hiçbiri yoksa playhead yine kartın
+ * başındadır: { oynadi: false } (panel "boşluk tuşuyla oynat" der). Durdurma panelden, kart bitince (KS_oynatDurdur).
+ */
+function KS_oynatQE() {
+  try {
+    app.enableQE();
+    if (typeof qe === "undefined" || !qe) return null;
+    return qe;
+  } catch (e) { return null; }
+}
+function KS_oynat(encoded) {
+  try {
+    var p = KS_arg(encoded) || {}; // { sec }
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var sn = Number(p.sec);
+    if (!(sn >= 0)) sn = 0;
+    var t = new Time();
+    t.seconds = sn;
+    seq.setPlayerPosition(t.ticks);
+    var q = KS_oynatQE(), yol = "";
+    if (q) {
+      try {
+        var qs = q.project ? q.project.getActiveSequence() : null;
+        if (qs && qs.player && typeof qs.player.play === "function") { qs.player.play(1); yol = "player"; }
+      } catch (eP) { yol = ""; }
+      if (!yol) {
+        try { if (typeof q.startPlayback === "function") { q.startPlayback(); yol = "qe"; } } catch (eS) { yol = ""; }
+      }
+    }
+    return KS_ok({ oynadi: !!yol, yol: yol, sec: sn });
+  } catch (e) { return KS_err(e); }
+}
+function KS_oynatDurdur() {
+  try {
+    var q = KS_oynatQE(), durdu = false;
+    if (q) {
+      try {
+        var qs = q.project ? q.project.getActiveSequence() : null;
+        if (qs && qs.player && typeof qs.player.stop === "function") { qs.player.stop(); durdu = true; }
+      } catch (eP) {}
+      if (!durdu) {
+        try { if (typeof q.stopPlayback === "function") { q.stopPlayback(); durdu = true; } } catch (eS) {}
+      }
+    }
+    return KS_ok({ durdu: durdu });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
  * Kaydedilmiş projenin klasörü. Altyazı SRT'si buraya yazılır: Premiere içe aktarılan
  * dosyayı kopyalamaz, yola referans verir — proje yanında duran dosya asla süpürülmez.
  * Proje kaydedilmemişse path boştur; panel kendi kalıcı klasörüne düşer.

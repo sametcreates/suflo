@@ -54,6 +54,10 @@ window.KCaptions = (function () {
   var WA = window.SufloWhisperAkis || null;
   // Yerel motor seçenekleri (Hızlı / En doğru, DTW, çevrimdışı İngilizce): saf modül js/whisper-args.js
   var WAR = window.SufloWhisperArgs || null;
+  // Senkron doğrulama (ses dalgasıyla kelime / kart zamanı): ses analizi js/ses-zarf.js, hizalama js/senkron.js,
+  // arayüz (rapor satırı, ses dalgası şeridi, sınır taşıma) js/senkron-ui.js. Ücretsiz.
+  var SZ = window.SufloSesZarf || null;
+  var SUI = window.SufloSenkronUI || null;
   var cleanSegments = CT.cleanSegments;
   var karaokeWords = CT.karaokeWords;
   var karaokeCumulative = CT.karaokeCumulative;
@@ -79,6 +83,21 @@ window.KCaptions = (function () {
   var editorQuery = "";
   var editorOnlyIssues = false;
   var selectedSegment = -1;
+  /*
+   * Senkron doğrulama durumu. Ses analizleri belgeye bağlıdır: belgeBagla her yeni belgede senkronBelgeNo'yu artırır
+   * (yeni transkript, SRT, kesimden sonra uyarlama: o zamanlar eski sese oturmaz), geri al girdisi numarayı taşır.
+   *   senkronKaynaklar: SUI.kaynak(analiz, t0, belge) — sekans ekseninde; en çok 6 (analizler ayrıca ses-zarf önbelleğinde)
+   *   senkronGeriGirdisi: raporun "Geri al"ı yalnız yığının tepesi hâlâ bu doğrulamanın anlık görüntüsüyken görünür
+   */
+  var senkronBelgeSayac = 0;
+  var senkronBelgeNo = 0;
+  var senkronKaynaklar = [];
+  var senkronGeriGirdisi = null;
+  var senkronRaporBelge = -1;
+  var senkronSerit = null;
+  var senkronAnalizde = false;
+  var senkronRenderSaat = null;
+  var senkronDinleSaat = null;
   var lastCorrection = null;
 
   /*
@@ -141,7 +160,7 @@ window.KCaptions = (function () {
   function durumAl(etiket) {
     return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
       dil: algilananDil, shorts: shortsYuklenen, ornek: ornekBelge, ornekSekansId: ornekSekansId, ts: Date.now(),
-      sekansId: belgeSekansId, sira: belgeSira, kesimAdi: belgeKesimAdi };
+      sekansId: belgeSekansId, sira: belgeSira, kesimAdi: belgeKesimAdi, senkronBelge: senkronBelgeNo };
   }
   // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
   function durumYukle(st) {
@@ -164,6 +183,8 @@ window.KCaptions = (function () {
       belgeKesimAdi = typeof st.kesimAdi === "string" ? st.kesimAdi : null;
       belgeDegisti();
     }
+    // senkron doğrulama: geri alınan belgenin ses analizleri (başka belgeye dönüldüyse onun sesi; yoksa şerit "analiz et" der)
+    if (typeof st.senkronBelge === "number") senkronBelgeNo = st.senkronBelge;
   }
 
   function snapshot(etiket) {
@@ -201,6 +222,7 @@ window.KCaptions = (function () {
     var u = el("cap-undo"), r = el("cap-redo");
     if (u) u.disabled = !undoStack.length;
     if (r) r.disabled = !redoStack.length;
+    senkronGeriDurumu();
   }
 
   // Taslağı diske yaz — panel kapanırsa iş kaybolmaz
@@ -3268,6 +3290,11 @@ window.KCaptions = (function () {
      */
     var isSekansId = ornek ? (ornekSekansId || String(ctx.sequenceId || "")) : String(ctx.sequenceId || "");
     var isSira = kesimSayac;
+    // senkron doğrulama (Gelişmiş ayarlar, varsayılan açık); rehberin hazır örnek klibi hariç
+    var senkronIste = !ornek && senkronDogrulaAcik();
+    var senkronSesler = [], senkronAtlama = "";
+    // önceki belgenin raporu yeni iş sürerken görünmesin (iş başarısız olursa belge kalır; girdisi ve Ctrl+Z'si de)
+    if (el("cap-senkron-rapor")) el("cap-senkron-rapor").hidden = true;
     busy = true;
     // İptal jetonu ve geçici satırlar bu işe ait; finally ikisini de bırakır
     aktifIptal = K.iptalJetonu ? K.iptalJetonu() : null;
@@ -3443,6 +3470,16 @@ window.KCaptions = (function () {
               if (s.words && s.words.length) m.words = s.words;
               mapped.push(m);
             });
+            // senkron doğrulama: klibin geçici sesi (finally siler) şimdi analiz edilir. Hızı değişmiş klipte ses ekseni
+            // timeline'a doğrusal oturmaz: atlanır. İptal burada kalan klipleri de durdurur (toplu işin İptal'i gibi).
+            if (senkronIste) {
+              if (Math.abs(bf - 1) < 0.002) {
+                status(tag + "ses dalgası analiz ediliyor…");
+                var bKay = await senkronSesiAnaliz(ba, bc.clipStart, bc.dur, { media: bc.mediaPath, inPoint: bc.inPoint, dur: bc.dur });
+                iptalDenetle();
+                if (bKay) senkronSesler.push(bKay);
+              } else senkronAtlama = SENKRON_HIZ;
+            }
           } catch (eB) {
             if (eB && eB.iptal) throw eB;   // İptal: kalan klipler işlenmez, yarım sonuç uygulanmaz
             failed.push(bc.name);
@@ -3551,6 +3588,23 @@ window.KCaptions = (function () {
       clearRevert();             // yeni doküman — eski çevirinin orijinalleri buraya ait değil
       shortsYuklenen = "";       // yeni transkript (basariyla geldi): artik Shorts kaydi degil, normal taslak
       uygulaEtiketiniSifirla();  // yeni transkript: uygula düğmesi normal haline dönsün
+      /*
+       * Senkron doğrulama: kelime / kart zamanları ses dalgasına oturtulur (js/senkron.js). Ses, motorun duyduğu geçici
+       * dosyadan okunur (finally silmeden önce). İptal ya da hata transkripti bozmaz: doğrulama atlanır, rapor nedenini
+       * söyler. Düzeltme tek geri al adımıdır ("sese yaslama"), rapordaki "Geri al" onu geri alır.
+       */
+      if (senkronIste) {
+        if (!batchClips && audioSrc) {
+          if (Math.abs(speedFactor - 1) < 0.002) {
+            status("Ses dalgasıyla senkron doğrulanıyor…");
+            var tekKay = await senkronSesiAnaliz(audioSrc, Number(seqOffset) || 0, durHint,
+              scope === "clip" && clip ? { media: clip.mediaPath, inPoint: clip.inPoint, dur: clip.dur } : null);
+            if (tekKay) senkronSesler.push(tekKay);
+            status("");
+          } else senkronAtlama = SENKRON_HIZ;
+        }
+        senkronIsSonu(senkronSesler, senkronAtlama);
+      }
       el("cap-result").hidden = false;
       el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
       render();
@@ -3586,6 +3640,243 @@ window.KCaptions = (function () {
     return basarili;
   }
 
+  /* ---------------- Senkron doğrulama (ses dalgası) ---------------- */
+
+  var SENKRON_HIZ = "Hızı değiştirilmiş klipte senkron doğrulama yapılmadı";
+  function senkronDogrulaAcik() {
+    try { return K.settings().senkronDogrula !== false; } catch (e) { return true; }
+  }
+  // sekansın kare hızı (kart giriş / çıkışı kareye oturur); bilinmiyorsa 0: yalnız milisaniye
+  function senkronFps() {
+    try {
+      var c = KApp.ctx() || {};
+      if (Number(c.fps) > 0) return Number(c.fps);
+      if (Number(c.frame) > 0) return 1 / Number(c.frame);
+    } catch (e) {}
+    return 0;
+  }
+  /*
+   * Satır modlarında kart en az kullanıcının en kısa ekran süresi kadar kalır (Ayarlar › Altyazı, 0,8 sn; satır kurucu
+   * kartı oraya uzatmıştı, yaslama onu "son kelime + kuyruk"a kısaltıp okunurluğu bozmasın). Kelime kelime / birikimli
+   * modda motorun 300 ms'i (kart kelimenin kendisi).
+   */
+  function senkronAyari() {
+    if (segmentsMode === "k1" || segmentsMode === "kc") return {};
+    var v = 0.8;
+    try { var m = Number(K.settings().altyaziMinSure); if (isFinite(m) && m >= 0) v = m; } catch (e) {}
+    return { minKartMs: Math.max(1, Math.round(v * 1000)) };
+  }
+  function senkronKaynakEkle(k) {
+    if (!k) return;
+    // aynı belgenin aynı aralığı yeniden analiz edildiyse eskisi düşer
+    senkronKaynaklar = senkronKaynaklar.filter(function (x) { return !(x.belge === k.belge && x.bas < k.son && k.bas < x.son); });
+    senkronKaynaklar.push(k);
+    if (senkronKaynaklar.length > 6) senkronKaynaklar = senkronKaynaklar.slice(-6);
+  }
+  function senkronBelgeKaynaklari() {
+    return senkronKaynaklar.filter(function (k) { return k.belge === senkronBelgeNo; });
+  }
+  /*
+   * Geçici sesin (16 kHz WAV ya da bulut MP3'ü) analizi → sekans ekseninde kaynak (belge sonra atanır). Hiç fırlatmaz:
+   * ffmpeg yok, okuma hatası ya da İptal → null. ozgun: { media, inPoint, dur } — analiz o klibin anahtarıyla da
+   * önbelleğe girer, şeridin "analiz et"i aynı klipte ffmpeg'i yeniden çalıştırmaz.
+   */
+  async function senkronSesiAnaliz(yol, t0, sure, ozgun) {
+    if (!SZ || !SUI || !yol) return null;
+    try {
+      var r = await SZ.sesZarfiCikar({ K: K, media: yol, inPoint: 0, dur: Number(sure) || 0, iptal: aktifIptal, onbellek: false });
+      if (!r || r.iptal || !r.analiz) {
+        if (r && r.neden) K.log("[senkron] ses analizi yok: " + r.neden);
+        return null;
+      }
+      if (ozgun && ozgun.media && SZ.anahtar && SZ.onbellek) {
+        try { SZ.onbellek.koy(SZ.anahtar(ozgun.media, ozgun.inPoint, ozgun.dur, K.fs.statSync(String(ozgun.media))), r.analiz); } catch (eO) {}
+      }
+      return SUI.kaynak(r.analiz, Number(t0) || 0, 0);
+    } catch (e) {
+      K.log("[senkron] ses analizi hatası: " + (e && e.message ? e.message : e));
+      return null;
+    }
+  }
+  // go() sonu: analizler bu belgeye bağlanır ve hizalama uygulanır; olmadıysa rapor nedenini söyler
+  function senkronIsSonu(sesler, atlama) {
+    if (aktifIptal && aktifIptal.iptalEdildi) {
+      senkronRaporGoster(null, "Senkron doğrulama iptal edildi: zamanlar motorun verdiği gibi");
+      return;
+    }
+    sesler.forEach(function (k) { k.belge = senkronBelgeNo; senkronKaynakEkle(k); });
+    if (!sesler.length) {
+      senkronRaporGoster(null, atlama || SUI && SUI.ATLANDI.analizYok || "");
+      return;
+    }
+    senkronUygula("sese yaslama");
+  }
+  /*
+   * Belgenin bütün kartlarını sesine yaslar (tek geri al adımı). Değişiklik yoksa anlık görüntü alınmaz.
+   * Döner: SUI.hepsiniYasla sonucu.
+   */
+  function senkronUygula(etiket) {
+    var r = SUI.hepsiniYasla(segments, senkronBelgeKaynaklari(), { belge: senkronBelgeNo, fps: senkronFps(), ayar: senkronAyari() });
+    if (JSON.stringify(r.segments) !== JSON.stringify(segments)) {
+      snapshot(etiket);
+      senkronGeriGirdisi = undoStack[undoStack.length - 1];
+      segments = r.segments;
+    } else senkronGeriGirdisi = null;
+    senkronRaporGoster(r.rapor);
+    return r;
+  }
+  function senkronRaporGoster(rapor, metin) {
+    var kutu = el("cap-senkron-rapor"), yazi = el("cap-senkron-rapor-metin");
+    if (!kutu || !yazi) return;
+    var m = rapor && SUI ? SUI.raporMetni(rapor) : { metin: metin || "", ayrinti: "", ton: "uyari" };
+    yazi.textContent = m.metin;
+    kutu.title = m.ayrinti || "";
+    kutu.setAttribute("data-ton", m.ton);
+    kutu.hidden = !m.metin;
+    senkronRaporBelge = senkronBelgeNo;
+    senkronGeriDurumu();
+  }
+  function senkronRaporGizle() {
+    var kutu = el("cap-senkron-rapor");
+    if (kutu) kutu.hidden = true;
+    senkronGeriGirdisi = null;
+  }
+  // refreshUndoUI'dan: rapor yalnız kendi belgesinde görünür; "Geri al" yalnız yığının tepesi doğrulamanın girdisiyken
+  function senkronGeriDurumu() {
+    var kutu = el("cap-senkron-rapor");
+    if (kutu && !kutu.hidden && senkronRaporBelge !== senkronBelgeNo) kutu.hidden = true;
+    var g = el("cap-senkron-geri");
+    if (g) g.hidden = !(senkronGeriGirdisi && undoStack.length && undoStack[undoStack.length - 1] === senkronGeriGirdisi);
+    var dg = el("cap-dalga-geri");
+    if (dg) dg.disabled = !undoStack.length;
+  }
+  function senkronGeriAl() {
+    if (!(senkronGeriGirdisi && undoStack[undoStack.length - 1] === senkronGeriGirdisi)) return;
+    senkronGeriGirdisi = null;
+    undo();
+    var yazi = el("cap-senkron-rapor-metin");
+    if (yazi) yazi.textContent = "Senkron düzeltmesi geri alındı";
+    var kutu = el("cap-senkron-rapor");
+    if (kutu) { kutu.title = ""; kutu.setAttribute("data-ton", "bilgi"); }
+    senkronGeriDurumu();
+  }
+  // Editörün "Hepsini sese yasla"sı: belgenin sesi yoksa önce seçili klibin sesi analiz edilir
+  async function senkronHepsiniYasla() {
+    if (busy || senkronAnalizde || !SUI || !segments.length) return;
+    if (!senkronBelgeKaynaklari().length && !(await senkronSecilenKlibiAnaliz())) return;
+    var r = senkronUygula("sese yaslama");
+    render();
+    saveDraftNow();
+    var m = SUI.raporMetni(r.rapor);
+    KApp.toast(m.metin, m.ton === "iyi" ? "good" : "warn", 7000);
+  }
+  /*
+   * Kaynağı olmayan belge (taslaktan kurtarılan, SRT, kesimden sonra uyarlanan): timeline'da seçili klibin sesi analiz
+   * edilir, klibin timeline başı t0 olur. Hızı değişmiş klip reddedilir. Döner: kaynak | null.
+   */
+  async function senkronSecilenKlibiAnaliz() {
+    if (senkronAnalizde || busy || !SZ || !SUI) return null;
+    senkronAnalizde = true;
+    if (senkronSerit) senkronSerit.ciz();
+    var belge = senkronBelgeNo;
+    try {
+      var sc = await K.call("KS_getSelectedClips");
+      var c = sc && sc.ok && sc.clips && sc.clips[0];
+      if (!c || !c.mediaPath) { KApp.toast("Önce timeline'da altyazının ait olduğu klibi seç.", "warn"); return null; }
+      var tl = Number(c.clipEnd) - Number(c.clipStart);
+      if (Number(c.dur) > 0 && tl > 0 && Math.abs(tl / Number(c.dur) - 1) > 0.002) { KApp.toast(SENKRON_HIZ + ".", "warn"); return null; }
+      var r = await SZ.sesZarfiCikar({ K: K, media: c.mediaPath, inPoint: Number(c.inPoint) || 0, dur: Number(c.dur) || 0 });
+      if (!r || !r.analiz) {
+        if (r && r.neden) K.log("[senkron] klip sesi okunamadı: " + r.neden);
+        KApp.toast(r && r.neden === "ffmpeg" ? "Ses dalgası için ffmpeg gerekli: Ayarlar › ffmpeg." : "Klibin sesi okunamadı.", "bad");
+        return null;
+      }
+      if (belge !== senkronBelgeNo) return null;   // analiz sürerken belge değişti
+      var k = SUI.kaynak(r.analiz, Number(c.clipStart) || 0, belge);
+      senkronKaynakEkle(k);
+      return k;
+    } catch (e) {
+      KApp.toast("Klibin sesi okunamadı.", "bad");
+      K.log("[senkron] analiz hatası: " + (e && e.message ? e.message : e));
+      return null;
+    } finally {
+      senkronAnalizde = false;
+      if (senkronSerit) senkronSerit.ciz();
+    }
+  }
+  // Şeritte sınır taşındı: ilk adımda anlık görüntü (tek Ctrl+Z bütün sürüklemeyi / tuş dizisini geri alır)
+  function senkronSinirDegisti(ci, seg, b) {
+    if (!segments[ci]) return;
+    b = b || {};
+    if (b.ilk) snapshot(b.etiket || "dalga ince ayarı");
+    segments[ci] = seg;   // şerit kendini yeniden çizer (js/senkron-ui.js tasi)
+    var row = el("cap-segments") && el("cap-segments").querySelector('.seg[data-i="' + ci + '"]');
+    var zaman = row && row.querySelector(".seg-time");
+    if (zaman) zaman.textContent = tc(seg.start, false).slice(3, 8) + "–" + tc(seg.end, false).slice(3, 8);
+    if (b.bitti) {
+      if (senkronRenderSaat) clearTimeout(senkronRenderSaat);
+      senkronRenderSaat = setTimeout(function () { senkronRenderSaat = null; render(); }, 250);
+      saveDraftSoon();
+    }
+  }
+  // "Dinle": playhead kartın başına, Premiere oynatır; kart bitince durur. Oynatma işlevi yoksa playhead yine oradadır.
+  async function senkronDinle(ci) {
+    var s = segments[ci];
+    if (!s) return;
+    if (senkronDinleSaat) { clearTimeout(senkronDinleSaat); senkronDinleSaat = null; }
+    var r = await K.call("KS_oynat", { sec: Number(s.start) || 0 }, 8000);
+    if (!r || !r.ok) { KApp.toast((r && r.error) || "Premiere yanıt vermedi.", "bad"); return; }
+    if (!r.oynadi) { KApp.toast("Playhead kartın başında: oynatmak için Premiere'de boşluk tuşuna bas.", "warn", 6000); return; }
+    var sure = Math.max(0.3, Number(s.end) - Number(s.start)) + 0.25;
+    senkronDinleSaat = setTimeout(function () { senkronDinleSaat = null; K.call("KS_oynatDurdur", {}, 8000); }, Math.round(sure * 1000));
+  }
+  function senkronSeritKur() {
+    if (!SUI || !el("cap-dalga")) return;
+    senkronSerit = SUI.serit({
+      belge: document,
+      segments: function () { return segments; },
+      secili: function () { return selectedSegment; },
+      kaynak: function (seg) { return SUI.kaynakBul(senkronKaynaklar, senkronBelgeNo, Number(seg.start)); },
+      fps: senkronFps,
+      ae: function () { return !!(K.hostKodu && K.hostKodu() === "AEFT"); },
+      degistir: senkronSinirDegisti,
+      dinle: senkronDinle,
+      hepsiniYasla: senkronHepsiniYasla,
+      geriAl: undo,
+      geriAlVar: function () { return undoStack.length > 0; },
+      analizEt: senkronSecilenKlibiAnaliz,
+      analizSuruyor: function () { return senkronAnalizde || busy; },
+      // tutamak odaktayken oklar / Home / End Premiere'e gitmesin (tüm ilgiler js/arac-ara.js'te birleşir)
+      tusTut: function (tut) {
+        var AA = window.SufloAracAra;
+        if (AA && typeof AA.tusIlgisiAyarla === "function") AA.tusIlgisiAyarla("dalga", tut ? SUI.tusIlgisi(!!(K && K.MAC)) : "");
+      }
+    });
+    var cb = el("cap-senkron");
+    if (cb) {
+      cb.checked = senkronDogrulaAcik();
+      cb.addEventListener("change", function () { K.settings().senkronDogrula = !!cb.checked; K.saveSettings(); });
+    }
+    if (el("cap-senkron-geri")) el("cap-senkron-geri").addEventListener("click", senkronGeriAl);
+    window.addEventListener("resize", function () { if (senkronSerit && segments.length) senkronSerit.ciz(); });
+  }
+  // Kartın uyarı işaretine tıklayınca: kart seçilir, şerit onu gösterir ve ilk sınır odaklanır
+  function senkronKartaGit(i) {
+    selectedSegment = i;
+    var box = el("cap-segments");
+    if (box) {
+      Array.prototype.forEach.call(box.querySelectorAll(".seg.selected"), function (x) { x.classList.remove("selected"); });
+      var row = box.querySelector('.seg[data-i="' + i + '"]');
+      if (row) row.classList.add("selected");
+    }
+    if (!senkronSerit) return;
+    senkronSerit.ciz();
+    var kok = el("cap-dalga");
+    if (kok && kok.scrollIntoView) { try { kok.scrollIntoView({ block: "nearest" }); } catch (e) {} }
+    var ilk = el("cap-dalga-tutamaklar") && el("cap-dalga-tutamaklar").querySelector(".dalga-tutamak");
+    if (ilk && ilk.focus) ilk.focus();
+  }
+
   /* ---------------- 3.4 adım 8: kesimden sonra altyazıyı yeni kurguya uyarla ---------------- */
 
   function kesimEsleModulu() { return window.SufloKesimEsle || null; }
@@ -3596,6 +3887,9 @@ window.KCaptions = (function () {
     belgeSekansId = sekansId ? String(sekansId) : "";
     belgeSira = Number(sira) || 0;
     belgeKesimAdi = typeof kesimAdi === "string" ? kesimAdi : null;
+    // yeni belge (transkript, SRT, kesimden sonra uyarlama…): önceki belgenin ses analizi bu zamanlara ait değil
+    senkronBelgeNo = ++senkronBelgeSayac;
+    senkronRaporGizle();
     belgeDegisti();
   }
   // Kesim kartlarındaki "Altyazıyı yeni kurguya uyarla" satırı (js/kesim-altyazi.js) belge değişince tazelenir
@@ -4201,6 +4495,7 @@ window.KCaptions = (function () {
         selectedSegment = i;
         Array.prototype.forEach.call(box.querySelectorAll(".seg.selected"), function (x) { x.classList.remove("selected"); });
         row.classList.add("selected");
+        if (senkronSerit) senkronSerit.ciz();
       };
 
       var meta = document.createElement("div");
@@ -4217,6 +4512,18 @@ window.KCaptions = (function () {
       t.onclick = function () { K.call("KS_setPlayerPosition", { sec: s.start }); };
       t.ondblclick = function () { editTime(i, t); };
       meta.appendChild(number); meta.appendChild(t);
+      // senkron doğrulamanın "emin değil" işareti: tıklayınca ses dalgası şeridi bu kartı gösterir
+      if (s.senkronUyari) {
+        var su = document.createElement("button");
+        su.type = "button";
+        su.className = "seg-senkron-uyari";
+        su.textContent = "⚠";
+        su.title = s.senkronUyari === "sessizlik" ? "Bir kelimesi sessizliğe düşüyor: zamanı ses dalgasında kontrol et"
+          : "Ses dalgasıyla tam eşleşmedi: zamanı ses dalgasında kontrol et";
+        su.setAttribute("aria-label", su.title);
+        su.onclick = function () { senkronKartaGit(i); };
+        meta.appendChild(su);
+      }
 
       var textWrap = document.createElement("div");
       textWrap.className = "seg-text-wrap";
@@ -4230,7 +4537,9 @@ window.KCaptions = (function () {
       inp.onfocus = function () {
         inp.dataset.before = inp.value;
         odakKelimeleri = segments[i] && segments[i].words || null;
+        var degisti = selectedSegment !== i;
         selectedSegment = i; row.classList.add("selected");
+        if (degisti && senkronSerit) senkronSerit.ciz();
       };
       inp.oninput = function () {
         segments[i].text = inp.value;
@@ -4367,6 +4676,7 @@ window.KCaptions = (function () {
     }
     updateQualityUI(report);
     renderHistory();
+    if (senkronSerit) senkronSerit.ciz();
   }
 
   /*
@@ -7134,6 +7444,7 @@ window.KCaptions = (function () {
     el("cap-fr-go").addEventListener("click", findReplace);
     el("cap-fr-glossary").addEventListener("click", addToGlossary);
     el("cap-undo").addEventListener("click", undo);
+    senkronSeritKur();
     el("cap-redo").addEventListener("click", redo);
     el("cap-shift-back").addEventListener("click", function () { shiftAll(-0.5); });
     el("cap-shift-fwd").addEventListener("click", function () { shiftAll(0.5); });
