@@ -91,6 +91,14 @@ ok("paketlenen her dosya git'te izleniyor; test arka ucu (fixtures) listede yok"
 
 /* ================= B) Test ayari ================= */
 
+// "ayar" bcrypt ozetini php ile uretir; php yoksa (ör. macOS CI) B ve C bolumu atlanir, diger Studio testleri gibi
+var phpVar = cp.spawnSync("php", ["-v"], { encoding: "utf8" });
+if (phpVar.error || phpVar.status !== 0) {
+  console.log("ATLA test ayari ve uctan uca bolumu: php bulunamadi (php olan makinelerde, ör. ubuntu CI, calisir)");
+  try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
+  bitir();
+}
+
 var AYAR = path.join(TMP, "ozel-test");
 var ra = cp.spawnSync(process.execPath, [ARAC, "ayar", "--cikis", AYAR], { encoding: "utf8" });
 var sifreDosya = path.join(AYAR, "test-sifre.txt"), cfgDosya = path.join(AYAR, "config.php");
