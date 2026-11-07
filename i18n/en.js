@@ -3844,8 +3844,8 @@
     "Stil kodu modülü yüklenemedi.": "The style code module couldn't be loaded.",
     // Altyazı sekmesi › Stil kartı
     "ALTYAZI EFEKTLERİ · PREMIERE ŞABLONLARI": "CAPTION EFFECTS · PREMIERE TEMPLATES",
-    "Aşağıdaki hazır görünümlerden birini seç ya da efekti kendin kur; 17 Premiere şablonu en altta. Önizleme ücretsiz; timeline'a eklemek Pro (3 deneme hakkı).":
-      "Pick one of the preset looks below or build your own effect; the 17 Premiere templates are at the bottom. Previewing is free; adding to the timeline is Pro (3 free trials).",
+    "Aşağıdaki hazır görünümlerden birini seç ya da efekti kendin kur; 31 Premiere şablonu en altta. Önizleme ücretsiz; timeline'a eklemek Pro (3 deneme hakkı).":
+      "Pick one of the preset looks below or build your own effect; the 31 Premiere templates are at the bottom. Previewing is free; adding to the timeline is Pro (3 free trials).",
     "önizleme ücretsiz · After Effects gerekmez": "free preview · no After Effects needed",
     "Hazır görünümler": "Preset looks",
     "Giriş animasyonu": "Entrance animation",
