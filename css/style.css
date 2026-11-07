@@ -1692,6 +1692,8 @@ details.adv > *:not(summary) { margin-top: 8px; }
     linear-gradient(145deg, rgba(19,20,26,.98), rgba(13,14,18,.98));
   box-shadow: inset 0 1px rgba(255,255,255,.045), 0 22px 42px -34px #000;
 }
+/* .set-group (aşağıda, padding: 13px 0) bu kartın iç boşluğunu ezmesin: logo ve Taramayı başlat kenara yapışıyordu */
+.set-group.doctor-card, .set-group.doctor-card:first-child { padding: 16px; }
 .stil-katmani-card[hidden] { display: none !important; }
 .doctor-card::before {
   content: "";
