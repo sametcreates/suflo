@@ -78,8 +78,11 @@
    * kase / punct: altyazı metninin yazım biçimi ve noktalaması (Altyazı sekmesi ya da hazır görünüm).
    * Adım 17: gölge nesnesi (yalnız renk + üç sayı) ya da null, kutu, serbest konum (null = hazır konum).
    */
+  // anim: yazı animasyonu (animasyon motoru v2; "" klasik). Stil motoru katalogda olmayanı "" yapar
   var EFEKT_SECIM_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime", "font", "renk", "konturRenk", "vurguRenk",
-    "boyut", "kontur", "konum", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY"];
+    "boyut", "kontur", "konum", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY", "anim",
+    // Parti 5: vurgu kutusu rengi ve ikinci vurgu rengi (null = türetilir; stil motoru #rrggbb değilse yok sayar)
+    "vurguKutuRenk", "vurguRenk2"];
   // Stil motoruna gitmeyen metin kuralı alanları
   var METIN_ALANLARI = ["kase", "punct"];
   function golgeSecimi(g) {
@@ -95,7 +98,7 @@
     EFEKT_SECIM_ALANLARI.forEach(function (k) {
       if (!Object.prototype.hasOwnProperty.call(e, k)) return;
       var v = e[k];
-      if (v === null && (k === "golge" || k === "konumX" || k === "konumY")) { out[k] = null; var1 = true; return; }
+      if (v === null && (k === "golge" || k === "konumX" || k === "konumY" || k === "vurguKutuRenk" || k === "vurguRenk2")) { out[k] = null; var1 = true; return; }
       if (k === "golge") { var g = golgeSecimi(v); if (g) { out.golge = g; var1 = true; } return; }
       if ((typeof v === "string" && v.length <= 40) || (typeof v === "number" && isFinite(v)) || typeof v === "boolean") { out[k] = v; var1 = true; }
     });
@@ -245,6 +248,10 @@
       boyut: st.boyut, kontur: st.kontur, konum: st.konum, guvenli: !!dikey };
     // Altyazı Efektleri alanları (giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime; gölge, kutu, serbest konum)
     if (SE && SE.EFEKT_ALANLARI && styleId === "efekt") SE.EFEKT_ALANLARI.forEach(function (k) { if (st[k] !== undefined) ov[k] = st[k]; });
+    // Yazı animasyonu (panelin seçimi) yalnız seçiliyse: klasik paketin overrides'ı eskisi gibi
+    if (styleId === "efekt" && typeof st.anim === "string" && st.anim) ov.anim = st.anim;
+    // Parti 5 renkleri yalnız elle seçildiyse (klasik paketin overrides'ı eskisi gibi)
+    ["vurguKutuRenk", "vurguRenk2"].forEach(function (k) { if (styleId === "efekt" && typeof st[k] === "string" && st[k]) ov[k] = st[k]; });
     var serbest = styleId === "efekt" && typeof ov.konumX === "number" && isFinite(ov.konumX) && typeof ov.konumY === "number" && isFinite(ov.konumY);
     return { overrides: ov, konum: Number(st.konum) || 5, konumY: serbest ? ov.konumY : null };
   }
@@ -633,12 +640,14 @@
   }
 
   function hataMetni(e) { return e && e.message ? e.message : String(e || "?"); }
+  function iptalHatasi() { var e = new Error("İptal edildi"); e.iptal = true; return e; }
 
   /*
    * İşi çalıştır. deps (hepsi async olabilir):
    *   makeShorts(k, job) → { ok, id, dikeyId, hata }        (1. evre, her an için)
    *   activate(k, job)   → { ok, paket: [katman adları], miras: { altyazi }, mirasKapatilan, width, height, end, fps, hata }
-   *   altyazi / kanca / cerceve (k, ctx, job) → { ok } | { atla: neden } | { ok: false, hata }
+   *   altyazi / kanca / cerceve (k, ctx, job) → { ok } | { atla: neden } | { ok: false, hata } | { iptal: true }
+   *     (ya da e.iptal'li hata fırlatır: adım "bekliyor" kalır, iş "iptal" durumunda biter)
    *   metin(k, job)      → { ok, paylasim }
    *   kaydet(job), ilerleme(job, i, adim), iptalMi(), anaSekansaDon(job)
    * Bir adımın hatası diğer Shorts'u durdurmaz; ana sekans hata olsa da geri açılır.
@@ -690,11 +699,14 @@
               continue;
             }
             var sonuc = await deps[s.adim](k, ctx, job);
+            if (sonuc && sonuc.iptal) throw iptalHatasi();
             if (sonuc && sonuc.atla) markSkip(job, s.i, s.adim, sonuc.atla);
             else if (!sonuc || !sonuc.ok) throw new Error((sonuc && (sonuc.hata || sonuc.error)) || "?");
             else markDone(job, s.i, s.adim, sonuc);
           }
         } catch (e) {
+          // kullanıcı İptal'e bastı, katman render'ı durdu: adım "bekliyor" kalır (hata değil), "Devam et" oradan sürer
+          if (e && e.iptal) { job.durum = "iptal"; kaydet(); ilerle(s.i, s.adim); break; }
           markFail(job, s.i, s.adim, hataMetni(e));
           // sekans değişmiş olabilir: bu Short'un sonraki adımı onu yeniden açar
           if (PREMIERE_ADIMLARI.indexOf(s.adim) !== -1) aktif = -1;

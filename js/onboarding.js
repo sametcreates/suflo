@@ -124,7 +124,15 @@ window.KOnboarding = (function () {
     };
   }
 
+  /*
+   * Rehber Premiere'e göre yazıldı: "Örnekte dene" KS_importSample çağırır (After Effects'te engelli), sonraki adımlar
+   * AE'de gizli Premiere düğmelerini (#cap-apply) gösterir. After Effects'te (deneysel) karar baştan "yok": kart açılmaz,
+   * #cap-setup kartın içine taşınmaz, motor kurulum kartı Altyazı sekmesinde normal yerinde kalır.
+   */
+  function aeMi() { return !!(K.hostKodu && K.hostKodu() === "AEFT"); }
+
   function kararVer() {
+    if (aeMi()) return "yok";
     var s = K.settings();
     return SO.gosterimKarari({
       ayarDosyasiVardi: K.ayarDosyasiVardi ? K.ayarDosyasiVardi() : true,
@@ -441,6 +449,8 @@ window.KOnboarding = (function () {
   }
 
   function rehberiAc() {
+    // Ayarlar › Destek › "Kurulum rehberini aç" da After Effects'te rehberi açmaz (kararVer ile aynı neden)
+    if (aeMi()) { KApp.toast("Kurulum rehberi yalnız Premiere Pro'da.", "", 5000); return; }
     kayit.kapandi = false;
     kayit.bitti = false;
     kayitYaz();
@@ -508,9 +518,14 @@ window.KOnboarding = (function () {
   function sekansaUygulaVurgula() {
     var b = el("cap-apply");
     if (!b) return;
-    b.classList.add("onb-vurgu");
-    kaydir(b);
-    setTimeout(function () { b.classList.remove("onb-vurgu"); }, 9000);
+    // Parti 4: görünür denetim 3. adımın tek "Timeline'a uygula" düğmesi (#cap-apply'ye tıklar). Rehber ücretsiz
+    // düz altyazı izini anlatır: tür bu oturumluk "Düz" olur (kullanıcının kayıtlı seçimine yazılmaz)
+    var tek = el("cap-uygula-tek");
+    if (tek && window.SufloAltyaziAkis && SufloAltyaziAkis.turSec) SufloAltyaziAkis.turSec("duz", { gecici: true });
+    var vurgulananlar = tek ? [b, tek] : [b];
+    vurgulananlar.forEach(function (n) { n.classList.add("onb-vurgu"); });
+    kaydir(tek || b);
+    setTimeout(function () { vurgulananlar.forEach(function (n) { n.classList.remove("onb-vurgu"); }); }, 9000);
   }
 
   /*
@@ -862,7 +877,7 @@ window.KOnboarding = (function () {
     }
     if (kararDegeri === "tam") {
       // Taze kurulumda "Suflo 3.1'de yeni" penceresi rehberin üstüne binmesin
-      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.4";
+      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.5";
       kayitYaz();
     }
     olaylariBagla();

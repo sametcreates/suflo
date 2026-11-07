@@ -68,7 +68,9 @@ window.KBroll = (function () {
   }
 
   async function bul() {
-    if (typeof Pro !== "undefined" && !Pro.gate("highlights")) return;
+    // Pro: kendi 'broll' anahtarı (upsell B-roll'u anlatsın; eskiden "Viral anlar" penceresi açılıyordu).
+    // Deneme hakkı yok (js/deneme.js listesinde değil): kurucu kademesinde B-roll yalnız Pro.
+    if (typeof Pro !== "undefined" && !Pro.gate("broll")) return;
     if (busy || !BR) return;
     var segs = window.KCaptions ? KCaptions.getSegments() : [];
     if (!segs.length) { durum("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }

@@ -3,9 +3,9 @@
   "collection": "Suflo Pro — Caption Styles",
   "creator": "Suflo Pro",
   "publicPreviewOnly": true,
-  "styleCount": 17,
+  "styleCount": 31,
   "ratioCount": 3,
-  "fileCount": 51,
+  "fileCount": 65,
   "items": [
     {
       "id": "01-akira",
@@ -142,6 +142,132 @@
       "category": "Subtitle Style",
       "preview": "previews/17-typewriter.webp",
       "video": "previews/17-typewriter.webm"
+    },
+    {
+      "id": "18-autocaptions-arcoiris",
+      "name": "AutoCaptions Arcoiris",
+      "styleKey": "AutoCaptions Arcoiris",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/18-autocaptions-arcoiris.webp",
+      "video": "previews/18-autocaptions-arcoiris.webm"
+    },
+    {
+      "id": "19-autocaptions-aura",
+      "name": "AutoCaptions Aura",
+      "styleKey": "AutoCaptions Aura",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/19-autocaptions-aura.webp",
+      "video": "previews/19-autocaptions-aura.webm"
+    },
+    {
+      "id": "20-autocaptions-azul",
+      "name": "AutoCaptions Azul",
+      "styleKey": "AutoCaptions Azul",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/20-autocaptions-azul.webp",
+      "video": "previews/20-autocaptions-azul.webm"
+    },
+    {
+      "id": "21-autocaptions-blanco-con-sombra",
+      "name": "AutoCaptions Blanco con sombra",
+      "styleKey": "AutoCaptions Blanco con sombra",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/21-autocaptions-blanco-con-sombra.webp",
+      "video": "previews/21-autocaptions-blanco-con-sombra.webm"
+    },
+    {
+      "id": "22-autocaptions-celeste",
+      "name": "AutoCaptions Celeste",
+      "styleKey": "AutoCaptions Celeste",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/22-autocaptions-celeste.webp",
+      "video": "previews/22-autocaptions-celeste.webm"
+    },
+    {
+      "id": "23-autocaptions-editorial",
+      "name": "AutoCaptions Editorial",
+      "styleKey": "AutoCaptions Editorial",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/23-autocaptions-editorial.webp",
+      "video": "previews/23-autocaptions-editorial.webm"
+    },
+    {
+      "id": "24-autocaptions-lima-viva",
+      "name": "AutoCaptions Lima Viva",
+      "styleKey": "AutoCaptions Lima Viva",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/24-autocaptions-lima-viva.webp",
+      "video": "previews/24-autocaptions-lima-viva.webm"
+    },
+    {
+      "id": "25-autocaptions-naranja",
+      "name": "AutoCaptions Naranja",
+      "styleKey": "AutoCaptions Naranja",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/25-autocaptions-naranja.webp",
+      "video": "previews/25-autocaptions-naranja.webm"
+    },
+    {
+      "id": "26-autocaptions-rojo",
+      "name": "AutoCaptions Rojo",
+      "styleKey": "AutoCaptions Rojo",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/26-autocaptions-rojo.webp",
+      "video": "previews/26-autocaptions-rojo.webm"
+    },
+    {
+      "id": "27-autocaptions-rosa",
+      "name": "AutoCaptions Rosa",
+      "styleKey": "AutoCaptions Rosa",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/27-autocaptions-rosa.webp",
+      "video": "previews/27-autocaptions-rosa.webm"
+    },
+    {
+      "id": "28-autocaptions-simple",
+      "name": "AutoCaptions Simple",
+      "styleKey": "AutoCaptions Simple",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/28-autocaptions-simple.webp",
+      "video": "previews/28-autocaptions-simple.webm"
+    },
+    {
+      "id": "29-autocaptions-sombra-degradada",
+      "name": "AutoCaptions Sombra Degradada",
+      "styleKey": "AutoCaptions Sombra Degradada",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/29-autocaptions-sombra-degradada.webp",
+      "video": "previews/29-autocaptions-sombra-degradada.webm"
+    },
+    {
+      "id": "30-autocaptions-verde",
+      "name": "AutoCaptions Verde",
+      "styleKey": "AutoCaptions Verde",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/30-autocaptions-verde.webp",
+      "video": "previews/30-autocaptions-verde.webm"
+    },
+    {
+      "id": "31-autocaptions-violeta-enfocada",
+      "name": "AutoCaptions Violeta Enfocada",
+      "styleKey": "AutoCaptions Violeta Enfocada",
+      "category": "Subtitle Style",
+      "collection": "AutoCaptions",
+      "preview": "previews/31-autocaptions-violeta-enfocada.webp",
+      "video": "previews/31-autocaptions-violeta-enfocada.webm"
     }
   ]
 }

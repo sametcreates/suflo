@@ -1,4 +1,4 @@
-// Suflo testi: Pro'yu dene bağlantıları — 13 araç deneme kapısından geçer, hak yalnız
+// Suflo testi: Pro'yu dene bağlantıları — 14 araç deneme kapısından geçer, hak yalnız
 // başarı dalında düşer; kütüphaneler/MOGRT/toplu/ASS deneme almaz; filigran yalnız
 // stilli katman ve kanca başlığında; temiz yeniden oluşturma KS_removeOverlay'e nodeId vermez.
 var fs = require("fs"), path = require("path"), vm = require("vm");
@@ -42,7 +42,11 @@ var SITELER = [
   // 3.4 Eğri: düzenleyici, önizleme ve geri al ücretsiz; hak yalnız en az bir özellik yazılınca, bir kez
   ["js/egri.js", "async function uygula()", "curves", "if (!basarili) hataAt(", true],
   // 3.4 adım 14 Varışta yaylan: aynı 'curves' kapısı ve hakları; hak yalnız en az bir varış yazılınca, bir kez
-  ["js/egri.js", "async function yaylanUygula()", "curves", "if (!varisSayi) hataAt(", true]
+  ["js/egri.js", "async function yaylanUygula()", "curves", "if (!varisSayi) hataAt(", true],
+  // Pro denetimi: Sahne algılama kendi 'sahne' anahtarında (eskiden denemesiz 'cut' kapısı; Otomatik kesim denemeliydi).
+  // Tarama hak düşürmez; hak ilk timeline çıktısında (marker ya da bölme) yalnız başarıda, analiz başına bir kez
+  ["js/sahneler.js", "async function analyze()", "sahne", null, false],
+  ["js/sahneler.js", "async function uygula(bol)", "sahne", "if (!r.ok) throw", true]
 ];
 var kapiliOzellikler = {};
 SITELER.forEach(function (s) {
@@ -62,8 +66,8 @@ SITELER.forEach(function (s) {
   var hata = g.search(/\n    \} catch \(/);
   ok(ad + ": hak yalnız başarı denetiminden sonra düşer", basari > 0 && harca > basari && (hata === -1 || harca < hata), "basari " + basari + " harca " + harca + " catch " + hata);
 });
-var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube", "curves"];
-ok("13 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
+var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube", "curves", "sahne"];
+ok("14 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
 ok("deneme listesi deneme.js ile aynı", JSON.stringify(require(path.join(KOK, "js", "deneme.js")).OZELLIKLER) === JSON.stringify(DOKUZ));
 
 /* ---------------- 2) deneme almayan kapılar ---------------- */
@@ -82,7 +86,7 @@ jsDosyalari.forEach(function (f) {
     }
   });
 });
-ok("tarama deneme kapılarını buluyor (20 kapı: 19 araç + rehberin stil adımı)", denemeli.length === 20, denemeli.join(" | "));
+ok("tarama deneme kapılarını buluyor (22 kapı: 21 araç + rehberin stil adımı)", denemeli.length === 22, denemeli.join(" | "));
 // 3.4 Yapay zekâ köprüsü (MCP): kurucu kademesi "köprüyü açmak Pro gerektirir" (deneme hakkı yok; Shorts Paketi /
 // Podcast Modu gibi). İnceleme bulgusu: açılış Pro.gate("mcp", { deneme: true }) ile 3 deneme oturumu veriyordu.
 var kopruAc = govde(oku("js/otomasyon-panel.js"), "async function ac(ev)");
@@ -96,9 +100,28 @@ ok("onboarding stilKoyTikla: Suflo Stili için overlay denemesi, MOGRT için kü
   /KCaptions\.mogrtSecili\(\)\) \{ Pro\.gate\("captionStyles"\); return; \}/.test(koy) && koy.indexOf("mogrtSecili") < koy.indexOf('Pro.gate("overlay"') &&
   koy.indexOf('Pro.gate("overlay"') < koy.indexOf("KCaptions.applyStyled()"), koy.slice(0, 300));
 ok("kütüphane / MOGRT / toplu / ASS / Shorts paketi kapıları deneme almaz", yanlis.length === 0, yanlis.join(" | "));
-["js/sahneler.js", "js/broll-ui.js", "js/library.js", "js/presets.js", "js/sfx.js", "js/motionbg.js", "js/emoji-assets.js", "js/library-health.js"].forEach(function (f) {
+["js/broll-ui.js", "js/library.js", "js/presets.js", "js/sfx.js", "js/motionbg.js", "js/emoji-assets.js", "js/library-health.js"].forEach(function (f) {
   ok(f + ": deneme hiç geçmez", !/deneme/.test(ayikla(oku(f))));
 });
+// Pro denetimi: B-roll kendi 'broll' anahtarında (eskiden "Viral anlar" upsell'i açılıyordu, rozet "YENİ" diyordu).
+// Karar: deneme hakkı YOK (kurucu kademesi; rehberin aiDenemeKabul'ü de "B-roll hayır" der); rozet PRO.
+var brollSrc = oku("js/broll-ui.js"), proSrc = oku("js/pro.js");
+ok("broll-ui.js: kapı Pro.gate(\"broll\") (denemesiz), 'highlights' kapısı yok",
+  /Pro\.gate\("broll"\)\) return;/.test(brollSrc) && !/Pro\.gate\("highlights"/.test(brollSrc), (brollSrc.match(/Pro\.gate\([^\n]*/) || [""])[0]);
+ok("pro.js: 'broll' ve 'sahne' upsell metinleri kendi araçlarını anlatır",
+  /\n\s+broll:\s+'B-roll önerileri[^']*'/.test(proSrc) && /\n\s+sahne:\s+'Sahne algılama[^']*'/.test(proSrc));
+ok("index.html: B-roll önerileri başlığında PRO rozeti (YENİ değil)", /<summary>B-roll önerileri <span class="tc-yeni">PRO<\/span><\/summary>/.test(oku("index.html")));
+ok("deneme.js: B-roll denemesiz, sahne denemeli", !require(path.join(KOK, "js", "deneme.js")).listede("broll") && require(path.join(KOK, "js", "deneme.js")).listede("sahne"));
+// FEATURE_LABELS'ta kullanılmayan anahtar kalmaz (karaoke / glossary / emojiAssets kapısı yoktu): her anahtar
+// bir kapıda, izin denetiminde ya da araç/MCP rozetinde geçer
+var labelBlok = (proSrc.match(/var FEATURE_LABELS = \{([\s\S]*?)\n  \};/) || ["", ""])[1];
+var labelAnahtarlari = (labelBlok.match(/\n\s+([A-Za-z]+):/g) || []).map(function (x) { return x.replace(/[\s:]/g, ""); });
+var tumJs = jsDosyalari.filter(function (f) { return f !== "pro.js"; }).map(function (f) { return oku("js/" + f); }).join("\n");
+var kullanilmayan = labelAnahtarlari.filter(function (k) {
+  return !new RegExp('(gate|izinVar|denemeBaslat)\\("' + k + '"|pro: "' + k + '"').test(tumJs);
+});
+ok("FEATURE_LABELS: her anahtar gerçekten kullanılıyor", labelAnahtarlari.length > 20 && kullanilmayan.length === 0, kullanilmayan.join(",") + " / " + labelAnahtarlari.length);
+ok("emoji-assets.js başlık yorumu: ücretsiz (eski 'ayrı bir Pro medya kütüphanesi' notu yok)", !/Pro medya kutuphanesidir/.test(oku("js/emoji-assets.js")));
 var cap = oku("js/captions.js");
 ok("captions.js: MOGRT, toplu klip ve stilli ASS kapıları denemesiz", /Pro\.gate\("mogrt"\)/.test(cap) && /Pro\.gate\("batch"\)/.test(cap) && /Pro\.gate\("assexport"\)/.test(cap) &&
   !/Pro\.gate\("(mogrt|batch|assexport|captionStyles)",/.test(cap));
@@ -191,6 +214,23 @@ ok("ücretsiz sütunu: kelime kelime altyazı ve terim sözlüğü", /<li>Kelime
 ok("kanca başlığı tanıtımı 5 stil (seçicideki stil sayısı)", /<strong>5<\/strong> stil/.test(blok(html, "kanca-tanitim")) && html.match(/id="kanca-stil">[\s\S]*?<\/select>/)[0].match(/<option /g).length === 5);
 ok("eski 'v1.7' ve 'ücretsiz altyazı paneli' yedekleri yok", !/v1\.7</.test(html) && !/ücretsiz altyazı paneli/.test(html));
 ok("çeviri ipucu artık 'ücretsiz' demiyor", !/başka dile çevir \(ücretsiz/.test(html));
+// İnceleme bulgusu: Sahne algılama 'sahne' denemesi ve denemesiz 'broll' kapısı kullanıcıya dönük listelere yansımamıştı
+var readme = oku("README.md");
+var denemeSatirlari = readme.split("\n").filter(function (l) { return /^(\| \*\*Pro'yu dene\*\*|\*\*Pro'yu dene\.\*\*)/.test(l); });
+ok("README: iki 'Pro'yu dene' listesi de sahne algılamayı sayar", denemeSatirlari.length === 2 && denemeSatirlari.every(function (l) { return /sahne algılama/.test(l); }),
+  denemeSatirlari.length);
+var enDeneme = readme.slice(readme.indexOf("Every code-based Pro tool"), readme.indexOf("are Pro-only.", readme.indexOf("Every code-based Pro tool")) + 13);
+ok("README (EN): deneme listesinde scene detection, Pro-only cümlesinde B-roll suggestions", /scene detection/.test(enDeneme.split("free tries")[0]) &&
+  /B-roll suggestions[^.]*are Pro-only\.$/.test(enDeneme.replace(/\s+/g, " ")), enDeneme.replace(/\s+/g, " ").slice(-200));
+ok("README Pro tablosu: B-roll önerileri denemesiz Pro satırı", /\n\| — \| \*\*B-roll önerileri\*\* \(deneme hakkı yok\)[^\n]*\|\n/.test(readme));
+ok("README test tablosu: deneme araç sayısı 14 (13 değil), sahne anahtarı anılır", !/13 araç/.test(readme) &&
+  /\| `test-deneme\.js` \| [^\n]*14 araç[^\n]*Sahne `sahne`/.test(readme) && /\| `test-deneme-baglanti\.js` \| [^\n]*14 araç/.test(readme));
+ok("Ayarlar Pro listesi: B-roll önerileri (deneme hakkı yok), çevirisi var", /<li>[^<]*B-roll önerileri \(deneme hakkı yok\)<\/li>/.test(kilitli) &&
+  oku("i18n/en.js").indexOf('"' + (kilitli.match(/<li>([^<]*B-roll önerileri \(deneme hakkı yok\))<\/li>/) || ["", "\u0000"])[1] + '": ') !== -1,
+  (kilitli.match(/<li>[^<]*B-roll[^<]*<\/li>/) || [""])[0]);
+ok("app.js: PRO kilidi yorumu denemesiz araç örneğinde Sahneleri bul'u saymaz (artık deneme hakkı var)",
+  !/deneme hakkı her Pro araçta yok \([^)]*Sahneleri bul/.test(app) && /deneme hakkı her Pro araçta yok \([^)]*B-roll/.test(app));
+ok("index.html: Sahne algılama başlığında PRO rozeti (B-roll gibi; YENİ değil)", /<b>Sahne algılama<\/b><span class="tc-yeni">PRO<\/span>/.test(html));
 
 /* ---------------- 8) davranış: gecisler.js (sahte Pro) ---------------- */
 function gecisCalistir(o) {
@@ -235,6 +275,67 @@ Promise.resolve().then(function () {
   return gecisCalistir({ kurulu: true, cevap: { ok: true, track: 1, half: 0.25 } }).then(function (r) {
     ok("gecisler: başarıda tek hak düşer ve bildirilir", r.harcanan.join(",") === "transitions" &&
       r.toastlar.some(function (t) { return t[0] === "1 deneme hakkı kullanıldı · 2 kaldı"; }), JSON.stringify(r.toastlar));
+  });
+}).then(function () {
+  /* ---------------- Pro denetimi: Sahne algılama denemesi uçtan uca (sahte DOM / Premiere) ---------------- */
+  function sahneOrtami(o) {
+    var dom = {}, cagri = [], harcanan = [], kapi = [], toastlar = [];
+    function D(id) {
+      if (!dom[id]) dom[id] = { id: id, hidden: false, disabled: false, value: "orta", className: "", textContent: "", innerHTML: "", style: {}, _o: {},
+        classList: { toggle: function () {} }, appendChild: function () {}, addEventListener: function (e, f) { this._o[e] = f; } };
+      return dom[id];
+    }
+    var ctx = {
+      window: {}, document: { getElementById: D, createElement: function () { return D("_" + Math.random()); } },
+      K: {
+        call: function (fn, a) {
+          cagri.push(fn);
+          if (fn === "KS_getSelectedClips") return Promise.resolve({ ok: true, clips: [{ mediaPath: "/v.mp4", clipStart: 0, clipEnd: 20, inPoint: 0, dur: 20 }] });
+          return Promise.resolve(o.cevap || { ok: true, added: 2, cuts: 2 });
+        },
+        findFfmpeg: function () { return Promise.resolve("ffmpeg"); },
+        run: function () { return Promise.resolve({ code: 0, stderr: "" }); },
+        hataYardimi: function (e) { return e.message; }, log: function () {}
+      },
+      KApp: { ctx: function () { return { sel: true }; }, onContext: function () {}, toast: function (m, t) { toastlar.push([m, t]); } },
+      Pro: {
+        gate: function (f, op) { kapi.push([f, op || {}]); return !!o.kurulu; },
+        denemeHarca: function (f, bildir) { harcanan.push(f); bildir("1 deneme hakkı kullanıldı · 2 kaldı", "good"); return 2; }
+      },
+      Promise: Promise, Math: Math, Number: Number, String: String, Error: Error
+    };
+    ctx.window.SufloScenes = {
+      ffmpegArgs: function () { return []; }, parse: function () { return [{ t: 5, skor: 0.5 }, { t: 12, skor: 0.6 }]; },
+      clean: function (x) { return x; }, toSequence: function (x) { return x; }
+    };
+    vm.createContext(ctx);
+    vm.runInContext(oku("js/sahneler.js"), ctx);
+    ctx.window.KSahne.init();
+    return { dom: dom, cagri: cagri, harcanan: harcanan, kapi: kapi, toastlar: toastlar,
+      tikla: function (id) { return Promise.resolve(dom[id]._o.click()).then(function () { return new Promise(function (r) { setTimeout(r, 5); }); }); } };
+  }
+  var s1 = sahneOrtami({ kurulu: false });
+  return s1.tikla("sc-analyze").then(function () {
+    ok("sahneler: kurulmamışken tarama yok, kapı 'sahne' + deneme + yeniden", s1.cagri.length === 0 && s1.kapi.length === 1 &&
+      s1.kapi[0][0] === "sahne" && s1.kapi[0][1].deneme === true && typeof s1.kapi[0][1].yeniden === "function" && s1.harcanan.length === 0, JSON.stringify(s1.kapi));
+    var s2 = sahneOrtami({ kurulu: true });
+    return s2.tikla("sc-analyze").then(function () {
+      ok("sahneler: tarama hak düşürmez", s2.harcanan.length === 0 && s2.dom["sc-result"].hidden === false, JSON.stringify(s2.toastlar));
+      return s2.tikla("sc-markers");
+    }).then(function () {
+      ok("sahneler: marker başarısında tek hak düşer ve bildirilir", s2.harcanan.join(",") === "sahne" && s2.cagri.indexOf("KS_addMarkers") !== -1 &&
+        s2.toastlar.some(function (t) { return t[0] === "1 deneme hakkı kullanıldı · 2 kaldı"; }), JSON.stringify(s2.toastlar));
+      var kapiOnce = s2.kapi.length;
+      return s2.tikla("sc-split").then(function () {
+        ok("sahneler: aynı analizle bölme yeni hak ya da kapı istemez", s2.harcanan.length === 1 && s2.kapi.length === kapiOnce &&
+          s2.cagri.indexOf("KS_splitSelectedAt") !== -1, JSON.stringify([s2.harcanan, s2.kapi.length, kapiOnce]));
+      });
+    }).then(function () {
+      var s3 = sahneOrtami({ kurulu: true, cevap: { ok: false, error: "Premiere klibi bölemedi." } });
+      return s3.tikla("sc-analyze").then(function () { return s3.tikla("sc-split"); }).then(function () {
+        ok("sahneler: Premiere hatasında hak düşmez", s3.harcanan.length === 0 && /bölemedi/.test(s3.dom["sc-status"].textContent), s3.dom["sc-status"].textContent);
+      });
+    });
   });
 }).then(function () {
   console.log("\n" + gecen + "/" + toplam + " gecti");

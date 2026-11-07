@@ -4,7 +4,7 @@
  * Kullanicinin PNG/WEBP/GIF/JPG arsivini oldugu yerden okur. Dosyalari paket
  * icine kopyalamaz; arama, favori, son kullanilan, buyuk onizleme ve playhead'e
  * guvenli yerlestirme saglar. WEBP, Premiere'e girmeden once yerelde PNG olur.
- * Mevcut Unicode emoji secici UCRETSIZ kalir; bu ayri bir Pro medya kutuphanesidir.
+ * Unicode emoji secici de bu kutuphane de UCRETSIZ (Pro kapisi yok; bagli Suflo Cloud katalogu dahil).
  */
 window.KEmojiAssets = (function () {
   "use strict";

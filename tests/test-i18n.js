@@ -370,5 +370,9 @@ ok("host hataları: birleşik ve cümleli biçimler", T("✕ Aktif sequence yok.
   T("Preset seçili klibe uygulanamadı. Eksik efekt: Lumetri Color.") === "Couldn't apply the preset to the selected clip. Missing effect: Lumetri Color.",
   T("Preset seçili klibe uygulanamadı. Eksik efekt: Lumetri Color."));
 
+ok("tek düğmenin iki tıklık onay etiketi İngilizcede tam çevrilir (kritik sorun sayısıyla)",
+  T("3 kritik sorunla yine de uygula") === "Apply anyway with 3 critical issue(s)" && T("Yine de yeni iz ekle · 3 sorun") === "Add a new track anyway · 3 issue(s)" &&
+  T("Yine de yeni iz ekle") === "Add a new track anyway", [T("3 kritik sorunla yine de uygula"), T("Yine de yeni iz ekle · 3 sorun")].join(" | "));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

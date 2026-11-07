@@ -1,0 +1,404 @@
+/*
+ * Suflo — paylaşılabilir stil kodları (SFL1.…) ve stil ince ayarının doğrulaması
+ *
+ * Bir temel stil (3.3'ten beri arayüzde Altyazı Efektleri) + ince ayarı (yazı tipi, renkler, punto, kontur, konum, platform güvenli
+ * yerleşimi) + metin biçimi (satır uzunluğu, yazım, noktalama) + isteğe bağlı yazar adı
+ * tek satırlık bir koda paketlenir: "SFL1." + base64url(UTF-8 JSON). Kod hem panelde
+ * ("Kod yapıştır") hem suflo.app/stil#KOD sayfasında çözülür; bu yüzden aynı dosyanın
+ * bayt bayt kopyası docs/js/style-share.js'tedir (test denetler).
+ *
+ * 3.3 Altyazı Efektleri (styleId "efekt"): giriş / vurgu animasyonu, kelime vurgusu, kalın, italik,
+ * satır sayısı ve en çok kelime de koda girer; adım 17'den beri isteğe bağlı gölge (golge: { renk, opak,
+ * mesafe, yumusak } ya da null), arka plan kutusu (kutu, kutuRenk, kutuOpak) ve serbest konum (konumX,
+ * konumY: %5-95 ya da null). Bu alanları tanımayan eski paneller (3.2 ve öncesi) onları "geçersiz ayar
+ * atlandı" uyarısıyla atar; "efekt" stilini hiç tanımadıkları için kodu reddeder.
+ *
+ * Güvenlik: kod yabancı kaynaktan gelir ve değerleri ASS Style satırına yazılır.
+ *   - renkler yalnız #rrggbb, yazı tipi yalnız paketle gelen OFL fontlarından biri (FONTS; 3.3 adım 18'den beri
+ *     13 aile, Kalın / Modern / Zarif / Teknik kategorileriyle)
+ *   - konum ∈ {1, 2, 5, 8}; punto 36-180, kontur 0-16 aralığına kırpılır
+ *   - giris / aktif sabit kimlik listesinden; satır 1-3, kelime 1-10 aralığına kırpılır
+ *   - gölge opaklığı 0-100, mesafe 0-20, yumuşaklık 0-30; kutu opaklığı 0-100; konum %5-95 (kırpılır)
+ *   - bilinmeyen anahtarlar ve __proto__ atılır; fontFile ASLA girdiden alınmaz,
+ *     yazı tipinden yerelde türetilir (yol kaçışı olmasın)
+ *   - yerel yollar (logo vb.) koda hiç yazılmaz
+ *   - decode() asla fırlatmaz: { ok, recipe, warnings, error }
+ *
+ * Saf ve durumsuz (ES5, UMD): Node 12'de btoa yok, base64 burada elle yazıldı.
+ * style-engine.js'ten ÖNCE yüklenir; captions.js FONTLAR ve genişlik katsayıları buradan okur.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (root) root.SufloStyleShare = api;
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function () {
+  "use strict";
+
+  var ONEK = "SFL1.";
+  var SURUM = 1;
+  var EN_UZUN_GIRDI = 2048;
+  var PAYLASIM_ADRESI = "https://suflo.app/stil";
+  var PAYLASIM_ADRESI_EN = "https://suflo.app/en/stil";
+
+  /*
+   * Yazı tipi seçicisinin kategorileri (3.3 adım 18): Altyazı Efektleri'nin ve Marka Kiti'nin yazı tipi listesi bu
+   * sırayla gruplanır (index.html optgroup'ları; test eşleşmeyi denetler). etiket: optgroup'un görünen adı
+   * (i18n/en.js'te İngilizcesi var; düz "Kalın" sözlükte çubuk kalınlığı "Thick" olarak çevrildiği için ayrı).
+   */
+  var KATEGORILER = [
+    { id: "kalin", ad: "Kalın", etiket: "Kalın · iddialı" },
+    { id: "modern", ad: "Modern", etiket: "Modern · sade" },
+    { id: "zarif", ad: "Zarif", etiket: "Zarif · serif" },
+    { id: "teknik", ad: "Teknik", etiket: "Teknik · fütüristik" }
+  ];
+
+  // Panelle gelen fontlar (Google Fonts, OFL; Türkçe glifler tam). genislik: ortalama
+  // karakter genişliği / punto (satır sığdırma hesabı için kaba katsayı; büyük harfli metnin
+  // ölçülen ortalamasından biraz geniş: satır taşmasın). kategori: seçicideki grup.
+  var FONTS = {
+    "Anton": { file: "Anton.ttf", genislik: 0.47, kategori: "kalin" },
+    "Archivo Black": { file: "ArchivoBlack.ttf", genislik: 0.72, kategori: "kalin" },
+    "Bebas Neue": { file: "BebasNeue.ttf", genislik: 0.43, kategori: "kalin" },
+    "Bungee": { file: "Bungee.ttf", genislik: 0.8, kategori: "kalin" },
+    "Lora": { file: "Lora.ttf", genislik: 0.55, kategori: "zarif" },
+    // statik Bold: libass değişken fontu seçemiyor, DejaVu'ya düşüyordu. normal: "Kalın yazı" kapalıyken
+    // (Altyazı Efektleri) statik Regular; tek ağırlıklı fontlarda libass kalını kendisi üretir
+    "Montserrat": { file: "Montserrat-Bold.ttf", normal: "Montserrat-Regular.ttf", genislik: 0.64, kategori: "modern" },
+    /*
+     * 3.3 adım 18: seçilmiş yeni fontlar (google/fonts, OFL; fonts/OFL-<Aile>.txt). Hepsi tools/font-kontrol.js --az
+     * denetiminden geçti: Türkçe + Azerbaycanca ə / Ə TAM. İki ağırlıklı ailelerde statik Bold + Regular ("Kalın yazı"
+     * kapalıyken Regular; dosyaların iç aile adı anahtarla aynı, libass onunla eşler). surum: fontun geldiği sürüm.
+     * 3.3'ün Stili paylaş'ı her zaman styleId "efekt" yazar; 3.2 paneli efekt kodunu fonttan bağımsız olarak "bu
+     * sürümde yok" diye reddeder. "font" uyarısıyla yalnız fontun düşürülmesi, 3.3 öncesi (eski kimlikli) kodlarda olur.
+     */
+    "Bangers": { file: "Bangers.ttf", genislik: 0.42, kategori: "kalin", surum: "3.3" },
+    "Inter": { file: "Inter-Bold.ttf", normal: "Inter-Regular.ttf", genislik: 0.63, kategori: "modern", surum: "3.3" },
+    "Poppins": { file: "Poppins-Bold.ttf", normal: "Poppins-Regular.ttf", genislik: 0.62, kategori: "modern", surum: "3.3" },
+    "Nunito": { file: "Nunito-Bold.ttf", normal: "Nunito-Regular.ttf", genislik: 0.62, kategori: "modern", surum: "3.3" },
+    "Libre Caslon Display": { file: "LibreCaslonDisplay.ttf", genislik: 0.57, kategori: "zarif", surum: "3.3" },
+    "Exo 2": { file: "Exo2-Bold.ttf", normal: "Exo2-Regular.ttf", genislik: 0.58, kategori: "teknik", surum: "3.3" },
+    "Chakra Petch": { file: "ChakraPetch-Bold.ttf", normal: "ChakraPetch-Regular.ttf", genislik: 0.6, kategori: "teknik", surum: "3.3" }
+  };
+
+  var KONUMLAR = [1, 2, 5, 8];
+  var YOGUNLUK = ["soft", "balanced", "hard"];
+  var KASE = ["normal", "upper", "lower"];
+  // l32 / l42: 3.2'nin kelime zamanından satır modu; c42x2: 2 satır × 42 (eski sürümler c32 / c42 alır)
+  var MAXLEN = /^(w[2-5]|c(32|42|60)|l(32|42)|c42x2|k1|kc)$/;
+  var YAZAR = /^[A-Za-z0-9_.ÇĞİÖŞÜçğıöşü-]{1,32}$/;
+  var STIL_KIMLIGI = /^[a-z0-9_-]{1,24}$/;
+  var RENK = /^#[0-9a-f]{6}$/i;
+  var RENK_ANAHTARLARI = ["renk", "konturRenk", "vurguRenk"];
+  // Altyazı Efektleri: stil motorundaki (js/style-engine.js GIRISLER / AKTIFLER) listeyle aynı; test eşleşmeyi denetler
+  var GIRISLER = ["yok", "pop", "fade", "yukari", "asagi", "zipla"];
+  var AKTIFLER = ["yok", "zipla", "titre", "glitch"];
+  var BAYRAKLAR = ["vurgu", "kalin", "italik"];
+  // Yalnız Altyazı Efektleri'nin (styleId "efekt") okuduğu alanlar: eski stil kimliğiyle gelirse uyarıyla atılır
+  var EFEKT_STILI = "efekt";
+  var EFEKT_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime",
+    "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY"];
+  var ALANLAR = ["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli"].concat(EFEKT_ALANLARI);
+  // Gölge (TranscriptAI şablonunun Drop Shadow kontrolleriyle aynı aralık ve varsayılan): stil motorundaki
+  // GOLGE_VARSAYILAN / ARALIKLAR ile aynı; test eşleşmeyi denetler
+  var GOLGE_VARSAYILAN = { renk: "#000000", opak: 75, mesafe: 5, yumusak: 5 };
+  var GOLGE_ARALIK = { opak: [0, 100], mesafe: [0, 20], yumusak: [0, 30] };
+  var KUTU_OPAK = [0, 100], KONUM_YUZDE = [5, 95];
+
+  function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
+  function hasFont(name) { return typeof name === "string" && own(FONTS, name); }
+  // normal === true: kalın olmayan yüz (ayrı dosyası olan fontta), yoksa fontun tek dosyası
+  function fontFile(name, normal) {
+    if (!hasFont(name)) return null;
+    return normal === true && FONTS[name].normal ? FONTS[name].normal : FONTS[name].file;
+  }
+  function fontNames() { return Object.keys(FONTS); }
+  function fontFiles() {
+    var o = {};
+    fontNames().forEach(function (n) { o[n] = FONTS[n].file; });
+    return o;
+  }
+  function widths() {
+    var o = {};
+    fontNames().forEach(function (n) { o[n] = FONTS[n].genislik; });
+    return o;
+  }
+  /*
+   * Kategorili seçici (3.3 adım 18): [{ id, ad, etiket, fontlar: [ad…] }] KATEGORILER sırasıyla, grup içinde
+   * alfabetik. Boş kategori listelenmez.
+   */
+  function fontGruplari() {
+    return KATEGORILER.map(function (k) {
+      return { id: k.id, ad: k.ad, etiket: k.etiket, fontlar: fontNames().filter(function (n) { return FONTS[n].kategori === k.id; }).sort() };
+    }).filter(function (g) { return g.fontlar.length > 0; });
+  }
+  function fontKategorisi(name) { return hasFont(name) ? FONTS[name].kategori : null; }
+  // Fontun geldiği Suflo sürümü ("3.3"); 3.2'den beri pakette olanlarda null
+  function fontSurumu(name) { return hasFont(name) && FONTS[name].surum ? FONTS[name].surum : null; }
+  // Önizleme / seçici için CSS font-family (paket fontu değilse ""): "Exo 2" gibi rakamla başlayan
+  // kelimeli adlar tırnaksız geçersizdir
+  function cssFontFamily(name) { return hasFont(name) ? "\"" + name + "\", sans-serif" : ""; }
+  function isColor(v) { return typeof v === "string" && RENK.test(v); }
+
+  function sayi(v) {
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    if (typeof v === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(v)) return Number(v);
+    return null;
+  }
+  function kirp(n, a, b) { return Math.max(a, Math.min(b, Math.round(n))); }
+
+  /*
+   * İnce ayar değerlerini doğrula. Geçersiz değer atılır (stilin kendi değeri kalır),
+   * aralık dışı sayı kırpılır. uyarilar (dizi) verilirse atılan / kırpılan alanlar yazılır.
+   * Dönen nesnede yalnız: font + fontFile, renk, konturRenk, vurguRenk, boyut, kontur, konum, guvenli
+   * ve Altyazı Efektleri alanları (giris, aktif, vurgu, kalin, italik, satir, kelime, golge, kutu, kutuRenk,
+   * kutuOpak, konumX, konumY). giris / aktif "" (stilin kendi değeri) uyarısız atlanır; golge / konumX /
+   * konumY null (gölge yok / hazır konum) olduğu gibi kalır.
+   */
+  function sanitizeOverrides(o, uyarilar) {
+    var out = {};
+    function uyar(m) { if (uyarilar && uyarilar.push) uyarilar.push(m); }
+    if (o === null || typeof o !== "object" || o instanceof Array) return out;
+    if (own(o, "font")) {
+      if (hasFont(o.font)) { out.font = o.font; out.fontFile = FONTS[o.font].file; }
+      else uyar("font");
+    }
+    RENK_ANAHTARLARI.forEach(function (k) {
+      if (!own(o, k)) return;
+      if (isColor(o[k])) out[k] = o[k].toLowerCase();
+      else uyar(k);
+    });
+    if (own(o, "boyut")) {
+      var b = sayi(o.boyut);
+      if (b === null) uyar("boyut");
+      else { out.boyut = kirp(b, 36, 180); if (out.boyut !== b) uyar("boyut"); }
+    }
+    if (own(o, "kontur")) {
+      var k = sayi(o.kontur);
+      if (k === null) uyar("kontur");
+      else { out.kontur = kirp(k, 0, 16); if (out.kontur !== k) uyar("kontur"); }
+    }
+    if (own(o, "konum")) {
+      var p = sayi(o.konum);
+      if (p !== null && KONUMLAR.indexOf(p) !== -1) out.konum = p;
+      else uyar("konum");
+    }
+    if (own(o, "guvenli")) {
+      if (typeof o.guvenli === "boolean") out.guvenli = o.guvenli;
+      else uyar("guvenli");
+    }
+    [["giris", GIRISLER], ["aktif", AKTIFLER]].forEach(function (g) {
+      if (!own(o, g[0]) || o[g[0]] === "") return;
+      if (g[1].indexOf(o[g[0]]) !== -1) out[g[0]] = o[g[0]];
+      else uyar(g[0]);
+    });
+    BAYRAKLAR.forEach(function (k) {
+      if (!own(o, k)) return;
+      if (typeof o[k] === "boolean") out[k] = o[k];
+      else uyar(k);
+    });
+    [["satir", 1, 3], ["kelime", 1, 10], ["kutuOpak", KUTU_OPAK[0], KUTU_OPAK[1]],
+      ["konumX", KONUM_YUZDE[0], KONUM_YUZDE[1]], ["konumY", KONUM_YUZDE[0], KONUM_YUZDE[1]]].forEach(function (a) {
+      if (!own(o, a[0])) return;
+      if (o[a[0]] === null && (a[0] === "konumX" || a[0] === "konumY")) { out[a[0]] = null; return; }
+      var n = sayi(o[a[0]]);
+      if (n === null) { uyar(a[0]); return; }
+      out[a[0]] = kirp(n, a[1], a[2]);
+      if (out[a[0]] !== n) uyar(a[0]);
+    });
+    if (own(o, "kutu")) {
+      if (typeof o.kutu === "boolean") out.kutu = o.kutu;
+      else uyar("kutu");
+    }
+    if (own(o, "kutuRenk")) {
+      if (isColor(o.kutuRenk)) out.kutuRenk = o.kutuRenk.toLowerCase();
+      else uyar("kutuRenk");
+    }
+    if (own(o, "golge")) {
+      var g = o.golge;
+      if (g === null || g === false) out.golge = null;
+      else if (typeof g !== "object" || g instanceof Array) uyar("golge");
+      else {
+        // eksik alan şablonun varsayılanı; bozuk alan uyarıyla varsayılana, aralık dışı sayı kırpılır
+        var gt = { renk: GOLGE_VARSAYILAN.renk, opak: GOLGE_VARSAYILAN.opak, mesafe: GOLGE_VARSAYILAN.mesafe, yumusak: GOLGE_VARSAYILAN.yumusak };
+        if (own(g, "renk")) { if (isColor(g.renk)) gt.renk = g.renk.toLowerCase(); else uyar("golge.renk"); }
+        ["opak", "mesafe", "yumusak"].forEach(function (k) {
+          if (!own(g, k)) return;
+          var n = sayi(g[k]);
+          if (n === null) { uyar("golge." + k); return; }
+          gt[k] = kirp(n, GOLGE_ARALIK[k][0], GOLGE_ARALIK[k][1]);
+          if (gt[k] !== n) uyar("golge." + k);
+        });
+        Object.keys(g).forEach(function (k) { if (["renk", "opak", "mesafe", "yumusak"].indexOf(k) === -1) uyar("golge." + k); });
+        out.golge = gt;
+      }
+    }
+    Object.keys(o).forEach(function (key) {
+      // fontFile de uyarı sayılır: girdiden ASLA alınmaz, yazı tipinden türetilir
+      if (ALANLAR.indexOf(key) === -1) uyar(key);
+    });
+    return out;
+  }
+
+  /* ---------------- base64url (UTF-8) ---------------- */
+  var ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+  function b64urlEncode(str) {
+    var bin = unescape(encodeURIComponent(String(str)));
+    var out = "", i;
+    for (i = 0; i + 2 < bin.length; i += 3) {
+      var n = (bin.charCodeAt(i) << 16) | (bin.charCodeAt(i + 1) << 8) | bin.charCodeAt(i + 2);
+      out += ABC.charAt((n >> 18) & 63) + ABC.charAt((n >> 12) & 63) + ABC.charAt((n >> 6) & 63) + ABC.charAt(n & 63);
+    }
+    var kalan = bin.length - i;
+    if (kalan === 1) {
+      var a = bin.charCodeAt(i) << 16;
+      out += ABC.charAt((a >> 18) & 63) + ABC.charAt((a >> 12) & 63);
+    } else if (kalan === 2) {
+      var c = (bin.charCodeAt(i) << 16) | (bin.charCodeAt(i + 1) << 8);
+      out += ABC.charAt((c >> 18) & 63) + ABC.charAt((c >> 12) & 63) + ABC.charAt((c >> 6) & 63);
+    }
+    return out;
+  }
+
+  // Geçersizse null (fırlatmaz)
+  function b64urlDecode(s) {
+    if (typeof s !== "string" || !/^[A-Za-z0-9_-]*$/.test(s) || s.length % 4 === 1) return null;
+    var bin = "", bits = 0, deger = 0;
+    for (var i = 0; i < s.length; i++) {
+      deger = (deger << 6) | ABC.indexOf(s.charAt(i));
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        bin += String.fromCharCode((deger >> bits) & 255);
+        deger &= (1 << bits) - 1;
+      }
+    }
+    try { return decodeURIComponent(escape(bin)); } catch (e) { return null; }
+  }
+
+  function validAuthor(a) { return typeof a === "string" && YAZAR.test(a); }
+
+  // Paylaşılacak tarifin temiz hâli (encode ile decode aynı kuralı kullanır)
+  function metinTemiz(t, uyar) {
+    var out = {};
+    if (t === null || typeof t !== "object" || t instanceof Array) return out;
+    if (own(t, "maxlen")) { if (typeof t.maxlen === "string" && MAXLEN.test(t.maxlen)) out.maxlen = t.maxlen; else uyar("text.maxlen"); }
+    if (own(t, "kase")) { if (KASE.indexOf(t.kase) !== -1) out.kase = t.kase; else uyar("text.kase"); }
+    if (own(t, "punct")) { if (typeof t.punct === "boolean") out.punct = t.punct; else uyar("text.punct"); }
+    return out;
+  }
+
+  /*
+   * r: { styleId, intensity?, overrides?, text?: { maxlen, kase, punct }, author? }
+   * Döner: "SFL1.…". Geçersiz stil kimliği hata fırlatır (arayüz yalnız motor stiliyle çağırır).
+   * Geçersiz yazar adı koda yazılmaz; fontFile ve tanınmayan alanlar (logo yolu vb.) hiç yazılmaz.
+   */
+  function encode(r) {
+    r = r || {};
+    if (typeof r.styleId !== "string" || !STIL_KIMLIGI.test(r.styleId)) throw new Error("Stil kimliği geçersiz.");
+    var yok = function () {};
+    var ov = sanitizeOverrides(r.overrides || {});
+    delete ov.fontFile;
+    if (r.styleId !== EFEKT_STILI) EFEKT_ALANLARI.forEach(function (k) { delete ov[k]; });
+    var obj = { v: SURUM, styleId: r.styleId };
+    if (YOGUNLUK.indexOf(r.intensity) !== -1) obj.intensity = r.intensity;
+    if (Object.keys(ov).length) obj.overrides = ov;
+    var t = metinTemiz(r.text, yok);
+    if (Object.keys(t).length) obj.text = t;
+    if (validAuthor(r.author)) obj.author = r.author;
+    return ONEK + b64urlEncode(JSON.stringify(obj));
+  }
+
+  function izinli(liste, id) {
+    if (!liste) return STIL_KIMLIGI.test(id);
+    if (typeof liste === "function") return !!liste(id);
+    if (liste instanceof Array) return liste.indexOf(id) !== -1;
+    return own(liste, id);
+  }
+
+  function hata(mesaj) { return { ok: false, recipe: null, warnings: [], error: mesaj }; }
+
+  /*
+   * Kodu çöz. Girdi tam paylaşım bağlantısı da olabilir (…/stil#SFL1.…); boşluk ve satır
+   * sonları (yapıştırırken bölünen kod) yok sayılır. izinliStiller: dizi, { id: … } ya da işlev.
+   * Döner: { ok, recipe: { styleId, intensity?, overrides, text, author? }, warnings: [alan], error? }
+   */
+  function decode(code, izinliStiller) {
+    try {
+      if (typeof code !== "string") return hata("Stil kodu boş.");
+      if (code.length > EN_UZUN_GIRDI) return hata("Stil kodu çok uzun.");
+      var s = code.replace(/\s+/g, "");
+      var kare = s.lastIndexOf("#");
+      if (kare !== -1) s = s.slice(kare + 1);
+      if (!s) return hata("Stil kodu boş.");
+      if (s.indexOf(ONEK) !== 0) return hata("Bu bir Suflo stil kodu değil (SFL1. ile başlamalı).");
+      var json = b64urlDecode(s.slice(ONEK.length));
+      if (json === null) return hata("Stil kodu bozuk; eksik kopyalanmış olabilir.");
+      var obj;
+      try { obj = JSON.parse(json); } catch (eJ) { return hata("Stil kodu bozuk; eksik kopyalanmış olabilir."); }
+      if (obj === null || typeof obj !== "object" || obj instanceof Array) return hata("Stil kodu bozuk; eksik kopyalanmış olabilir.");
+      if (own(obj, "v") && typeof obj.v === "number" && obj.v > SURUM) return hata("Bu kod daha yeni bir Suflo sürümüyle yapılmış; Suflo'yu güncelle.");
+      var id = own(obj, "styleId") ? obj.styleId : null;
+      if (typeof id !== "string" || !STIL_KIMLIGI.test(id) || !izinli(izinliStiller, id)) {
+        // Geçerli biçimde ama tanınmayan kimlik: büyük olasılıkla daha yeni bir sürümün stili
+        return hata(typeof id === "string" && STIL_KIMLIGI.test(id) ? "Bu stil bu Suflo sürümünde yok: " + id + ". Suflo'yu güncelle." : "Bu stil bu Suflo sürümünde yok.");
+      }
+      var author = own(obj, "author") ? obj.author : undefined;
+      if (author !== undefined && author !== null && author !== "" && !validAuthor(author)) return hata("Stil kodundaki yazar adı geçersiz.");
+      var uyarilar = [];
+      var uyar = function (m) { uyarilar.push(m); };
+      var recipe = { styleId: id, overrides: {}, text: {} };
+      if (own(obj, "intensity")) {
+        if (YOGUNLUK.indexOf(obj.intensity) !== -1) recipe.intensity = obj.intensity;
+        else uyar("intensity");
+      }
+      recipe.overrides = sanitizeOverrides(own(obj, "overrides") ? obj.overrides : {}, uyarilar);
+      // Giriş / vurgu animasyonu, satır, kelime… yalnız Altyazı Efektleri'nde çizilir: eski stil kimliğiyle
+      // gelen kod uyarısız "geçerli" görünüp animasyonsuz çizilmesin
+      if (id !== EFEKT_STILI) EFEKT_ALANLARI.forEach(function (k) { if (own(recipe.overrides, k)) { delete recipe.overrides[k]; uyar(k); } });
+      recipe.text = metinTemiz(own(obj, "text") ? obj.text : {}, uyar);
+      if (validAuthor(author)) recipe.author = author;
+      Object.keys(obj).forEach(function (k) {
+        if (["v", "styleId", "intensity", "overrides", "text", "author"].indexOf(k) === -1) uyar(k);
+      });
+      return { ok: true, recipe: recipe, warnings: uyarilar };
+    } catch (e) {
+      return hata("Stil kodu okunamadı.");
+    }
+  }
+
+  // Paylaşım bağlantısı: kod # ile (sunucuya gitmez, günlüğe düşmez). lang "en": İngilizce sayfa (/en/stil)
+  function shareUrl(code, lang) { return (lang === "en" ? PAYLASIM_ADRESI_EN : PAYLASIM_ADRESI) + "#" + code; }
+
+  return {
+    PREFIX: ONEK,
+    VERSION: SURUM,
+    MAX_INPUT: EN_UZUN_GIRDI,
+    SHARE_BASE: PAYLASIM_ADRESI,
+    FONTS: FONTS,
+    KATEGORILER: JSON.parse(JSON.stringify(KATEGORILER)),
+    GIRISLER: GIRISLER.slice(),
+    AKTIFLER: AKTIFLER.slice(),
+    EFEKT_ALANLARI: EFEKT_ALANLARI.slice(),
+    GOLGE_VARSAYILAN: JSON.parse(JSON.stringify(GOLGE_VARSAYILAN)),
+    ARALIKLAR: { golgeOpak: GOLGE_ARALIK.opak.slice(), golgeMesafe: GOLGE_ARALIK.mesafe.slice(), golgeYumusak: GOLGE_ARALIK.yumusak.slice(),
+      kutuOpak: KUTU_OPAK.slice(), konum: KONUM_YUZDE.slice() },
+    hasFont: hasFont,
+    fontFile: fontFile,
+    fontNames: fontNames,
+    fontFiles: fontFiles,
+    widths: widths,
+    fontGruplari: fontGruplari,
+    fontKategorisi: fontKategorisi,
+    fontSurumu: fontSurumu,
+    cssFontFamily: cssFontFamily,
+    isColor: isColor,
+    validAuthor: validAuthor,
+    sanitizeOverrides: sanitizeOverrides,
+    b64urlEncode: b64urlEncode,
+    b64urlDecode: b64urlDecode,
+    encode: encode,
+    decode: decode,
+    shareUrl: shareUrl
+  };
+});

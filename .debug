@@ -3,6 +3,7 @@
   <Extension Id="com.sametcreates.kesit.panel">
     <HostList>
       <Host Name="PPRO" Port="8092"/>
+      <Host Name="AEFT" Port="8093"/>
     </HostList>
   </Extension>
 </ExtensionList>

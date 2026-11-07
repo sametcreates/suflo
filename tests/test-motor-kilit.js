@@ -15,6 +15,9 @@ var gecen = 0, toplam = 0;
 function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 260) + "]" : "")); }
 
 var MB = 1048576;
+// Sahte indiricinin bıraktığı motor arşivinin içeriği (engine.js arşivi açmadan önce SHA-256'sını denetler)
+var SAHTE_ARSIV = Buffer.from("sahte motor arsivi");
+var SAHTE_OZET = require("crypto").createHash("sha256").update(SAHTE_ARSIV).digest("hex");
 function motor(opts) {
   opts = opts || {};
   var vfs = {};                 // yol -> boyut (dizinler: -1)
@@ -36,7 +39,16 @@ function motor(opts) {
       return { size: dizinMi(p) ? 0 : vfs[p], isDirectory: function () { return dizinMi(p); } };
     },
     unlinkSync: function (p) { delete vfs[p]; },
-    chmodSync: function () {}
+    chmodSync: function () {},
+    createReadStream: function (p) {
+      var h = {};
+      setTimeout(function () {
+        if (!Object.prototype.hasOwnProperty.call(vfs, p)) { if (h.error) h.error(new Error("ENOENT " + p)); return; }
+        if (h.data) h.data(SAHTE_ARSIV);
+        if (h.end) h.end();
+      }, 1);
+      return { on: function (e, f) { h[e] = f; return this; } };
+    }
   };
   var K = {
     nodeOK: true, MAC: false, path: path, fs: sfs, os: { arch: function () { return "x64"; } },
@@ -87,6 +99,9 @@ function motor(opts) {
     require: require, process: { env: {}, platform: "win32" }, console: console };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "js", "engine.js"), "utf8"), ctx);
+  // Kilit testleri sahte arşivle: sabit özet sahte içeriğinkiyle değişir (doğrulama yine çalışır).
+  // opts.gercekOzet: v1.9.1'in gerçek özetleri kalır, sahte arşiv uyuşmaz
+  if (!opts.gercekOzet) { ctx.window.KEngine._BUILDS.cpu.sha256 = SAHTE_OZET; ctx.window.KEngine._BUILDS.cuda.sha256 = SAHTE_OZET; }
   return { E: ctx.window.KEngine, vfs: vfs, indirmeler: indirmeler, ayarlar: ayarlar, ffAranma: function () { return ffAranma; } };
 }
 
@@ -326,6 +341,20 @@ Promise.all([a, b]).then(function (r) {
     ok("küçük dosya: installModel 'indirildi ama doğrulanamadı' ile reddedilir, dosya silinir, Turbo kurulu değil",
       e && /Turbo indirildi ama doğrulanamadı/.test(e.message) && !Object.prototype.hasOwnProperty.call(m18.vfs, turboYolu) &&
       !m18.E.installedModels().some(function (x) { return x.id === "turbo"; }), e && e.message);
+  });
+}).then(function () {
+  // Pro denetimi: whisper.cpp arşivi sabit SHA-256'yla uyuşmazsa AÇILMAZ, silinir, derleme kaydedilmez
+  var acildi19 = false;
+  var m19 = motor({ gercekOzet: true, ffmpeg: true, ayarlar: { provider: "local" }, unzip: function () { acildi19 = true; return Promise.resolve(true); },
+    // kurulu motor açılmıyor (0xC0000135): yeniden indirilir
+    run: function (exe, args) { return Promise.resolve(/whisper-cli/.test(exe) && args && args[0] === "-h" && !acildi19 ? { code: -1073741515, stdout: "", stderr: "" } : { code: 0, stdout: "", stderr: "" }); } });
+  m19.vfs[path.join("/sanal/whisper", "models", "ggml-small-q5_1.bin")] = 200 * MB;
+  return m19.E.install({ modelId: "small", useGpu: false }).then(function () {
+    ok("uyuşmayan motor arşivi kurulmamalı", false);
+  }, function (e) {
+    ok("motor arşivi özeti uyuşmuyor: açılmaz, silinir, 'doğrulanamadı' hatası, derleme kaydedilmez",
+      e && /Motor arşivi doğrulanamadı/.test(e.message) && !acildi19 && !Object.prototype.hasOwnProperty.call(m19.vfs, path.join("/sanal/whisper", "engine-cpu.zip")) &&
+      m19.ayarlar.engineBuild === undefined && m19.E.kurulumSuruyor() === false, e && e.message);
   });
 }).then(function () {
   console.log(gecen + "/" + toplam + " gecti");

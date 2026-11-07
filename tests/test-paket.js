@@ -8,6 +8,9 @@ function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "F
 var DOM = { "cap-case": { value: "upper" }, "cap-punct": { checked: true } };
 var M = new Function("DOM", [
   "function el(id) { return DOM[id]; }",
+  // paketSrt "Küfürleri maskele"yi uygular (ayar kapalı: metin aynen; maske testleri test-kufur-maske.js'te)
+  "var K = { settings: function () { return {}; } }, window = {};",
+  kes("function kufurMaskesiAcik("), kes("function kufurMaskele("),
   kes("function tc(sec, comma)"), kes("function paketZamanlari("), kes("function paketStil("), kes("function paketSrt("),
   "return { z: paketZamanlari, srt: paketSrt, stil: paketStil };"].join("\n"))(DOM);
 var liste = [{ start: 0, end: 0.1, text: "kısa" }, { start: 0.5, end: 2, text: "" }, { start: 1, end: 3, text: "iki" }, { start: 2.5, end: 4, text: "üç" }];

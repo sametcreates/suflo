@@ -44,7 +44,12 @@ var tekdüze = dizi[9].every(function (s) {
 ok("Kelime zamanları kart içinde ve artan", tekdüze, JSON.stringify(dizi[9].map(function (s) { return s[3]; })));
 ok("*Vurgu* işaretleri ayıklanır, sayısı vurguKaybi'nde", dizi[9][0][2].indexOf("*") === -1 && /önemli/.test(dizi[9][0][2]) && r.vurguKaybi === 1, dizi[9][0][2] + " / " + r.vurguKaybi);
 ok("Tırnak ve ters bölü JSON içinde kaçırılır, geri okununca aynı", dizi[9][1][2].replace(/\n/g, " ") === "ikinci \"satır\" burada\\ok" && /\\\\ok/.test(p0.json) && /\\"satır\\"/.test(p0.json), p0.json);
-ok("Kart içi satır kırılımı \\n (önizlemeyle aynı 2 satır)", /\n/.test(dizi[9][0][2]) && p0.json.indexOf("\n") === -1, JSON.stringify(dizi[9][0][2]));
+// Kalite motoru: satır sayısı üst sınır. Kadrajsız (1920 × 1080 varsayımı) kart tek satıra sığar; 9:16'da önizleme gibi 2 satır
+var dizi916 = JSON.parse(CMJ.build(cues, ayar, { cueKind: "lines", fps: 25, kadraj: { w: 1080, h: 1920 } }).parcalar[0].json);
+var kart916 = SE.efektSatirlari({ cues: cues, cueKind: "lines" }, AE.overrides(ayar), { width: 1080, height: 1920 })[0];
+var bekle916 = kart916.kelimeler.map(function (w, i) { return (i === 0 ? "" : kart916.kir.indexOf(i) !== -1 ? "\n" : " ") + w.text; }).join("");
+ok("Kart içi satır kırılımı \\n (önizlemeyle aynı 2 satır)", /\n/.test(dizi916[9][0][2]) && dizi916[9][0][2] === bekle916 && !/\n/.test(dizi[9][0][2]) &&
+  p0.json.indexOf("\n") === -1, JSON.stringify([dizi[9][0][2], dizi916[9][0][2], bekle916]));
 
 // Kartlar önizlemenin kartlarıyla aynı (stil motorunun efektSatirlari)
 var kartlar = SE.efektSatirlari({ cues: cues, cueKind: "lines" }, AE.overrides(ayar));
@@ -190,10 +195,14 @@ var ypA = yerelPlan(glitch, [{ start: 0, end: 2, text: kartG }], 1080, 1920, { f
 var dA = JSON.parse(ypA.plan.parcalar[0].json);
 ok("Font Arial'a düşerse (kurulu değil) Arial'ın genişliğiyle sığdırılır (" + CMJ.ARIAL_GENISLIK + "; Bebas'tan küçük punto)",
   dA[2] === "Arial-BoldMT" && dA[3] < dG[3] && kartG.length * dA[3] * ypA.s * CMJ.ARIAL_GENISLIK * 1.08 <= 0.88 * 1080 + 1e-6, JSON.stringify([dA[3], dG[3]]));
-var ypGv = yerelPlan(glitch, [{ start: 0, end: 2, text: kartG }], 1080, 1920, { guvenli: true });
+// Kalite motoru: güvenli alanda tek başına sığmayan "Abonelerimizden" kendi kartına geçer; kelimeleri sığan kartla denenir
+var kartGv = "Gelen bütün sorulara";
+var dG2 = JSON.parse(yerelPlan(glitch, [{ start: 0, end: 2, text: kartGv }], 1080, 1920).plan.parcalar[0].json);
+var ypGv = yerelPlan(glitch, [{ start: 0, end: 2, text: kartGv }], 1080, 1920, { guvenli: true });
 var dGv = JSON.parse(ypGv.plan.parcalar[0].json);
 ok("'Platform arayüzünden kaçın' (9:16): kadrajın %74'üne sığdırılır, önizlemenin puntosuyla aynı",
-  Math.abs(dGv[3] * ypGv.s - previewFs(glitch, kartG, 1080, 1920, true)) < 0.11 && dGv[3] < dG[3], JSON.stringify([dGv[3], previewFs(glitch, kartG, 1080, 1920, true)]));
+  Math.abs(dGv[3] * ypGv.s - previewFs(glitch, kartGv, 1080, 1920, true)) < 0.11 && dGv[3] < dG2[3] && dGv[9].length === 1,
+  JSON.stringify([dGv[3], dG2[3], previewFs(glitch, kartGv, 1080, 1920, true)]));
 ok("Kadraj verilmezse punto eskisi gibi ayarınki (boyut × punto çarpanı)", JSON.parse(CMJ.build([{ start: 0, end: 2, text: kartG }], glitch, { cueKind: "lines" }).parcalar[0].json)[3] === 118);
 
 // Stil motorunun kart puntosu önizlemenin \fs'i ile aynı (tek kaynak: efektSigdir)
@@ -208,6 +217,17 @@ var tekKaynak = AE.GORUNUMLER.every(function (g) {
   });
 });
 ok("efektSatirlari(kadraj).fs = önizlemenin \\fs'i (her görünüm, 9:16 / 16:9 / 4:5)", tekKaynak);
+// Kalite motoru: o.dil kartları önizlemeyle (compile options.dil) aynı dilde kırar; AE planı da aynı kartları alır
+var dilCues = [{ start: 0, end: 2, text: "Sen bunu yapabilir misin acaba" }];
+var dilAyar = AE.normalize({ kelime: 4, satir: 1, giris: "yok" });
+function kartMetni(dil) { return CMJ.satirlar(dilCues, dilAyar, { cueKind: "lines", dil: dil }).map(function (x) { return x.text; }).join("|"); }
+function onizlemeKart(dil) {
+  return SE.compile({ styleId: "efekt", cues: dilCues, cueKind: "lines", width: 1920, height: 1080, dil: dil, overrides: Object.assign(AE.overrides(dilAyar), { vurgu: false }) }).ass
+    .split("\n").filter(function (l) { return /^Dialogue: 1,/.test(l); }).map(function (l) { return l.replace(/^.*\}/, ""); }).join("|");
+}
+ok("satirlar / build o.dil: kartlar önizlemenin compile(dil)'iyle aynı (tr: soru eki kart başında değil; de: yalnız denge)",
+  kartMetni("tr") === "Sen bunu|yapabilir misin acaba" && kartMetni("de") === "Sen bunu yapabilir|misin acaba" && kartMetni() === kartMetni("tr") &&
+  onizlemeKart("tr") === kartMetni("tr") && onizlemeKart("de") === kartMetni("de"), JSON.stringify([kartMetni("tr"), kartMetni("de"), onizlemeKart("de")]));
 
 // Her görünüm × kadraj × güvenli alan × font yedeği: her kartın en uzun satırı × ekrandaki punto × genişlik ≤ %88 alan
 var uzunMetin = "Merhaba arkadaşlar bugün sizlere abonelerimizden gelen sorulara cevap vereceğim. Öncelikle şunu söylemek istiyorum " +
@@ -222,15 +242,22 @@ AE.GORUNUMLER.forEach(function (g) {
     [false, true].forEach(function (guv) {
       [false, true].forEach(function (arial) {
         var yp = yerelPlan(a, uzunCues, wh[0], wh[1], { guvenli: guv, font: arial ? "Arial-BoldMT" : "" });
-        var kartFs = SE.efektSatirlari({ cues: uzunCues, cueKind: "lines" }, guv ? Object.assign(AE.overrides(a), { guvenli: true }) : AE.overrides(a),
-          { width: wh[0], height: wh[1], genislik: arial ? CMJ.ARIAL_GENISLIK : 0 }).map(function (k) { return k.fs; });
+        var kartlarS = SE.efektSatirlari({ cues: uzunCues, cueKind: "lines" }, guv ? Object.assign(AE.overrides(a), { guvenli: true }) : AE.overrides(a),
+          { width: wh[0], height: wh[1], genislik: arial ? CMJ.ARIAL_GENISLIK : 0 });
+        // uzun kelime kartı: önizlemede \fscx ile sıkışır, şablon aynı genişliği küçük puntoyla verir (k.sx)
+        var kartFs = kartlarS.map(function (k) { return k.sx ? Math.floor(k.fs * k.sx / 100) : k.fs; });
+        /*
+         * Kalite motoru: tabanda (en büyük(30 px, %55)) ve %85 sıkıştırmada da tahminen sığmayan uzun kelime kartı taşma
+         * riskini kabul eder (style-engine.js efektOlcegi); bu kartlar sığma denetiminin dışında, punto denetiminde
+         */
+        var tabanda = kartlarS.map(function (k) { return k.sx === 85 && k.kelimeler.length === 1; });
         var alan = guv && wh[1] > wh[0] * 1.2 ? Math.round(wh[0] * 0.74) : wh[0];
         var k = arial ? CMJ.ARIAL_GENISLIK : genislikler[a.font], kartNo = 0;
         yp.plan.parcalar.forEach(function (p) {
           var d = JSON.parse(p.json), ekran = d[3] * yp.s;
           d[9].forEach(function (s) {
             var enUzun = Math.max.apply(null, s[2].split("\n").map(function (l) { return l.length; }));
-            if (enUzun * ekran * k * 1.08 > 0.88 * alan + 1e-6) tasan.push([g.id, wh.join("x"), guv, arial, s[2], d[3], yp.s]);
+            if (enUzun * ekran * k * 1.08 > 0.88 * alan + 1e-6 && !tabanda[kartNo]) tasan.push([g.id, wh.join("x"), guv, arial, s[2], d[3], yp.s]);
             // Hiçbir kart önizlemedeki puntosunun %90'ından küçük, hiçbiri büyük değil (0,1 px yuvarlama payı)
             var onizleme = kartFs[kartNo++];
             if (ekran < onizleme * CMJ.PUNTO_ORANI - 0.1 * yp.s - 1e-6 || ekran > onizleme + 0.5 * yp.s + 1e-6) kucuk.push([g.id, wh.join("x"), guv, arial, s[2], ekran, onizleme]);
@@ -445,7 +472,7 @@ function yerelUi(pro, o) {
   dom["cap-efekt-cikti"].value = "yerel";
   dom["cap-yerel-font-not"].hidden = true;
   var f = new Function("el", "CMJ", "AE", "Pro", "window", "AYAR", "KURULU", "BEKLEYEN",
-    "var secilenMogrt = null, secilenMotorStili = 'efekt', EFEKT = 'efekt', kaliteOnayBekleyen = '';\n" +
+    "var secilenMogrt = null, secilenMotorStili = 'efekt', EFEKT = 'efekt', kaliteOnayBekleyen = '', katmanIptal = null, katmanHazirlaniyor = false;\n" +
     "var yerelBekleyenFontlar = BEKLEYEN;\n" +
     "function efektAyari() { return AE.normalize(AYAR); }\n" +
     "function sistemFontDosyalari() { return KURULU; }\n" +
@@ -583,7 +610,9 @@ ok("Yerleşim kartın payıyla (ayar) hesaplanır; font seçimi bu oturumda kuru
 ok("Satır sığdırma: build sekansın kadrajını ve 'Platform arayüzünden kaçın'ı (konumla aynı seçim) alır, font yedeği o.font'tan",
   /var guvenliYer = !!\(el\("cap-guvenli-yerlesim"\) && el\("cap-guvenli-yerlesim"\)\.checked\);/.test(uyg) &&
   /AE\.sablonKonumu\(ayar, \{ w: w, h: h, guvenli: guvenliYer,/.test(uyg) &&
-  /CMJ\.build\(cs, ayar, \{ cueKind: tur, fps: probe\.fps, font: fontSec\.ps, punto: yer\.punto, bayt: kademeler\[ki\],\s*kadraj: \{ w: w, h: h, guvenli: guvenliYer \} \}\)/.test(uyg));
+  /CMJ\.build\(cs, ayar, \{ cueKind: tur, fps: probe\.fps, font: fontSec\.ps, punto: yer\.punto, bayt: kademeler\[ki\],\s*kadraj: \{ w: w, h: h, guvenli: guvenliYer \}, dil: kirilimDili\(\) \}\)/.test(uyg) &&
+  // kalite motoru: kartlar önizlemeyle aynı dilde kırılır (konum örneği de aynı dili taşır)
+  /ornek: \{ cues: cs, cueKind: tur, dil: kirilimDili\(\) \}/.test(uyg));
 ok("Font kurulumu önbelleği tazelemez (Premiere yeni fontu yeniden başlayınca görür); yeni kopyalananlar bekleyen listesine",
   !/yerelFontOnbellek = null/.test(kur) && /if \(yeni\) yerelBekleyenFontlar\.push\(K\.path\.basename\(adim\.hedef\)\)/.test(kur));
 

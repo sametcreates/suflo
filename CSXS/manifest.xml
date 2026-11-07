@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<ExtensionManifest ExtensionBundleId="com.sametcreates.kesit" ExtensionBundleName="Suflo" ExtensionBundleVersion="3.4.2" Version="11.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ExtensionManifest ExtensionBundleId="com.sametcreates.kesit" ExtensionBundleName="Suflo" ExtensionBundleVersion="3.5.0" Version="11.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.sametcreates.kesit.panel" Version="3.4.2"/>
+    <Extension Id="com.sametcreates.kesit.panel" Version="3.5.0"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
       <!-- Alt sınır CEP 10 (Premiere 14.4): panelin ihtiyaç duyduğu Chromium 74 + Node 12
            ilk burada geliyor. CEP 9 (CC 2019) hostlarında modüller ayrıştırılamıyor. -->
       <Host Name="PPRO" Version="[14.4,99.9]"/>
+      <!-- After Effects (deneysel): yalnız altyazı araçları, metin katmanı olarak (js/ae-panel.js, jsx/host-ae.jsx).
+           17.0 = AE 2020; panel yine CSXS 10 ister (aşağıdaki RequiredRuntime), CEP 10'suz sürümde yüklenmez.
+           Gerçek After Effects'te henüz denenmedi. -->
+      <Host Name="AEFT" Version="[17.0,99.9]"/>
     </HostList>
     <LocaleList>
       <Locale Code="All"/>

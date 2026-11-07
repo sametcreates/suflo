@@ -571,7 +571,11 @@ window.KLibraryHealth = (function () {
     if (!presetItems.length) {
       addCheck(report, "bad", "Preset paketi manifestte yok", "Pro presetleri eşitlenmeli.", "sync-pro", "pro");
     } else {
-      var presetFile = K.path.join(root, String(presetItems[0].path).replace(/\//g, K.path.sep));
+      // Denetlenen paket Suflo Smooth (KPresets.packs()[0].file): başka bir .prfpset alfabede önce gelse de o seçilir
+      var paketAdi = "";
+      try { paketAdi = window.KPresets && KPresets.packs ? String(KPresets.packs()[0].file || "") : ""; } catch (eN) {}
+      var paketKaydi = presetItems.filter(function (item) { return paketAdi && String(item.path).split("/").pop().toLowerCase() === paketAdi.toLowerCase(); })[0] || presetItems[0];
+      var presetFile = K.path.join(root, String(paketKaydi.path).replace(/\//g, K.path.sep));
       try {
         if (!window.SufloPresetPack) throw new Error("preset okuyucu yüklenmedi");
         var parsed = SufloPresetPack.parse(K.fs.readFileSync(presetFile, "utf8"));

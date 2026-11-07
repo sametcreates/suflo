@@ -1,4 +1,4 @@
-/* Ucretsiz kullanici 17 gercek altyazi stilini dosyalari satin almadan gorur. */
+/* Ucretsiz kullanici 31 gercek altyazi stilini (17 + 14 AutoCaptions) dosyalari satin almadan gorur. */
 "use strict";
 
 var fs = require("fs"), path = require("path");
@@ -23,11 +23,18 @@ var videos = files.filter(function (f) { return /\.webm$/i.test(f); });
 var keys = {};
 catalog.items.forEach(function (item) { keys[String(item.styleKey).toLowerCase()] = 1; });
 
-ok("Vitrin tam 17 benzersiz altyazi stili tasir",
-  catalog.styleCount === 17 && catalog.items.length === 17 && Object.keys(keys).length === 17,
+ok("Vitrin tam 31 benzersiz altyazi stili tasir (17 + 14 AutoCaptions)",
+  catalog.styleCount === 31 && catalog.items.length === 31 && Object.keys(keys).length === 31 && catalog.fileCount === 65,
   "katalog=" + catalog.items.length);
+// AutoCaptions (ClashiVFX, yazarin izniyle; tools/build-autocaptions-showcase.js): Pro paketindeki
+// "SUFLO MOGRT - AutoCaptions <Ad>.mogrt" dosyasinin panel adi styleKey'dir, gercek kartla vitrin karti tekillesir
+var ac = catalog.items.filter(function (item) { return item.collection === "AutoCaptions"; });
+ok("AutoCaptions: 14 vitrin karti katalogun sonunda, ad = styleKey = \"AutoCaptions <Ad>\"",
+  ac.length === 14 && catalog.items.slice(-14).every(function (item) { return item.collection === "AutoCaptions"; }) &&
+  ac.every(function (item) { return /^AutoCaptions [A-Z]/.test(item.name) && item.styleKey === item.name && item.category === "Subtitle Style"; }),
+  ac.map(function (item) { return item.name; }).join(","));
 ok("Her stil gercek statik ve hareketli MOGRT onizlemesine sahiptir",
-  stills.length === 17 && videos.length === 17 && catalog.items.every(function (item) { return item.preview && item.video; }),
+  stills.length === 31 && videos.length === 31 && catalog.items.every(function (item) { return item.preview && item.video; }),
   "webp=" + stills.length + " webm=" + videos.length);
 ok("Public vitrinde ucretli MOGRT dosyasi yoktur", !files.some(function (f) { return /\.mogrt$/i.test(f); }));
 ok("Ucretsiz Stil alani public vitrini okur ve dosyasiz kartlari kabul eder",
@@ -35,7 +42,7 @@ ok("Ucretsiz Stil alani public vitrini okur ve dosyasiz kartlari kabul eder",
 ok("Node olmayan panel onizlemesi de altyazi vitrinini baslatir",
   /if \(!K\.nodeOK[\s\S]{0,420}altyaziStilleriniGonder\(\)/.test(library));
 ok("Kilitli altyazi karti ozellige ozel satis kapisini acar",
-  /Pro\.gate\("captionStyles"\)/.test(source) && /captionStyles:\s*'17 gerçek altyazı stili'/.test(pro));
+  /Pro\.gate\("captionStyles"\)/.test(source) && /captionStyles:\s*'31 gerçek altyazı stili'/.test(pro));
 ok("Gercek ve vitrin kartlari canonical stil anahtariyla tekillestirilir",
   /item\.styleKey\s*\|\|\s*temizMogrtAdi/.test(source));
 ok("CEP acilisinda 17 WebM decoder'i birden baslatilmaz",

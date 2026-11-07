@@ -7,8 +7,14 @@ DEST="$HOME/Library/Application Support/Adobe/CEP/extensions/com.sametcreates.ke
 
 echo "Suflo kuruluyor..."
 
-# 1) Imzasiz eklentilere izin
+# 1) Imzasiz eklentilere izin. Kaldirma yalniz Suflo'nun degistirdigini geri alsin: PlayerDebugMode
+#    zaten 1 degilse onceki deger (yoksa "yok") isaret anahtarina yazilir; isaret varsa ellenmez.
+ISARET=SufloOncekiPlayerDebugMode
 for v in 9 10 11 12 13 14; do
+  if ! defaults read "com.adobe.CSXS.$v" "$ISARET" >/dev/null 2>&1; then
+    ONCEKI="$(defaults read "com.adobe.CSXS.$v" PlayerDebugMode 2>/dev/null || echo yok)"
+    [ "$ONCEKI" = "1" ] || defaults write "com.adobe.CSXS.$v" "$ISARET" -string "$ONCEKI" 2>/dev/null || true
+  fi
   defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1 2>/dev/null || true
 done
 echo "  PlayerDebugMode acildi (CSXS 9-14)"

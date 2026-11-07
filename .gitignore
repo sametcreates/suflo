@@ -18,3 +18,9 @@ suflo-studio-*.json
 suflo-studio-*.csv
 private/
 config.php
+
+# Ucretli sablon dosyalari (AutoCaptions Pro icerik eki vb.) repoya girmez; Pro icerigi depo disinda
+*.ffx
+*.prfpset
+*.aep
+suflo-pro-icerik/

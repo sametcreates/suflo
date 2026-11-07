@@ -60,12 +60,16 @@ function altyaziKur(o) {
     "var undoStack = [], redoStack = [], UNDO_MAX = 50, kaliteOnayBekleyen = null, onayBekleyen = null, uygulananSekans = {};",
     "function render() {} function refreshUndoUI() {} function renderHistory() {} function uygulaEtiketiniSifirla() {} function shortsDugmesi() {}",
     "function clearRevert() {} function hideRestore() {} function applyGlossary() {} function cancelDraft() {}",
+    // senkron doğrulama: belge numarası (belgeBagla artırır, geri al taşır) ve rapor satırı
+    "var senkronBelgeSayac = 0, senkronBelgeNo = 0; function senkronRaporGizle() {}",
     // o.K verilirse taslak yazımı gerçek: writeDraft / shortsKaydiGuncelle (Shorts belgesi ana taslağı ezmesin)
     o.K ? "var scope = 'entire', WW = window.SufloWhisperWords;\n" + govde("function writeDraft(") + "\n" + govde("function shortsKaydiGuncelle(") +
       "\nfunction saveDraftNow() { kayit.taslak++; writeDraft(); } function saveDraftSoon() { kayit.taslak++; writeDraft(); }"
       : "function saveDraftNow() { kayit.taslak++; } function saveDraftSoon() { kayit.taslak++; }",
     "function qualityReport() { throw new Error('UYGULAMA_DEVAM'); }",
     "function kurSecenekleri(s) { return { minSure: 0.8, maxSure: 6, sonSinir: Number(s) > 0 ? Number(s) : undefined }; }",
+    // kalite motoru: "Otomatik (kadraja göre)" satır uzunluğu ve kırılım dili (gerçek işlevler)
+    govde("function kadrajBoyutu("), govde("function uzunlukDegeri("), govde("function kirilimDili("),
     govde("function dilKodu("), govde("function durumAl("), govde("function durumYukle("), govde("function snapshot("), govde("function undo("),
     govde("async function apply("),
     BLOK,

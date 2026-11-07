@@ -13,6 +13,9 @@ var pathPosix = require("path").posix;
 var pathWin = require("path").win32;
 
 var KOK = KOKYOL + "js/";
+// Sahte indirilen dosyanin icerigi ve GitHub'in yayinladigi ozeti (Pro denetimi: ozetsiz surum kurulmaz)
+var PAKET = Buffer.from("SUFLO-PAKET-9.9.9");
+var OZET = "sha256:" + require("crypto").createHash("sha256").update(PAKET).digest("hex");
 var sonuc = [];
 function chk(ad, k, ek) { sonuc.push((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 95) + "]" : "")); }
 
@@ -100,7 +103,13 @@ function ortam(opts) {
           renameSync: function () {}, accessSync: function () {}, rmSync: function () {},
           chmodSync: function () {}, copyFileSync: function () {}, utimesSync: function () {},
           constants: { W_OK: 2 },
-          createWriteStream: function () { return { on: function () {}, close: function (cb) { cb && cb(); }, destroy: function () {} }; }
+          createWriteStream: function () { return { on: function () {}, close: function (cb) { cb && cb(); }, destroy: function () {} }; },
+          // app.js dosyaOzeti: indirilen dosya PAKET icerigini verir
+          createReadStream: function () {
+            var h = {};
+            Promise.resolve().then(function () { if (h.data) h.data(PAKET); if (h.end) h.end(); });
+            return { on: function (e, f) { h[e] = f; return this; } };
+          }
         };
       }
       if (m === "path") return P;
@@ -131,6 +140,7 @@ function ortam(opts) {
         return { get: istek, request: istek };
       }
       if (m === "buffer") return { Buffer: Buffer };
+      if (m === "crypto") return require("crypto");
       throw new Error("bilinmeyen modul: " + m);
     }
   };
@@ -146,7 +156,7 @@ function ortam(opts) {
     return Promise.resolve(opts.apiYanit || { status: 200, body: JSON.stringify({
       tag_name: "v9.9.9",
       body: "## Suflo 9.9.9 — deneme\n\nBu surumde ffmpeg artik kendi kuruluyor ve her sey guzel.",
-      assets: [{ name: "Suflo-9.9.9.zxp", browser_download_url: "https://ornek/Suflo-9.9.9.zxp" }]
+      assets: [{ name: "Suflo-9.9.9.zxp", browser_download_url: "https://ornek/Suflo-9.9.9.zxp", digest: OZET }]
     }) });
   };
   K.download = function (url, hedef) {
@@ -254,7 +264,7 @@ function ortam(opts) {
   var e4 = ortam({ mac: false, apiYanit: { status: 200, body: JSON.stringify({
     tag_name: "v9.9.9",
     body: "## Suflo 9.9.9\n\nKesim geri geldi, ritim markerlari ve emoji secici eklendi.",
-    assets: [{ name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip" }]
+    assets: [{ name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip", digest: OZET }]
   }) } });
   if (e4.belgeOlaylari.DOMContentLoaded) { try { e4.belgeOlaylari.DOMContentLoaded(); } catch (eI4) {} }
   await e4.KApp.checkUpdate();
@@ -274,8 +284,8 @@ function ortam(opts) {
     tag_name: "v9.9.9",
     body: "## Suflo 9.9.9\n\nIki paketli surum notu deneme metni.",
     assets: [
-      { name: "Suflo-9.9.9.zxp", browser_download_url: "https://ornek/Suflo-9.9.9.zxp" },
-      { name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip" }
+      { name: "Suflo-9.9.9.zxp", browser_download_url: "https://ornek/Suflo-9.9.9.zxp", digest: OZET },
+      { name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip", digest: OZET }
     ]
   }) } });
   if (e5.belgeOlaylari.DOMContentLoaded) { try { e5.belgeOlaylari.DOMContentLoaded(); } catch (eI5) {} }
@@ -284,6 +294,36 @@ function ortam(opts) {
   chk("iki paketli release'te Kurulum ZIP tercih ediliyor",
     e5.indirmeler.length === 1 && /Kurulum\.zip$/.test(e5.indirmeler[0].url),
     e5.indirmeler[0] && e5.indirmeler[0].url);
+
+  /*
+   * 8) Pro denetimi: SHA-256 ozeti olmayan release dosyasi panelden INDIRILMEZ / KURULMAZ.
+   * Eskiden ozet yoksa dogrulama atlaniyor, ZIP dogrulanmadan CEP klasorune kopyalaniyordu.
+   * Kullaniciya acik Turkce mesaj + elle indirme baglantisi (surum sayfasi tarayicida acilir).
+   */
+  var e6 = ortam({ mac: false, apiYanit: { status: 200, body: JSON.stringify({
+    tag_name: "v9.9.9", body: "## Suflo 9.9.9\n\nOzetsiz paketli deneme surumu notu metni.",
+    assets: [{ name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip" }]
+  }) } });
+  if (e6.belgeOlaylari.DOMContentLoaded) { try { e6.belgeOlaylari.DOMContentLoaded(); } catch (eI6) {} }
+  await e6.KApp.checkUpdate();
+  if (e6.ogeler["update-indir"].on_click) await e6.ogeler["update-indir"].on_click();
+  chk("ozetsiz release: indirme ve otomatik kurulum YOK", e6.indirmeler.length === 0 && !/Kuruldu|İndirildi/.test(e6.ogeler["update-indir"].textContent),
+    JSON.stringify(e6.indirmeler) + " " + e6.ogeler["update-indir"].textContent);
+  chk("ozetsiz release: acik Turkce mesaj ve elle indirme baglantisi",
+    /doğrulama özeti \(SHA-256\) taşımıyor; güvenlik için otomatik kurulum yapılmadı/.test(e6.ogeler["update-not"].textContent) &&
+    /github\.com\/[^ ]+\/releases\/latest/.test(e6.ogeler["update-not"].textContent) &&
+    e6.komutlar.some(function (k) { return k.cmd === "TARAYICI" && /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/latest$/.test(k.args[0]); }),
+    e6.ogeler["update-not"].textContent);
+  // Ozet uyusmazsa dosya silinir, kurulum yapilmaz (mevcut davranis korunur)
+  var e7 = ortam({ mac: false, apiYanit: { status: 200, body: JSON.stringify({
+    tag_name: "v9.9.9", body: "## Suflo 9.9.9\n\nYanlis ozetli deneme surumu notu metni.",
+    assets: [{ name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip", digest: "sha256:" + "0".repeat(64) }]
+  }) } });
+  if (e7.belgeOlaylari.DOMContentLoaded) { try { e7.belgeOlaylari.DOMContentLoaded(); } catch (eI7) {} }
+  await e7.KApp.checkUpdate();
+  if (e7.ogeler["update-indir"].on_click) await e7.ogeler["update-indir"].on_click();
+  chk("yanlis ozet: indirilen dosya silinir, kurulum yapilmaz", e7.indirmeler.length === 1 && !/Kuruldu|İndirildi/.test(e7.ogeler["update-indir"].textContent) &&
+    !e7.komutlar.some(function (k) { return k.cmd === "explorer"; }), e7.ogeler["update-indir"].textContent);
 
   /* ---------- otomatikKur: gercek ZIP + sahte CEP klasoru ---------- */
   // Windows'un tar.exe'si ve CEP klasor duzeni gerekir

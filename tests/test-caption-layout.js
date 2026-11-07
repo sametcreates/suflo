@@ -305,11 +305,107 @@ ok("captions.js: menü eşlemesi (c32/c42 → l32/l42) tercih, şablon, stil kod
 ok("captions.js: kalite denetimi satır modunun satır sayısını bilir (c42x2 → 2)", /maxLines: mc && mc\[2\] \? Number\(mc\[2\]\) : 1,/.test(cap));
 ok("captions.js: dışa aktarma — SRT cue içi CRLF, boş satır yok, çift dilde her dil tek satır, TXT tek satır",
   /out\.push\(c\.text\.split\("\\n"\)\.join\("\\r\\n"\)\);/.test(govde("function buildSrt(")) && /satirlariTopla\(styleText/.test(govde("function cueler(")) &&
-  /CL\.duzMetin\(styleText\(CT\.stripEmphasis\(s\.text\)\)\)/.test(cap));
+  /CL\.duzMetin\(styleText\(kufurMaskele\(CT\.stripEmphasis\(s\.text\)\)\)\)/.test(cap));
 ok("captions.js: ASS karaoke satır modunda gerçek kelime zamanlarıyla, kaydırılmış katmanda kelimeler de kayar",
   /cs\.forEach\(function \(c\) \{ olay\(c\.start, c\.end, assSatirKaraoke\(c, skTag, skDil\)\); \}\);/.test(cap) &&
   /if \(s\.words\) s\.words = WW\.kelimeleriKaydir\(s\.words, -offset\);/.test(govde("function buildAssKaydirilmis(")));
 ok("captions.js: panel açılışında Premiere çağrısı yok (kelime sınırı ve süre ayarları yalnız DOM)", !/K\.call\(/.test(govde("function kelimeSiniriDurumu(")) && !/K\.call\(/.test(govde("function kurSecenekleri(")));
+
+/* ---------------- 12) kalite motoru (parti 1): kadraja göre satır uzunluğu, Türkçe-duyarlı kırılım ---------------- */
+ok("uzunlukAyari('auto'): yatay (≥ 1,3) 2 × 42, kare / 4:5 2 × 32, dikey 9:16 2 × 24; boyut yoksa 42 karakter",
+  J(CL.uzunlukAyari("auto", { w: 1920, h: 1080 })) === J({ tur: "c", maxChars: 42, maxLines: 2, otomatik: true, deger: "c42x2" }) &&
+  CL.uzunlukAyari("auto", { w: 1080, h: 1080 }).deger === "c32x2" && CL.uzunlukAyari("auto", { w: 1080, h: 1350 }).deger === "c32x2" &&
+  CL.uzunlukAyari("auto", { w: 1080, h: 1920 }).deger === "c24x2" && CL.uzunlukAyari("auto", { width: 3840, height: 2160 }).deger === "c42x2" &&
+  CL.uzunlukAyari("auto", { w: 1440, h: 1080 }).deger === "c42x2" && CL.uzunlukAyari("auto", { w: 1080, h: 1920 }).maxChars === 24 &&
+  CL.uzunlukAyari("auto").deger === "l42" && CL.uzunlukAyari("auto", { w: 0, h: 1080 }).maxChars === 42 && CL.uzunlukAyari("auto", { w: "x", h: NaN }).maxLines === 1,
+  J([CL.uzunlukAyari("auto", { w: 1920, h: 1080 }), CL.uzunlukAyari("auto")]));
+ok("uzunlukAyari: eski değerler aynı (l42, c42x2, w3, k1, c60)", J(CL.uzunlukAyari("l42")) === J({ tur: "l", maxChars: 42, maxLines: 1 }) &&
+  CL.uzunlukAyari("c42x2").maxLines === 2 && CL.uzunlukAyari("w3").n === 3 && CL.uzunlukAyari("k1").tur === "k" && CL.uzunlukAyari("c60").maxChars === 60);
+ok("auto: segmentleriKur kadraja göre kurar (9:16'da satır ≤ 24 karakter, 2 satır; kadraj yoksa 42 tek satır)", (function () {
+  var ws = zamanla("Bugün size kamerayla ilgili birkaç şey anlatacağım ve sonra hep birlikte deneyeceğiz arkadaşlar");
+  var seg = [{ start: ws[0].start, end: ws[ws.length - 1].end, text: hepsi(ws), words: ws }];
+  var d = CT.segmentleriKur(seg, "auto", { kadraj: { w: 1080, h: 1920 } }).segments;
+  var y = CT.segmentleriKur(seg, "auto", {}).segments;
+  return d.every(function (c) { return satirlar(c.text).length <= 2 && satirlar(c.text).every(function (l) { return l.length <= 24; }); }) &&
+    d.some(function (c) { return /\n/.test(c.text); }) && y.every(function (c) { return !/\n/.test(c.text) && c.text.length <= 42; });
+})());
+// kelimedenSatirlar / obekBol / karakterleBol / splitLong dili taşır: "bir" satır sonunda kalmaz (Türkçe), başka dilde eski denge
+(function () {
+  var ws = zamanla("Bugün size çok önemli bir şey anlatacağım arkadaşlar");
+  var tr = metinler(CL.kelimedenSatirlar(ws, { maxChars: 30, maxLines: 1 })), de = metinler(CL.kelimedenSatirlar(ws, { maxChars: 30, maxLines: 1, dil: "de" }));
+  ok("kelimedenSatirlar o.dil: Türkçede (ve dil yokken) 'bir' satır sonunda değil; 'de' dilinde eski en dengeli kırılım",
+    tr === "Bugün size çok önemli bir şey|anlatacağım arkadaşlar" && de === "Bugün size çok önemli bir|şey anlatacağım arkadaşlar" &&
+    metinler(CL.kelimedenSatirlar(ws, { maxChars: 30, maxLines: 1, dil: "tr" })) === tr, tr + " / " + de);
+  var kb = CL.karakterleBol({ start: 0, end: 4, text: hepsi(ws) }, 30, { dil: "tr" });
+  ok("karakterleBol o.dil: parçalar Türkçe-duyarlı, bütçe sert (≤ 30)", metinler(kb) === "Bugün size çok önemli bir şey|anlatacağım arkadaşlar" &&
+    kb.every(function (c) { return c.text.length <= 30; }), metinler(kb));
+  var sg = CT.segmentleriKur([{ start: 0, end: 4, text: hepsi(ws) }], "l32", { dil: "tr" });
+  ok("segmentleriKur secenek.dil kelimesiz l32'de de (splitLong) geçer", metinler(sg.segments) === "Bugün size çok önemli bir şey|anlatacağım arkadaşlar", metinler(sg.segments));
+  var x2 = CT.segmentleriKur([{ start: 0, end: 6, text: "Bu işi gerçekten yapabilir misin, yoksa bırakalım mı?", words: zamanla("Bu işi gerçekten yapabilir misin, yoksa bırakalım mı?") }], "c42x2", { dil: "tr" });
+  ok("c42x2: soru eki fiiliyle, iki satır virgülden kırılır", x2.segments.length === 1 && x2.segments[0].text === "Bu işi gerçekten yapabilir misin,\nyoksa bırakalım mı?", J(x2.segments.map(function (c) { return c.text; })));
+})();
+ok("parcalaCezali: tam k parça, enCokKelime / sinir sert; sığmazsa null; dil false cezasız (eski en dengeli)",
+  J(CL.parcalaCezali("a b c d e f g".split(" "), 2, { enCokKelime: 4 })) === J([0, 3]) && J(CL.parcalaCezali("a b c d e f g h i".split(" "), 3, { enCokKelime: 3 })) === J([0, 3, 6]) &&
+  CL.parcalaCezali(["uzunkelime", "x"], 2, { sinir: 5 }) === null && J(CL.parcalaCezali([], 3)) === J([0]) &&
+  J(CL.parcalaCezali("Bugün size çok önemli bir şey".split(" "), 2, { dil: false })) === J([0, 3]));
+ok("ikiyeBolNoktasi(words, false): eski kural bayt bayt (stil motorunun eski stilleri)", CL.ikiyeBolNoktasi("Bugün size çok önemli bir şey anlatacağım arkadaşlar".split(" "), false) === 5 &&
+  CL.ikiyeBolNoktasi("Bugün size çok önemli bir şey anlatacağım arkadaşlar".split(" ")) === 6 && CL.ikiyeBolNoktasi(["tek"]) === -1);
+(function () {
+  var Q = require(path.join(KOK, "js", "caption-quality.js"));
+  var uzun = [{ start: 0, end: 6, text: "Bu işi gerçekten yapabilir misin, yoksa bırakalım mı? Bugün size çok önemli bir şey anlatacağım arkadaşlar" }];
+  var tr = Q.splitOverlong(uzun, { maxChars: 24, maxLines: 2, lang: "tr" }).map(function (c) { return c.text; });
+  var de = Q.splitOverlong(uzun, { maxChars: 24, maxLines: 2, lang: "de" }).map(function (c) { return c.text; });
+  ok("caption-quality splitOverlong options.lang: Türkçede parça / satır 'çok' ya da 'bir' ile bitmez, bütçe (2 × 24) sert",
+    tr.every(function (t) { return !/ (çok|bir)(\n|$)/.test(t) && t.split("\n").length <= 2 && t.split("\n").every(function (l) { return l.length <= 24; }); }) &&
+    de.some(function (t) { return / çok(\n|$)/.test(t); }) && tr.join(" ").replace(/\n/g, " ") === uzun[0].text, J([tr, de]));
+})();
+var trKaynak = fs.readFileSync(path.join(KOK, "js", "tr-kirilim.js"), "utf8");
+ok("index.html: tr-kirilim.js caption-layout.js ve style-engine.js'ten önce yüklenir", sira("tr-kirilim.js") > 0 && sira("tr-kirilim.js") < sira("caption-layout.js") &&
+  sira("tr-kirilim.js") < sira("style-engine.js") && /SufloTrKirilim/.test(trKaynak));
+ok("index.html: Satır uzunluğu kısa 'Otomatik' (auto) seçeneği (dar panelde kesilmez, ayrıntı title'da); HTML varsayılanı l42 (kayıtlı tercih değeri korunur)",
+  /<option value="auto" title="[^"]*9:16[^"]*">Otomatik<\/option>/.test(html) && /<select id="cap-maxlen" title="[^"]*kadraja göre[^"]*">/.test(html) && /<option value="l42" selected>/.test(html) && (html.match(/ selected>/g) || []).length > 0);
+var en = fs.readFileSync(path.join(KOK, "i18n", "en.js"), "utf8");
+ok("i18n/en.js: 'Otomatik' ve iki açıklama (title) İngilizce girdisi", /"Otomatik": "Auto"/.test(en) &&
+  en.indexOf('"Otomatik: satır bütçesi kadraja göre (sekansın oranından) seçilir": "') !== -1 &&
+  en.indexOf('"Satır bütçesi sekansın oranından: yatay 2 × 42, kare/4:5 2 × 32, 9:16 2 × 24": "') !== -1);
+ok("captions.js: kayıtlı tercih yokken satır uzunluğu auto; kayıtlı tercih kendi değerinde (uzunlukSecimi auto'yu menüden kabul eder)",
+  /if \(!p && el\("cap-maxlen"\)\) el\("cap-maxlen"\)\.value = uzunlukSecimi\("auto"\);/.test(govde("function loadPrefs(")) &&
+  /if \(p\.maxlen\) el\("cap-maxlen"\)\.value = uzunlukSecimi\(p\.maxlen\);/.test(govde("function loadPrefs(")));
+ok("captions.js: satır kuran, kalite denetimi, kesimden sonra uyarlama ve örnek yükleme menü değerini uzunlukDegeri'nden (auto çözülür) okur",
+  /var lenVal = uzunlukDegeri\(\);/.test(cap) && /var len = el\("cap-maxlen"\) \? uzunlukDegeri\(\) : "l42";/.test(govde("function qualityOptions(")) &&
+  /CL\.uzunlukAyari\(uzunlukDegeri\(\)\)/.test(cap) && /CT\.segmentleriKur\(M\.kelimelerdenSegment\(liste\), uzunlukDegeri\(\), kurSecenekleri/.test(cap) &&
+  /return L && L\.otomatikUzunluk \? L\.otomatikUzunluk\(kadrajBoyutu\(\)\) : "l42";/.test(govde("function uzunlukDegeri(")));
+ok("captions.js: kurSecenekleri altyazının dilini ve sekansın kadrajını taşır; stil motoru, yerel çıktı, AE ve kesim eşleme aynı dili alır",
+  /dil: kirilimDili\(\),\s*kadraj: kadrajBoyutu\(\)/.test(govde("function kurSecenekleri(")) &&
+  (cap.match(/overrides: motorAyarlari\([a-zA-Z]+\), dil: kirilimDili\(\)/g) || []).length === 2 &&
+  /kadraj: \{ w: w, h: h, guvenli: guvenliYer \}, dil: kirilimDili\(\) \}\)/.test(cap) && /kelimeModu: segmentsMode, dil: kirilimDili\(\) \}\)/.test(cap) &&
+  (cap.match(/guvenli: false, dil: kirilimDili\(\) \}|guvenli: !!\(el\("cap-guvenli-yerlesim"\) && el\("cap-guvenli-yerlesim"\)\.checked\), dil: kirilimDili\(\) \}/g) || []).length === 2);
+ok("captions.js: stil motorunun her derlemesi (önizleme, video katmanı, ASS dışa aktarma) altyazının dilini verir; Shorts paketi Short'un dilini",
+  (function () {
+    var parcalar = cap.split("window.SufloStyleEngine.compile(").slice(1).map(function (p) { return p.slice(0, p.indexOf("}))")); });
+    return parcalar.length === 3 && parcalar.every(function (p) { return /dil: kirilimDili\(\)/.test(p); });
+  })() && /overrides: sa\.overrides,\s*dil: typeof job\.lang === "string" \? job\.lang : undefined \}\);/.test(fs.readFileSync(path.join(KOK, "js", "shorts-paket.js"), "utf8")));
+// Stil kodu (SFL1.) "auto" taşımaz: eski paneller ve site style-share.js'in listesindekini okur
+(function () {
+  var SSyeni = require(path.join(KOK, "js", "style-share.js")), SSeski = require(path.join(KOK, "tests", "fixtures", "style-share-3.2.0.js"));
+  var reddi = SSyeni.decode(SSyeni.encode({ styleId: "efekt", text: { maxlen: "auto" } }));
+  ok("style-share.js metinTemiz 'auto'yu ve 'c24x2' / 'c32x2'yi reddeder (kod çözülmüş değer yazmalı)", reddi.ok && !reddi.recipe.text.maxlen &&
+    !SSyeni.decode(SSyeni.encode({ styleId: "efekt", text: { maxlen: "c24x2" } })).recipe.text.maxlen);
+  var f = new Function("el", "window", "EFEKT", govde("function kadrajBoyutu(") + govde("function uzunlukDegeri(") + govde("function paylasimUzunlugu(") +
+    "return paylasimUzunlugu;");
+  function paylas(deger, wh) {
+    return f(function (id) { return id === "cap-maxlen" ? { value: deger } : null; },
+      { SufloStyleShare: SSyeni, SufloCaptionLayout: CL, KApp: { ctx: function () { return wh ? { width: wh[0], height: wh[1] } : {}; } } }, "efekt")();
+  }
+  var sonuc = [paylas("auto", [1920, 1080]), paylas("auto", [1080, 1080]), paylas("auto", [1080, 1920]), paylas("auto"), paylas("l32")];
+  ok("paylasimUzunlugu: auto kodda çözülmüş geçerli değer (16:9 c42x2, 1:1 / 9:16 c32, sekans yok c42); l32 → c32",
+    J(sonuc) === J(["c42x2", "c32", "c32", "c42", "c32"]), J(sonuc));
+  ok("paylaşılan auto kodu eski (3.2.0) style-share.js ile de çözülür, uyarısız", sonuc.every(function (m) {
+    var r = SSeski.decode(SSyeni.encode({ styleId: "efekt", text: { maxlen: m } }), ["efekt"]);
+    return r.ok && r.recipe.text.maxlen === m && !(r.warnings || []).length;
+  }));
+  ok("stilKodu: menü auto ise kodda paylasimUzunlugu", /maxlen: el\("cap-maxlen"\)\.value === "auto" \? paylasimUzunlugu\(\) :/.test(govde("function stilKodu(")));
+})();
 
 /* ---- editör işlevleri gerçek kaynaktan, sahte ortamla: bölme, Shift+Enter, zaman düzenleme ---- */
 var toastlar = [];
@@ -368,6 +464,40 @@ ok("editTime: başlangıç – bitiş satırı yeniden boyutlar, kelimeler doğr
 toastlar.length = 0;
 zamanDuzenle("00:00:25.000 – 00:00:24.000");
 ok("editTime: bitiş başlangıçtan önceyse uyarır, satıra dokunmaz", ED.get()[0].start === 20 && toastlar.length === 1 && /dd:ss\.mmm – dd:ss\.mmm/.test(toastlar[0]), toastlar[0]);
+
+/* ---------------- unvan / sıra sayısı cümle sonu sayılmaz (satır öbekleri ve birleştirme) ---------------- */
+var unvanW = zamanla("Prof. Dr. Ahmet Bey bugün bizimle.");
+var unvanL = CL.kelimedenSatirlar(unvanW, { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kelimedenSatirlar: 'Prof.' / 'Dr.' kendi cue'su olmaz (unvan addan ayrılmaz)", unvanL.length === 1 && unvanL[0].text === "Prof. Dr. Ahmet Bey bugün bizimle.", metinler(unvanL));
+var siraL = CL.kelimedenSatirlar(zamanla("Takımımız 2. sırada bitirdi."), { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kelimedenSatirlar: '2.' sırada'dan ayrılmaz", siraL.length === 1 && siraL[0].text === "Takımımız 2. sırada bitirdi.", metinler(siraL));
+var mrL = CL.kelimedenSatirlar(zamanla("Mr. Smith is here."), { maxChars: 42, maxLines: 1, dil: "en" });
+ok("kelimedenSatirlar: 'Mr. Smith' tek öbek", mrL.length === 1, metinler(mrL));
+var gercekSon = CL.kelimedenSatirlar(zamanla("Geldik. Sonra gittik."), { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kelimedenSatirlar: gerçek cümle sonu hâlâ öbeği bitirir; '1. Dünya' gibi büyük harfli sürüm de", gercekSon.length === 2 &&
+  CL.kelimedenSatirlar(zamanla("Bitti 1. Dünya savaşı"), { maxChars: 42, maxLines: 1, dil: "tr" }).length === 2, metinler(gercekSon));
+var eskiDil = CL.kelimedenSatirlar(unvanW, { maxChars: 42, maxLines: 1, dil: false });
+ok("kelimedenSatirlar: dil false eski davranış (her nokta cümle sonu)", eskiDil.length === 3, metinler(eskiDil));
+var kbU = CL.kisaBirlestir([{ start: 0, end: 0.3, text: "Dr." }, { start: 0.35, end: 1.5, text: "Ayşe geldi" }], { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kisaBirlestir: unvanla biten parça addan ayrı kalmaz", kbU.length === 1 && kbU[0].text === "Dr. Ayşe geldi", metinler(kbU));
+var kbC = CL.kisaBirlestir([{ start: 0, end: 0.6, text: "Bitti." }, { start: 0.65, end: 1.5, text: "Sonra gittik" }], { maxChars: 42, maxLines: 1, dil: "tr" });
+ok("kisaBirlestir: bitmiş cümle hâlâ yapıştırılmaz", kbC.length === 2, metinler(kbC));
+var uctan = CT.segmentleriKur([{ start: 0, end: 3.2, text: "Prof. Dr. Ahmet Bey bugün bizimle.", words: unvanW }], "auto", { dil: "tr", kadraj: { w: 1920, h: 1080 } }).segments;
+ok("segmentleriKur (auto): unvanlar alt saniyelik ayrı cue olmaz", uctan.length === 1 && /^Prof\. Dr\. Ahmet/.test(uctan[0].text), metinler(uctan));
+
+/* ---------------- uzun zamansız cue: kırılım DP'si karakter sınırını da kullanır (panel donmaz) ---------------- */
+(function () {
+  var sozler = ["bugün", "size", "kamerayla", "ilgili", "birkaç", "şey", "anlatacağım", "ve", "sonra", "mi", "2.", "sırada", "50", "TL"];
+  var ws = []; for (var i = 0; i < 2000; i++) ws.push(sozler[i % sozler.length]);
+  var metin = ws.join(" ");
+  var t0 = Date.now(), sar = CL.dengeliSar(metin, 42, 2, "tr"), tSar = Date.now() - t0;
+  t0 = Date.now(); var bol = CL.karakterleBol({ start: 0, end: 600, text: metin }, 42, { maxLines: 2, dil: "tr" }); var tBol = Date.now() - t0;
+  ok("dengeliSar 2000 kelime: < 1,5 sn (eskiden ~5 sn), satırlar 42'yi aşmaz, kelime kaybı yok",
+    tSar < 1500 && satirlar(sar).every(function (x) { return x.length <= 42; }) && sar.replace(/\n/g, " ") === metin, tSar + " ms");
+  ok("karakterleBol 2000 kelime: < 1,5 sn (eskiden ~6 sn), parçalar 2 × 42 bütçede, kelime kaybı yok",
+    tBol < 1500 && bol.every(function (c) { return satirlar(CL.dengeliSar(c.text, 42, 2, "tr")).every(function (x) { return x.length <= 42; }); }) &&
+    bol.map(function (c) { return c.text; }).join(" ") === metin, tBol + " ms, " + bol.length + " parça");
+})();
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

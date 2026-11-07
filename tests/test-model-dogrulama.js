@@ -64,6 +64,32 @@ ok("hfBeklenenOzet: LFS olmayan / bozuk girdi bos", E._hfBeklenenOzet([{ path: "
   ok("ozet yalniz huggingface.co'dan istenir (ayna kendi dosyasini onaylamaz)",
     istekler.filter(function (u) { return /ag\/yok/.test(u); }).length === 1 && istekler.every(function (u) { return /^https:\/\/huggingface\.co\//.test(u); }), istekler.join(" "));
 
+  /* ---- Pro denetimi: whisper.cpp v1.9.1 Windows motor arşivi sabit SHA-256 ile doğrulanır ---- */
+  var B = E._BUILDS;
+  ok("motor arşivleri: v1.9.1 URL'leri ve 64 haneli sabit SHA-256",
+    ["cpu", "cuda"].every(function (k) { return /\/v1\.9\.1\//.test(B[k].urls[0]) && /^[0-9a-f]{64}$/.test(B[k].sha256); }) && B.cpu.sha256 !== B.cuda.sha256,
+    JSON.stringify([B.cpu.sha256, B.cuda.sha256]));
+  var arsiv = path.join(tmp, "engine-cpu.zip");
+  fs.writeFileSync(arsiv, icerik);
+  loglar = [];
+  ok("arsivDogrula: özet tutarsa true, dosya kalır", await E._arsivDogrula({ id: "cpu", sha256: dogruOzet }, arsiv) === true && fs.existsSync(arsiv));
+  ok("arsivDogrula: özet tutmazsa false, dosya silinir (açılmaz)", await E._arsivDogrula({ id: "cpu", sha256: B.cpu.sha256 }, arsiv) === false && !fs.existsSync(arsiv) &&
+    loglar.some(function (l) { return /UYUSMADI/.test(l); }), loglar.join(" | "));
+  fs.writeFileSync(arsiv, icerik);
+  ok("arsivDogrula: özet null ise 'doğrulanmadı' (eski davranış: dosya kalır, günlüğe düşer)",
+    await E._arsivDogrula({ id: "ffmpeg", sha256: null }, arsiv) === true && fs.existsSync(arsiv) && loglar.some(function (l) { return /dogrulanmadi: ffmpeg/.test(l); }), loglar.join(" | "));
+  // Kaynakta motor arşivini açan her K.unzip çağrısından önce arsivDogrula gelir (3 yer: ilk kurulum, CUDA'dan CPU'ya, ısınmadan CPU'ya)
+  var esrc = fs.readFileSync(path.join(ROOT, "js", "engine.js"), "utf8");
+  var acilanlar = [["zipPath", "build"], ["zp2", "cpu"], ["zp3", "BUILDS.cpu"]].map(function (x) {
+    var u = esrc.indexOf("K.unzip(" + x[0] + ", dir)"), d = esrc.lastIndexOf("arsivDogrula(" + x[1] + ", " + x[0], u);
+    return u > 0 && d > 0 && u - d < 400;
+  });
+  // ffmpeg indirmesi aynı düzenekten geçer (kaynakta sha256 yok: bugün "doğrulanmadı", kaynak değiştirilmedi)
+  var ffGovde = esrc.slice(esrc.indexOf("for (var i = 0; i < kaynaklar.length; i++)"), esrc.indexOf("ffmpegCikar(zip, dir, kaynak)"));
+  ok("ffmpeg arşivi açılmadan önce arsivDogrula(kaynak, zip) çağrılır; kaynaklarda sabit özet yok",
+    /if \(!\(await arsivDogrula\(kaynak, zip, say\)\)\) \{ sonHata = /.test(ffGovde) && !/sha256/.test(esrc.slice(esrc.indexOf("var FFMPEG_KAYNAKLARI"), esrc.indexOf("function ffmpegKaynaklari"))), ffGovde.slice(0, 200));
+  ok("motor arşivi açılmadan önce doğrulanıyor (3 yer)", acilanlar.every(Boolean) && (esrc.match(/K\.unzip\(z(ipPath|p\d), dir\)/g) || []).length === 3, JSON.stringify(acilanlar));
+
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

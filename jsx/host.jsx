@@ -200,14 +200,19 @@ function KS_getSelectedClips() {
     if (!seq) return KS_err("Aktif sequence yok.");
     var sel = seq.getSelection();
     var out = [];
+    // ic ice sekans ogesinin medya yolu bos: atlanir, sayisi doner (panel "Sekans kapsamini kullan" der)
+    var icSekans = 0;
     if (sel) {
       for (var i = 0; i < sel.length; i++) {
         var cl = sel[i];
         try {
           if (!cl.projectItem) continue;
           var mp = String(cl.projectItem.getMediaPath());
-          if (!mp) continue;
-          out.push({
+          if (!mp) {
+            if (KS_mcKlipBayrak(cl, "isSequence")) icSekans++;
+            continue;
+          }
+          var o = {
             name: String(cl.name),
             mediaPath: mp,
             clipStart: cl.start.seconds,
@@ -215,7 +220,11 @@ function KS_getSelectedClips() {
             inPoint: cl.inPoint.seconds,
             outPoint: cl.outPoint.seconds,
             dur: cl.outPoint.seconds - cl.inPoint.seconds
-          });
+          };
+          // senkron dogrulama: hiz (1 = %100) ve ters oynatma; okunamazsa alan yok (eski davranis: sure orani)
+          try { if (typeof cl.getSpeed === "function") { var hz = Math.abs(Number(cl.getSpeed())); if (hz > 0) o.speed = hz; } } catch (eS) {}
+          try { if (typeof cl.isSpeedReversed === "function") o.reversed = cl.isSpeedReversed() ? true : false; } catch (eR) {}
+          out.push(o);
         } catch (eC) {}
       }
     }
@@ -228,7 +237,7 @@ function KS_getSelectedClips() {
       ded.push(out[j]);
     }
     ded.sort(function (a, b) { return a.clipStart - b.clipStart; });
-    return KS_ok({ clips: ded });
+    return KS_ok({ clips: ded, nested: icSekans });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1518,6 +1527,58 @@ function KS_setPlayerPosition(encoded) {
     t.seconds = Number(p.sec) || 0;
     seq.setPlayerPosition(t.ticks);
     return KS_ok({});
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Senkron doğrulama "Dinle" (Caption Editor ses dalgası şeridi): playhead kartın başına gider ve Program Monitor
+ * oynatılır. Premiere'in belgeli DOM'unda Program Monitor'ü oynatan işlev yok; QE DOM'un oynatıcısı denenir
+ * (qe.project.getActiveSequence().player.play(1) ya da qe.startPlayback()). Hiçbiri yoksa playhead yine kartın
+ * başındadır: { oynadi: false } (panel "boşluk tuşuyla oynat" der). Durdurma panelden, kart bitince (KS_oynatDurdur).
+ */
+function KS_oynatQE() {
+  try {
+    app.enableQE();
+    if (typeof qe === "undefined" || !qe) return null;
+    return qe;
+  } catch (e) { return null; }
+}
+function KS_oynat(encoded) {
+  try {
+    var p = KS_arg(encoded) || {}; // { sec }
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var sn = Number(p.sec);
+    if (!(sn >= 0)) sn = 0;
+    var t = new Time();
+    t.seconds = sn;
+    seq.setPlayerPosition(t.ticks);
+    var q = KS_oynatQE(), yol = "";
+    if (q) {
+      try {
+        var qs = q.project ? q.project.getActiveSequence() : null;
+        if (qs && qs.player && typeof qs.player.play === "function") { qs.player.play(1); yol = "player"; }
+      } catch (eP) { yol = ""; }
+      if (!yol) {
+        try { if (typeof q.startPlayback === "function") { q.startPlayback(); yol = "qe"; } } catch (eS) { yol = ""; }
+      }
+    }
+    return KS_ok({ oynadi: !!yol, yol: yol, sec: sn });
+  } catch (e) { return KS_err(e); }
+}
+function KS_oynatDurdur() {
+  try {
+    var q = KS_oynatQE(), durdu = false;
+    if (q) {
+      try {
+        var qs = q.project ? q.project.getActiveSequence() : null;
+        if (qs && qs.player && typeof qs.player.stop === "function") { qs.player.stop(); durdu = true; }
+      } catch (eP) {}
+      if (!durdu) {
+        try { if (typeof q.stopPlayback === "function") { q.stopPlayback(); durdu = true; } } catch (eS) {}
+      }
+    }
+    return KS_ok({ durdu: durdu });
   } catch (e) { return KS_err(e); }
 }
 
@@ -3733,7 +3794,8 @@ function KS_placeMogrt(encoded) {
 function KS_captionMogrtTextProp(component) {
   if (!component || !component.properties) return null;
   var props = component.properties;
-  var names = ["Text", "Source Text", "Edit Text 01 - Text", "Title", "Subtitle"];
+  // "Texto": AutoCaptions (ClashiVFX) sablonlarinin metin kontrolu
+  var names = ["Text", "Source Text", "Edit Text 01 - Text", "Title", "Subtitle", "Texto"];
   if (props.getParamForDisplayName) {
     for (var ni = 0; ni < names.length; ni++) {
       try {
@@ -3748,7 +3810,7 @@ function KS_captionMogrtTextProp(component) {
     var prop = props[i];
     var display = "";
     try { display = String(prop.displayName || ""); } catch (eDisplay) {}
-    if (/(?:^|\s)(?:source\s+)?text(?:$|\s)|altyaz|subtitle|title/i.test(display)) return prop;
+    if (/(?:^|\s)(?:source\s+)?texto?(?:$|\s)|altyaz|subtitle|title/i.test(display)) return prop;
     // AE MOGRT metin kontrolleri getValue() ile JSON metin belgesi verir.
     try {
       var raw = prop.getValue();

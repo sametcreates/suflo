@@ -14,6 +14,43 @@ ok("kaynak: captions.js'teki zincirin aynısı (alpha=1 + unpremultiply)",
   "color=c=black@0.0:s=1920x1080:r=25:d=12,format=rgba,subtitles=f=altyazi.ass:alpha=1:fontsdir=.,unpremultiply=inplace=1");
 ok("ffmpeg argümanları: lavfi → qtrle, ses yok", JSON.stringify(OR.ffmpegArgs("X", "/o.mov")) === JSON.stringify(["-y", "-f", "lavfi", "-i", "X", "-c:v", "qtrle", "-an", "/o.mov"]));
 
+function J2(x) { return JSON.stringify(x); }
+/* ---------------- kareZamanlari: yüksek fps (100 / 119,88 / 120) ---------------- */
+// ffmpeg vf_subtitles'in libass'e verdiği an: (long long)(pts · av_q2d(1/r) · 1000); olay [bas, son) ms aralığında görünür,
+// ASS santisaniye taşır (stil motoru Math.round(t·100)). Kart k. karede açılmalı; aralıkta santisaniye yoksa en çok bir kare geç,
+// hiçbir zaman erken. Sabit 9,9 ms pay 100 fps'te her kartı bir kare ERKEN açıyordu.
+(function () {
+  [[25, 1 / 25], [30000 / 1001, 1001 / 30000], [60000 / 1001, 1001 / 60000], [100, 1 / 100], [120000 / 1001, 1001 / 120000], [120, 1 / 120]].forEach(function (fz) {
+    var F = fz[0], q = fz[1], tam = 0, mumkun = 0, erken = 0, cokGec = 0, ilkErken = -1;
+    function an(j) { return Math.floor(j * q * 1000); }
+    for (var k = 1; k < 3000; k++) {
+      var t = OR.kareZamanlari([{ start: k / F, end: (k + 5) / F }], F, 0)[0].start;
+      var cs = Math.round(t * 100), j = 0;
+      while (cs * 10 > an(j)) j++;
+      var var_ = Math.floor(an(k) / 10) * 10 > an(k - 1);
+      if (var_) { mumkun++; if (j === k) tam++; }
+      if (j < k) { erken++; if (ilkErken < 0) ilkErken = k; }
+      if (j > k + 1) cokGec++;
+    }
+    ok("kareZamanlari " + F.toFixed(3) + " fps: kart hiçbir karede erken açılmaz, santisaniye varsa tam karesinde",
+      erken === 0 && cokGec === 0 && tam === mumkun, "erken " + erken + " (ilk " + ilkErken + ") · tam " + tam + "/" + mumkun + " · 2+ geç " + cokGec);
+  });
+  // ofs: katman sekansın ortasından başlıyorsa da (stil motoru offset'i çıkarır) aynı kare
+  var o = 12.34, k2 = 457, z = OR.kareZamanlari([{ start: o + k2 / 100, end: o + (k2 + 3) / 100 }], 100, o)[0];
+  ok("kareZamanlari 100 fps, ofs'lu katman: santisaniye kare zamanının kendisi", Math.round((z.start - o) * 100) === k2 && Math.round((z.end - o) * 100) === k2 + 3, z.start + " " + z.end);
+  // yarım kareden kısa kart (motorun 14 ms'lik kelimesi) iki ucu aynı kareye oturup katmandan kaybolmasın: bir kare görünür
+  [25, 30000 / 1001, 100].forEach(function (F) {
+    var q = Math.abs(F - Math.round(F)) > 0.005 ? 1001 / (Math.round(F) * 1000) : 1 / F;
+    function an(j) { return Math.floor(j * q * 1000); }
+    var c = OR.kareZamanlari([{ start: 30 / F + 0.001, end: 30 / F + 0.001 + 0.3 / F, text: "a" }], F, 0)[0];
+    var bas = Math.round(c.start * 100) * 10, son = Math.round(c.end * 100) * 10, gor = [];
+    for (var j = 0; j < 60; j++) if (bas <= an(j) && an(j) < son) gor.push(j);
+    ok("kareZamanlari " + F.toFixed(3) + " fps: yarım kareden kısa kart tam bir kare (kendi karesinde) görünür", gor.length === 1 && gor[0] === 30, J2(c) + " " + gor.join(","));
+  });
+  var sifir = OR.kareZamanlari([{ start: 2, end: 2, text: "s" }], 25, 0)[0];
+  ok("kareZamanlari: sıfır süreli kart sıfır süreli kalır (uzatılmaz)", sifir.start === sifir.end, J2(sifir));
+})();
+
 /* ---------------- buildArgs / previewArgs (Marka Kiti logosu) ---------------- */
 var TABAN = { assName: "altyazi.ass", fontsdir: ".", w: 1920, h: 1080, fps: 25, dur: 12, out: "/o.mov" };
 ok("buildArgs: logo yokken bugünkü argümanların aynısı",
@@ -175,7 +212,8 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
   // 7) render başarısız: Premiere'e dokunulmaz
   var K7 = sahteK({ renderHata: true });
   var r7 = await OR.temizYenidenOlustur(K7, kayit);
-  ok("render başarısız: hata mesajı, Premiere'e dokunulmaz", !r7.ok && /Altyazı katmanı üretilemedi: Error opening kotu filtre/.test(r7.hata) && adlar(K7) === "KS_getContext", r7.hata + " " + adlar(K7));
+  // parti 8: bilinmeyen hatada stderr'in son satırı (hataMetni)
+  ok("render başarısız: hata mesajı, Premiere'e dokunulmaz", !r7.ok && r7.hata === "Altyazı katmanı üretilemedi: kotu filtre" && adlar(K7) === "KS_getContext", r7.hata + " " + adlar(K7));
   var K7b = sahteK({ ff: null });
   var r7b = await OR.temizYenidenOlustur(K7b, kayit);
   ok("ffmpeg yok: anlaşılır hata", !r7b.ok && r7b.hata === "ffmpeg bulunamadı.", r7b.hata);
@@ -220,6 +258,239 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
   });
 
   ok("bozuk kayıt: hiçbir çağrı yok", !(await OR.temizYenidenOlustur(sahteK(), { tur: "altyazi" })).ok);
+
+  /* ---------------- parti 8: ilerleme, iptal, parçalı render, hata metinleri ---------------- */
+  var IC = OR.ilerlemeCoz;
+  ok("ilerleme: out_time_ms mikrosaniye (ffmpeg adlandırması), son geçerli değer", IC(["frame=10", "out_time_ms=2500000", "out_time_ms=5000000"], 10) === 0.5);
+  ok("ilerleme: out_time_us ve out_time (SS:DD:SS.mikro)", IC(["out_time_us=1000000"], 4) === 0.25 && IC(["out_time=00:01:30.000000"], 180) === 0.5);
+  ok("ilerleme: N/A ve bozuk değer atlanır, öncekisi kalır", IC(["out_time_ms=3000000", "out_time_ms=N/A", "out_time=N/A", "out_time_us=12abc"], 6) === 0.5 &&
+    IC(["out_time_ms=N/A"], 6) === null && IC([], 6) === null);
+  ok("ilerleme: süreyi aşan değer 1'e, eksi değer 0'a sıkışır", IC(["out_time_ms=99000000"], 6) === 1 && IC(["out_time_us=-23220"], 6) === 0);
+  ok("ilerleme: progress=end → 1; süre geçersizse null", IC(["out_time_ms=1", "progress=end"], 6) === 1 && IC(["out_time_ms=1000000"], 0) === null && IC(["out_time_ms=1000000"], NaN) === null);
+  ok("ilerleme: metinde yarım son satır okunmaz (\"out_time_ms=12\" aslında 12345678 olabilir)", IC("out_time_ms=3000000\nout_time_ms=12", 6) === 0.5 &&
+    IC("out_time_ms=3000000\r\nout_time_ms=6000000\r\n", 6) === 1);
+  var akanlar = [], oku = OR.ilerlemeOkuyucu(10, function (p) { akanlar.push(p); });
+  ["frame=1\nout_ti", "me_ms=20", "00000\nprogress=cont", "inue\nout_time_ms=N/A\n", "out_time_ms=5000000\n"].forEach(oku);
+  ok("akan okuyucu: parça sınırında bölünen satır birleştirilir, N/A bildirilmez", JSON.stringify(akanlar) === JSON.stringify([0.2, 0.5]), JSON.stringify(akanlar));
+  ok("ilerleme metni: transkripsiyonla aynı kalıp ve kalan süre", OR.ilerlemeMetni(0.42, 50700) === "Altyazı katmanı çiziliyor · %42 · ~1 dk 10 sn kaldı" &&
+    OR.ilerlemeMetni(0.01, 5000) === "Altyazı katmanı çiziliyor · %1" && OR.ilerlemeMetni(0.5, 500) === "Altyazı katmanı çiziliyor · %50" &&
+    OR.ilerlemeMetni(1, 9000, "Başlık çiziliyor") === "Başlık çiziliyor · %100", OR.ilerlemeMetni(0.42, 50700));
+  var I18Nb = require(path.join(__dirname, "..", "js", "i18n.js"));
+  I18Nb.setDictionary(require(path.join(__dirname, "..", "i18n", "en.js")));
+  var ilEn = I18Nb.translate(OR.ilerlemeMetni(0.42, 50700));
+  ok("ilerleme metni İngilizce", !/[ıİşŞğĞçÇ]|kaldı|çiziliyor/.test(ilEn) && /42%/.test(ilEn) && /left/.test(ilEn), ilEn);
+
+  var PP = OR.parcaPlani;
+  function toplamKare(pl) { return pl.reduce(function (a, x) { return a + x.kare; }, 0); }
+  function sinirli(pl, fps) { return pl.every(function (x, i) { return x.bas === (i ? pl[i - 1].bas + pl[i - 1].kare : 0) && Math.abs(x.t0 - x.bas / fps) < 1e-9 && x.kare >= 1; }); }
+  ok("parça planı: 45 sn ve altı tek parça (1080p)", PP(45, 30, 8).length === 1 && PP(46, 30, 8).length === 4 && PP(96, 30, 4).length === 3);
+  ok("parça planı: çekirdek 1-2 → tek parça; 3 → 2; 64 → en çok 4", PP(96, 30, 1).length === 1 && PP(96, 30, 2).length === 1 && PP(96, 30, 3).length === 2 &&
+    PP(96, 30, 5).length === 4 && PP(96, 30, 64).length === 4 && PP(96, 30, NaN).length === 1 && PP(96, 30, 0).length === 1);
+  [[96, 30000 / 1001, 4], [96.0123, 24000 / 1001, 5], [61.7, 29.97, 64], [600, 254016000000 / 8475667008, 16], [47.3, 25, 3], [3600, 59.94, 8]].forEach(function (c) {
+    var pl = PP(c[0], c[1], c[2]);
+    ok("parça planı (" + c.join(", ") + "): kare sınırında, toplam = round(sure·fps), parçalar dengeli", sinirli(pl, c[1]) && toplamKare(pl) === Math.round(c[0] * c[1]) &&
+      Math.max.apply(null, pl.map(function (x) { return x.kare; })) - Math.min.apply(null, pl.map(function (x) { return x.kare; })) <= 1, JSON.stringify(pl));
+  });
+  ok("parça planı: geçersiz süre [], fps 0 / NaN → 25", PP(0, 30, 8).length === 0 && PP(NaN, 30, 8).length === 0 && PP(-3, 30, 8).length === 0 &&
+    toplamKare(PP(60, 0, 8)) === 1500 && toplamKare(PP(60, NaN, 8)) === 1500 && toplamKare(PP(60, 1e9, 8)) === 1500);
+  ok("parça planı: çok kısa katman (< 1 sn) zorlansa da kareden çok parça olmaz", PP(0.1, 30, 8, 4).length === 3 && toplamKare(PP(0.1, 30, 8, 4)) === 3 &&
+    PP(0.01, 30, 8, 4).length === 1 && toplamKare(PP(0.01, 30, 8)) === 1);
+  ok("parça planı: zorla 3 → eşik / çekirdek yok sayılır", PP(6, 30, 1, 3).length === 3 && toplamKare(PP(6, 30, 1, 3)) === 180);
+  ok("parça planı: 4K'da eşik piksel oranına bölünür (30 sn 4K parçalı, 30 sn 1080p tek)", PP(30, 30, 4, 0, 4).length === 3 && PP(30, 30, 4, 0, 1).length === 1 &&
+    PP(11, 30, 4, 0, 4).length === 1 && PP(30, 30, 4, 0, 0.25).length === 1);
+  ok("kare sayısı: round(sure·fps), en az 1", OR.kareSayisi(2, 25) === 50 && OR.kareSayisi(6.02, 30000 / 1001) === 180 && OR.kareSayisi(0.001, 25) === 1 && OR.kareSayisi(0, 25) === 0);
+
+  var pa = OR.parcaArgs({ assName: "altyazi.ass", fontsdir: ".", w: 1920, h: 1080, fps: 30, bas: 960, kare: 960, out: "parca.mov" });
+  ok("parça argümanları: mutlak zaman (setpts=PTS+bas) → libass → sıfırla; kesin kare; ilerleme; çıktı sonda",
+    pa[4] === "color=c=black@0.0:s=1920x1080:r=30:d=32.03333333333333,setpts=PTS+960,format=rgba,subtitles=f=altyazi.ass:alpha=1:fontsdir=.,unpremultiply=inplace=1,setpts=PTS-STARTPTS" &&
+    JSON.stringify(pa.slice(5)) === JSON.stringify(["-c:v", "qtrle", "-an", "-frames:v", "960", "-nostats", "-progress", "pipe:1", "parca.mov"]), pa.join(" "));
+  var paL = OR.parcaArgs({ assName: "a.ass", w: 640, h: 360, fps: 25, bas: 50, kare: 50, logo: { name: "logo.png", lw: 64, x: 14, y: "14" }, out: "parca.mov" });
+  ok("parça argümanları: logo aynı filtreyle, sıfırlanmış zamanla bindirilir", paL[4].indexOf("fontsdir") === -1 && /setpts=PTS-STARTPTS$/.test(paL[4]) &&
+    paL[paL.indexOf("-filter_complex") + 1] === "[1:v]scale=64:-2,format=rgba[l];[0:v][l]overlay=x=14:y=14:format=auto:shortest=1", paL.join(" "));
+  ok("buildArgs: kare + ilerleme çıktıdan hemen önce; ikisi yoksa eski argümanlar", JSON.stringify(OR.buildArgs(Object.assign({}, TABAN, { kare: 300, ilerleme: true })).slice(-8)) ===
+    JSON.stringify(["qtrle", "-an", "-frames:v", "300", "-nostats", "-progress", "pipe:1", "/o.mov"]));
+  ok("birleştirme listesi: tırnaklı / ters bölülü yol kaçırılır", OR.concatSatiri("parca-0/parca.mov") === "file 'parca-0/parca.mov'" &&
+    OR.concatSatiri("C:\\Users\\O'Brien\\p.mov") === "file 'C:/Users/O'\\''Brien/p.mov'", OR.concatSatiri("C:\\Users\\O'Brien\\p.mov"));
+
+  var HM = OR.hataMetni, HS = OR.hataSinifi;
+  var bag = { cikti: "/Users/Şule/Suflo Çıktı/suflo-altyazi-1.mov", g: 1921, y: 1080 };
+  ok("hata: libass yok → Suflo ffmpeg'i", HM("[AVFilterGraph @ 0x55d] No such filter: 'subtitles'\nError initializing complex filters.", 1, bag) ===
+    "ffmpeg'in altyazı filtresi yok: Ayarlar › ffmpeg'den Suflo ffmpeg'ini kur." && HS("No such filter: 'ass'", 1) === "filtre" && HS("[x @ 0x1] Unknown filter 'subtitles'", 1) === "filtre");
+  ok("hata: disk dolu (ENOSPC / No space left) + çıktı klasörü", HS("av_interleaved_write_frame(): No space left on device", 1) === "disk" && HS("Error: ENOSPC: write", 1) === "disk" &&
+    /^Diskte yer kalmadı: .*Çıktı klasörü: \/Users\/Şule\/Suflo Çıktı$/.test(HM("No space left on device", 1, bag)), HM("No space left on device", 1, bag));
+  ok("hata: izin yok (EACCES / Permission denied)", HS("/out/x.mov: Permission denied", 1) === "izin" && HS("EACCES: permission denied, mkdir", -1) === "izin" &&
+    /^Çıktı klasörüne yazılamıyor \(izin yok\)\..*Çıktı klasörü: \/Users\/Şule\/Suflo Çıktı$/.test(HM("Permission denied", 1, bag)));
+  ok("hata: geçersiz / tek sayı boyut", HS("[Parsed_color_0 @ 0x1] Invalid frame size: 0x1080", 1) === "boyut" && HS("width not divisible by 2 (1921x1080)", 1) === "boyut" &&
+    HM("Picture size 0x0 is invalid", 1, bag) === "Katman boyutu geçersiz (1921×1080): sekans ayarlarında kare boyutunu denetle, genişlik ve yükseklik çift sayı olmalı.");
+  ok("hata: font yüklenemedi (gerçek hata ya da son satır)", HS("[Parsed_subtitles_0 @ 0x1] Error opening memory font: Anton.ttf\nfoo", 1) === "font" &&
+    HS("x\n[Parsed_subtitles_0 @ 0x1] fontselect: failed to find any fallback with glyph", 1) === "font" &&
+    /^Yazı tipi yüklenemedi/.test(HM("No usable fontconfig configuration file found", 1, bag)));
+  // doğrulama: ffmpeg mesajsız çöktü / öldürüldü; son satır libass'in başarıda da yazdığı bilgi satırı → font DEĞİL
+  ok("hata: libass bilgi satırı (fontselect eşlemesi, emoji yedek fontu) son satırsa font sayılmaz",
+    HS("Input #0, lavfi\n[Parsed_subtitles_1 @ 0x55d0] fontselect: (Inter, 700, 0) -> /tmp/x/Inter-Bold.ttf, 0, Inter-Bold\n", 1) === "bilinmiyor" &&
+    HS("[Parsed_subtitles_1 @ 0x5] Glyph 0x1F525 not found, selecting one more font for (Inter, 700, 0)\n", 137) === "bilinmiyor" &&
+    /^Altyazı katmanı üretilemedi: fontselect: \(Inter/.test(HM("[Parsed_subtitles_1 @ 0x5] fontselect: (Inter, 700, 0) -> /x.ttf, 0, Inter", 1, bag)),
+    HS("[Parsed_subtitles_1 @ 0x55d0] fontselect: (Inter, 700, 0) -> /tmp/x/Inter-Bold.ttf, 0, Inter-Bold", 1));
+  // doğrulama: fontsdir=. ile libass çalışma klasöründeki HER dosyayı font diye dener; her çizimde (başarıda da)
+  // "Error opening memory font 'altyazi.ass'" yazar. Font olmayan dosyanın satırı font hatası değildir.
+  var LIBASS_GERCEK = "ffmpeg version 6.1.1 Copyright (c) 2000-2023 the FFmpeg developers\n" +
+    "Input #0, lavfi, from 'color=c=black@0.0:s=1280x720:r=25:d=3,format=rgba':\n" +
+    "  Duration: N/A, start: 0.000000, bitrate: N/A\n" +
+    "  Stream #0:0: Video: rawvideo (RGBA / 0x41424752), rgba, 1280x720 [SAR 1:1 DAR 16:9], 25 tbr, 25 tbn\n" +
+    "[Parsed_subtitles_1 @ 0x55d0c] Error opening memory font 'altyazi.ass'\n" +
+    "[Parsed_subtitles_1 @ 0x55d0c] Error opening memory font: 'logo.png'\n" +
+    "[Parsed_subtitles_1 @ 0x55d0c] Using font provider fontconfig\n";
+  ok("hata: libass'in ASS / logo dosyasını font diye deneme satırı font hatası sayılmaz; salt okunur disk 'izin'",
+    HS(LIBASS_GERCEK + "[out#0/mov @ 0x55d0d] Error opening output /Volumes/USB/suflo.mov: Read-only file system\nError opening output files: Read-only file system\n", 1) === "izin" &&
+    HS(LIBASS_GERCEK + "Error: EROFS: read-only file system, open '/mnt/x/a.mov'", -1) === "izin" &&
+    HS(LIBASS_GERCEK + "[out#0/mov @ 0x1] Error writing trailer: Input/output error\n", 1) === "bilinmiyor" &&
+    /Input\/output error$/.test(HM(LIBASS_GERCEK + "[out#0/mov @ 0x1] Error writing trailer: Input/output error\n", 1, bag)),
+    [HS(LIBASS_GERCEK + "Error opening output files: Read-only file system\n", 1), HS(LIBASS_GERCEK + "Error writing trailer: Input/output error\n", 1)].join(","));
+  ok("hata: öldürülen süreç (son satır ilerleme) font sayılmaz; gerçek font dosyası hatası hâlâ font",
+    HS(LIBASS_GERCEK + "frame=  120 fps= 60 q=-0.0 size=    1024kB time=00:00:04.80 bitrate=1747.6kbits/s speed=2.4x\n", 137) === "bilinmiyor" &&
+    HS(LIBASS_GERCEK + "[Parsed_subtitles_1 @ 0x55d0c] Error opening memory font: 'Anton-Regular.ttf'\n", 1) === "font" &&
+    HS("[Parsed_subtitles_1 @ 0x1] Error opening font: '/x/Inter.OTF', 0\n", 1) === "font" &&
+    HS("[Parsed_subtitles_1 @ 0x1] Loading font file './logo.png'\n[Parsed_subtitles_1 @ 0x1] Error opening memory font 'logo.png'\n", 139) === "bilinmiyor",
+    HS(LIBASS_GERCEK + "frame=  120 fps= 60 q=-0.0 size=    1024kB time=00:00:04.80\n", 137));
+  ok("hata: Windows'un her çizimdeki fontconfig uyarısı tek başına font hatası sayılmaz",
+    HS("Fontconfig error: Cannot load default config file: No such file: (null)\nConversion failed!", 1) === "bilinmiyor" &&
+    HM("Fontconfig error: Cannot load default config file\nConversion failed!", 1, bag) === "Altyazı katmanı üretilemedi: Conversion failed!");
+  ok("hata: zaman aşımı ve iptal", HS("abc\n[zaman aşımı]", -1) === "zaman" && /^Katman çizimi zaman sınırını aştı/.test(HM("abc\n[zaman aşımı]", -1, bag)) &&
+    HM("", -2, bag) === "İptal edildi" && HS("No space left on device", -2) === "iptal");
+  ok("hata: bilinmeyen → son stderr satırı (ffmpeg öneki atılmış, kırpılmış), önek verilebilir",
+    HM("a\n  [mov @ 0x55aa] moov atom not found  \n\n", 1, { onek: "Başlık katmanı üretilemedi: " }) === "Başlık katmanı üretilemedi: moov atom not found" &&
+    HM("", 3, {}) === "Altyazı katmanı üretilemedi: ffmpeg kod 3" && HM(new Array(50).join("x") + new Array(400).join("y"), 1).length <= 230);
+  var hEn = [HM("No such filter: 'subtitles'", 1, bag), HM("No space left on device", 1, bag), HM("Permission denied", 1, bag), HM("Invalid frame size", 1, bag),
+    HM("Error opening font: 'Anton.ttf'", 1, bag), HM("[zaman aşımı]", -1, bag), HM("", -2, bag), HM("x\nbozuk", 1, bag)].map(function (m) { return I18Nb.translate(m); });
+  ok("hata metinleri İngilizce (yol ve ffmpeg satırı çevrilmeden)", hEn.every(function (t) { return !/kaldı|yazılamıyor|geçersiz|yüklenemedi|aştı|edildi|üretilemedi|filtresi/.test(t); }) &&
+    /Suflo Çıktı$/.test(hEn[1]) && /: bozuk$/.test(hEn[7]), hEn.join(" | "));
+
+  // sahte K ile render: ilerleme, uyarlanan süre sınırı, iptal (yarım dosya ve geçici klasör silinir), parça hatasında tek süreç
+  function akisK(o) {
+    var K = sahteK();
+    K.os = { cpus: function () { return new Array(o.cpus || 1); } };
+    K.calisan = [];
+    K.run = function (exe, args, opt) {
+      var c = { args: args, cwd: opt.cwd, timeout: opt.timeout, iptal: opt.iptal, dosyalar: fs.readdirSync(opt.cwd) };
+      K.calisan.push(c);
+      var out = args[args.length - 1];
+      var hedef = path.isAbsolute(out) ? out : path.join(opt.cwd, out);
+      return new Promise(function (res) {
+        var bitti = false;
+        function kapat(x) { if (!bitti) { bitti = true; res(x); } }
+        fs.writeFileSync(hedef, "yarim");
+        if (opt.iptal) opt.iptal.dinle(function () { c.olduruldu = true; kapat({ code: -2, iptal: true, stderr: "" }); });
+        var h = o.hata && o.hata(c);
+        if (opt.onStdout) { opt.onStdout("out_time_ms=500000\nprogress=contin"); opt.onStdout("ue\nout_time_ms=N/A\n"); }
+        if (h) { try { fs.unlinkSync(hedef); } catch (e) {} kapat(h); return; }
+        if (o.bekle) { c.bitir = function () { kapat({ code: 0, stderr: "" }); }; return; }
+        setTimeout(function () { kapat({ code: 0, stderr: "" }); }, 2);
+      });
+    };
+    return K;
+  }
+  var dz = [], Ka = akisK({});
+  var ra = await OR.render(Ka, { ass: ASS, fontFiles: ["ArchivoBlack.ttf"], g: 640, y: 360, fps: 25, sure: 2, cikti: path.join(srt, "a.mov"), durum: function (m) { dz.push(m); } });
+  var aa = Ka.calisan[0];
+  ok("render: -progress pipe:1 -nostats ve kesin kare (-frames:v 50)", aa.args.join(" ").indexOf("-frames:v 50 -nostats -progress pipe:1 " + path.join(srt, "a.mov")) !== -1 && ra.kare === 50 && ra.parca === 1, aa.args.join(" "));
+  ok("render: ilerleme durum satırına (%25)", dz.indexOf("Altyazı katmanı çiziliyor · %25") !== -1, dz.join(" | "));
+  // doğrulama: çağıran sınır vermezse eski 1 saatlik taban korunur (yavaş bilgisayarda ağır 4K katman 10 dk'yı aşabilir)
+  ok("render: süre sınırı verilmezse eskisi gibi 1 saat (3 × süre daha büyükse o)", aa.timeout === 3600000, aa.timeout);
+  var Kt5 = akisK({});
+  await OR.render(Kt5, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 5, cikti: path.join(srt, "t5.mov"), timeout: 300000 });
+  ok("render: çağıranın küçük sınırı (kanca 5 dk) en az 10 dk'ya çıkar", Kt5.calisan[0].timeout === 600000, Kt5.calisan[0].timeout);
+  var Kt = akisK({});
+  await OR.render(Kt, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 3600, cikti: path.join(srt, "t.mov") });
+  var Kt2 = akisK({});
+  await OR.render(Kt2, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 10, cikti: path.join(srt, "t2.mov"), timeout: 1800000 });
+  ok("render: 1 saatlik katmanda 3 saat; çağıranın büyük sınırı korunur", Kt.calisan[0].timeout === 10800000 && Kt2.calisan[0].timeout === 1800000, Kt.calisan[0].timeout + " / " + Kt2.calisan[0].timeout);
+  var Kf = akisK({});
+  var rf = await OR.render(Kf, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: NaN, sure: 1, cikti: path.join(srt, "f.mov") });
+  ok("render: fps NaN / 0 → 25", rf.fps === 25 && Kf.calisan[0].args[4].indexOf(":r=25:") !== -1 && (await OR.render(akisK({}), { ass: ASS, g: 64, y: 36, fps: 0, sure: 1, cikti: path.join(srt, "f0.mov") })).fps === 25);
+
+  // iptal (tek süreç)
+  var Ki = akisK({ bekle: true }), ji = OR.yerelJeton(), hi = null;
+  var pi = OR.render(Ki, { ass: ASS, fontFiles: ["ArchivoBlack.ttf"], g: 640, y: 360, fps: 25, sure: 2, cikti: path.join(srt, "iptal.mov"), iptal: ji });
+  await new Promise(function (r) { setTimeout(r, 10); });
+  ji.iptal();
+  try { await pi; } catch (e) { hi = e; }
+  ok("iptal: ffmpeg öldürüldü, e.iptal + 'İptal edildi'", hi && hi.iptal === true && hi.message === "İptal edildi" && Ki.calisan[0].olduruldu === true, hi && hi.message);
+  ok("iptal: yarım çıktı ve geçici klasör silindi", !fs.existsSync(path.join(srt, "iptal.mov")) && fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
+  var Ki2 = akisK({}), j2 = OR.yerelJeton(); j2.iptal();
+  var h2 = null;
+  try { await OR.render(Ki2, { ass: ASS, g: 640, y: 360, fps: 25, sure: 2, cikti: path.join(srt, "i2.mov"), iptal: j2 }); } catch (e) { h2 = e; }
+  ok("iptal: önceden iptal edilmiş jetonla süreç hiç açılmaz, klasör açılmaz", h2 && h2.iptal && Ki2.calisan.length === 0 && fs.readdirSync(tmp).length === 0);
+
+  // parçalı (sahte): her parça kendi klasöründe ASS + font kopyasıyla; birleştirme listesi göreli
+  var Kp = akisK({ cpus: 4 });
+  var rp = await OR.render(Kp, { ass: ASS, fontFiles: ["ArchivoBlack.ttf"], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "p.mov") });
+  var parcalar = Kp.calisan.slice(0, 3), birlestir = Kp.calisan[3];
+  ok("parçalı: 50 sn, 4 çekirdek → 3 parça + birleştirme", rp.parca === 3 && Kp.calisan.length === 4, Kp.calisan.length);
+  ok("parçalı: her parça kendi klasöründe, ASS + font kopyasıyla", parcalar.every(function (c, i) { return /parca-\d$/.test(c.cwd) && c.dosyalar.sort().join() === "ArchivoBlack.ttf,altyazi.ass"; }) &&
+    parcalar[0].cwd !== parcalar[1].cwd, parcalar.map(function (c) { return c.cwd + ":" + c.dosyalar; }).join(" | "));
+  ok("parçalı: kareler 417 + 417 + 416 = 1250, mutlak zaman ofsetleri 0 / 417 / 834", parcalar.map(function (c) { return c.args[c.args.indexOf("-frames:v") + 1]; }).join() === "417,417,416" &&
+    /setpts=PTS\+0,/.test(parcalar[0].args[4]) && /setpts=PTS\+417,/.test(parcalar[1].args[4]) && /setpts=PTS\+834,/.test(parcalar[2].args[4]));
+  ok("parçalı: concat demuxer, -c copy, ses yok, çıktı son argüman", JSON.stringify(birlestir.args) === JSON.stringify(["-y", "-hide_banner", "-nostats", "-f", "concat", "-safe", "0", "-i", "parcalar.txt", "-c", "copy", "-an", path.join(srt, "p.mov")]) &&
+    !/parca-/.test(birlestir.cwd), birlestir.args.join(" "));
+  ok("parçalı: geçici klasörler (parça alt klasörleri dahil) silindi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
+
+  // parçalı iptal: bütün parçalar ölür, birleştirme yok
+  var Kpi = akisK({ cpus: 4, bekle: true }), jpi = OR.yerelJeton(), hpi = null;
+  var ppi = OR.render(Kpi, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "pi.mov"), iptal: jpi });
+  await new Promise(function (r) { setTimeout(r, 10); });
+  jpi.iptal();
+  try { await ppi; } catch (e) { hpi = e; }
+  ok("parçalı iptal: bütün parça süreçleri öldürüldü, birleştirme yok, temiz", hpi && hpi.iptal && Kpi.calisan.length === 3 && Kpi.calisan.every(function (c) { return c.olduruldu; }) &&
+    !fs.existsSync(path.join(srt, "pi.mov")) && fs.readdirSync(tmp).length === 0, Kpi.calisan.length);
+
+  // parça hatası: kardeşler durdurulur, neden günlüğe, tek süreçle yeniden
+  var loglar = [];
+  var Kph = akisK({ cpus: 4, hata: function (c) { return /parca-1$/.test(c.cwd) ? { code: 1, stderr: "[x @ 0x1] bozuk\n" } : null; } });
+  Kph.log = function (m) { loglar.push(m); };
+  var rph = await OR.render(Kph, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "ph.mov") });
+  var son = Kph.calisan[Kph.calisan.length - 1];
+  ok("parça hatası: tek süreçle yeniden çizilir (1250 kare), neden günlükte", rph.parca === 1 && son.cwd.indexOf("parca-") === -1 && son.args.indexOf("1250") !== -1 &&
+    loglar.some(function (l) { return /parçalı render başarısız, tek süreçle yeniden: parça 2: bozuk \(kod 1\)/.test(l); }), loglar.join(" | "));
+  // tekrarlanmaz hata (disk dolu): tek süreçle boşuna denenmez
+  var Kpd = akisK({ cpus: 4, hata: function (c) { return /parca-0$/.test(c.cwd) ? { code: 1, stderr: "No space left on device\n" } : null; } }), hpd = null;
+  try { await OR.render(Kpd, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "pd.mov") }); } catch (e) { hpd = e; }
+  ok("parça hatası disk dolu: tek süreçle yeniden denenmez, anlaşılır hata", hpd && /^Diskte yer kalmadı/.test(hpd.message) && Kpd.calisan.every(function (c) { return /parca-/.test(c.cwd); }),
+    hpd && hpd.message);
+  // doğrulama: birleştirmede disk dolu (parçalar + çıktı = 2 kat yer): parça klasörleri silinince tek süreç sığabilir → yeniden dener
+  var Kcd = akisK({ cpus: 4, hata: function (c) { return c.args.indexOf("concat") !== -1 ? { code: 1, stderr: "[out @ 0x1] Error writing trailer: No space left on device\n" } : null; } });
+  var rcd = await OR.render(Kcd, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "cd.mov") });
+  var sonCd = Kcd.calisan[Kcd.calisan.length - 1];
+  ok("birleştirmede disk dolu: parçalar silinip tek süreçle yeniden çizilir", rcd.parca === 1 && Kcd.calisan.length === 5 && sonCd.cwd.indexOf("parca-") === -1 &&
+    sonCd.args.indexOf("concat") === -1 && sonCd.args.indexOf("1250") !== -1, Kcd.calisan.length);
+  // doğrulama: bir parça hata verince kardeş parçalar öldürülür (boşuna çizmesin); yalnız öldürülerek bitebilen sahte süreçler
+  var Kpk = akisK({ cpus: 4, bekle: true, hata: function (c) { return /parca-1$/.test(c.cwd) ? { code: 1, stderr: "[x @ 0x1] bozuk\n" } : null; } });
+  var ppk = OR.render(Kpk, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "pk.mov") });
+  await new Promise(function (r) { setTimeout(r, 20); });
+  var kardesler = Kpk.calisan.slice(0, 3).filter(function (c) { return !/parca-1$/.test(c.cwd); });
+  ok("parça hatası: kardeş parça süreçleri öldürülür", kardesler.length === 2 && kardesler.every(function (c) { return c.olduruldu === true; }),
+    kardesler.map(function (c) { return c.cwd.slice(-7) + ":" + !!c.olduruldu; }).join(","));
+  Kpk.calisan.forEach(function (c) { if (c.bitir) c.bitir(); });
+  await new Promise(function (r) { setTimeout(r, 20); });
+  Kpk.calisan.forEach(function (c) { if (c.bitir) c.bitir(); });
+  var rpk = await ppk;
+  ok("parça hatası (kardeşler öldürülünce): tek süreçle biter", rpk.parca === 1, rpk.parca);
+  // doğrulama: parça klasörüne kopyalarken disk doldu (ENOSPC): ham hata değil, tek süreçle (tek kopya yeter) yeniden; hiçbir parça başlamaz
+  var Kcp = akisK({ cpus: 4 }), cpLog = [];
+  Kcp.log = function (m) { cpLog.push(m); };
+  Kcp.fs = Object.assign({}, fs, { copyFileSync: function (a, b) {
+    if (/parca-2/.test(b)) { var e = new Error("ENOSPC: no space left on device, copyfile '" + a + "' -> '" + b + "'"); e.code = "ENOSPC"; throw e; }
+    return fs.copyFileSync(a, b);
+  } });
+  var rcp = await OR.render(Kcp, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "cp.mov") });
+  ok("parça klasörü kopyası ENOSPC: tek süreçle yeniden, parça süreci hiç başlamaz, neden günlükte", rcp.parca === 1 && Kcp.calisan.length === 1 &&
+    Kcp.calisan[0].cwd.indexOf("parca-") === -1 && cpLog.some(function (l) { return /tek süreçle yeniden: parça klasörü hazırlanamadı: ENOSPC/.test(l); }) &&
+    fs.readdirSync(tmp).length === 0, Kcp.calisan.length + " | " + cpLog.join(" | "));
+  var Kcp2 = akisK({ cpus: 4 }), hcp2 = null;
+  Kcp2.fs = Object.assign({}, fs, { copyFileSync: function (a, b) { var e = new Error("ENOSPC: no space left on device, copyfile"); e.code = "ENOSPC"; throw e; } });
+  Kcp2.run = (function (eski) { return function (exe, args, opt) { return opt.cwd.indexOf("parca-") === -1 ? Promise.resolve({ code: 1, stderr: "[out @ 0x1] No space left on device\n" }) : eski(exe, args, opt); }; })(Kcp2.run);
+  try { await OR.render(Kcp2, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 50, cikti: path.join(srt, "cp2.mov") }); } catch (e) { hcp2 = e; }
+  ok("tek süreç de diske sığmazsa: anlaşılır 'Diskte yer kalmadı' (ham ENOSPC değil)", hcp2 && /^Diskte yer kalmadı/.test(hcp2.message), hcp2 && hcp2.message);
+  ok("parça hataları sonrası geçici klasör yok", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
   ok("geçici render klasörleri temizlendi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
 
   // 7) gerçek ffmpeg (libass'li) ile render

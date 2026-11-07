@@ -1,0 +1,45 @@
+{
+  "on": true,
+  "stil": {
+    "id": "",
+    "overrides": {
+      "font": "Lora",
+      "fontFile": "Lora.ttf",
+      "renk": "#fafafa",
+      "konturRenk": "#101010",
+      "vurguRenk": "#ff6600",
+      "konumX": 40,
+      "konumY": 70,
+      "golge": {
+        "renk": "#000000",
+        "opak": 60,
+        "mesafe": 4,
+        "yumusak": 3
+      },
+      "kutu": true,
+      "kutuRenk": "#1a1a2e",
+      "kutuOpak": 55
+    }
+  },
+  "kanca": {
+    "stil": "",
+    "renk": "#ff6600",
+    "sure": 3
+  },
+  "ilerleme": {
+    "konum": "alt",
+    "renk": "#ff6600",
+    "kalinlik": 8
+  },
+  "cta": {
+    "acik": true,
+    "metin": "Takip et",
+    "sure": 2
+  },
+  "logo": {
+    "path": "",
+    "kose": "ss",
+    "oran": 0.12
+  },
+  "kredi": false
+}

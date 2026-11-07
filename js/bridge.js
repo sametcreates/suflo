@@ -55,6 +55,19 @@ window.K = (function () {
     catch (e) { return ""; }
   }
 
+  /* ---------------- Ana uygulama ---------------- */
+
+  /*
+   * Panel Premiere Pro'da ("PPRO") mı After Effects'te ("AEFT", deneysel) mi? CSInterface'in host ortamından bir kez
+   * okunur (js/ae-plan.js uygulamaKodu); tarayıcı önizlemesinde / okunamazsa "" (Premiere davranışı). After Effects'te
+   * K.call Premiere işlevlerinin AE karşılığını çağırır, karşılığı olmayanı hiç göndermez (SufloAePlan.hostCagrisi).
+   */
+  var HOST_KODU = "";
+  try {
+    if (window.SufloAePlan && typeof cs.getHostEnvironment === "function") HOST_KODU = window.SufloAePlan.uygulamaKodu(cs.getHostEnvironment());
+  } catch (eH) { HOST_KODU = ""; }
+  function hostKodu() { return HOST_KODU; }
+
   /* ---------------- ExtendScript ---------------- */
 
   /*
@@ -91,6 +104,33 @@ window.K = (function () {
    * eskisi gibi atılır. Zaman aşımı sonucu zamanAsimi: true taşır.
    */
   function call(fn, arg, timeout, gec) {
+    // After Effects: Premiere işlevinin karşılığı (cevabı Premiere biçimine çevrilir) ya da hiç gönderilmeyen engel
+    var es = HOST_KODU === "AEFT" && window.SufloAePlan ? window.SufloAePlan.hostCagrisi(fn, HOST_KODU) : null;
+    if (es && es.engel) {
+      log("jsx " + fn + ": After Effects'te karsiligi yok, gonderilmedi");
+      return Promise.resolve(es.engel);
+    }
+    /*
+     * KSAE_* işlevleri host-ae.jsx'te (panel $.evalFile ile yükler). Açılıştaki yükleme başarısız olduysa bağlam yoklaması
+     * ve "Altyazı oluştur" tanımsız işlevi çağırıp "ExtendScript hatası" alıyordu; yalnız ekle/kaldır yeniden yüklüyordu.
+     * Her KSAE_* çağrısından önce yükleme beklenir: yüklüyse önbellekteki söz (bir mikro görev), değilse yeniden denenir
+     * (otomatik çağrı: son başarısızlıktan 10 sn sonra). hostYukle K.cs.evalScript'i doğrudan kullanır, call'a dönmez.
+     */
+    if (es && /^KSAE_/.test(es.ad) && window.SufloAePanel && typeof window.SufloAePanel.hostYukle === "function") {
+      return Promise.resolve(window.SufloAePanel.hostYukle(true)).then(function (yuklendi) {
+        if (!yuklendi) {
+          log("jsx " + fn + ": host-ae.jsx yuklu degil, gonderilmedi");
+          return { ok: false, error: "After Effects betiği (host-ae.jsx) yüklenemedi." };
+        }
+        return gonder(fn, arg, timeout, gec, es);
+      }, function () { return { ok: false, error: "After Effects betiği (host-ae.jsx) yüklenemedi." }; });
+    }
+    return gonder(fn, arg, timeout, gec, es);
+  }
+
+  function gonder(fn, arg, timeout, gec, es) {
+    var hostFn = es ? es.ad : fn;
+    var donustur = es ? es.donustur : null;
     return new Promise(function (resolve) {
       var bitti = false, asildi = false;
       var id = ++cagriNo;
@@ -111,13 +151,14 @@ window.K = (function () {
       }
       var saat = setTimeout(function () {
         log("jsx ZAMAN ASIMI " + fn + " (" + (timeout || 60000) + " ms)");
-        son({ ok: false, zamanAsimi: true, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
+        // Ana uygulamanın adıyla (After Effects'te "Premiere yanıt vermedi" ve Premiere ipucu yanlış yönlendirirdi)
+        son({ ok: false, zamanAsimi: true, error: (HOST_KODU === "AEFT" ? "After Effects" : "Premiere") + " yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
         asildi = true;
       }, timeout || 60000);
 
       var script = arg === undefined
-        ? fn + "()"
-        : fn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
+        ? hostFn + "()"
+        : hostFn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
       try {
         cs.evalScript(script, function (res) {
           cevapGeldi();
@@ -128,6 +169,7 @@ window.K = (function () {
           }
           try {
             var parsed = JSON.parse(res);
+            if (donustur) parsed = donustur(parsed);
             if (parsed && parsed.ok === false) log("jsx " + fn + ": " + parsed.error);
             son(parsed);
           }
@@ -716,6 +758,8 @@ window.K = (function () {
    * döner: bu "indi" sayılsaydı sayfa model adıyla kaydedilir, DNS ipucu hiç çıkmazdı.
    */
   var SAYFA_GELDI = "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.";
+  // https indirmesi düz http'ye (ya da başka bir şemaya) yönlendirildi: izlenmez (Pro denetimi)
+  var GUVENSIZ_YONLENDIRME = "Sunucu indirmeyi güvenli olmayan bir adrese (https dışı) yönlendirdi; güvenlik için izlenmedi.";
   function kucukGeldi(bayt, beklenenMB) {
     var b = Number(bayt) || 0;
     var boyut = b >= 1048576 ? Math.round(b / 1048576) + " MB" : Math.max(1, Math.ceil(b / 1024)) + " KB";
@@ -963,7 +1007,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "3.4.2";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
+  var VERSION = "3.5.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -1068,6 +1112,11 @@ window.K = (function () {
     {
       re: /Premiere yanıt vermedi/i,
       tip: "Premiere meşgul olabilir. Premiere'e geç, açık iletişim kutusu veya süren " +
+        "render varsa kapat, sonra tekrar dene."
+    },
+    { // aynı köprü After Effects'te (deneysel) kendi adıyla yazar
+      re: /After Effects yanıt vermedi/i,
+      tip: "After Effects meşgul olabilir. After Effects'e geç, açık iletişim kutusu veya süren " +
         "render varsa kapat, sonra tekrar dene."
     },
     { // motor bozuk / çalışmıyor
@@ -1598,6 +1647,16 @@ window.K = (function () {
           var next;
           try { next = new URL(res.headers.location, urlStr).href; }
           catch (eLoc) { next = u.protocol + "//" + u.host + res.headers.location; }
+          // Yalniz https -> https izlenir: indirilen motor / guncelleme / model dosyasi duz http'ye
+          // (ya da baska bir semaya) dusurulemez. Hedefin adi yine DNS teshisine girer (downloadTeshisli)
+          var nextProto = "";
+          try { nextProto = new URL(next).protocol; } catch (eP) {}
+          if (u.protocol !== "https:" || nextProto !== "https:") {
+            try { if (meta._izle) meta._izle.host = new URL(next).hostname; } catch (eH) {}
+            log("indirme: guvensiz yonlendirme reddedildi (" + u.protocol + " -> " + (nextProto || "?") + "): " + u.hostname);
+            resolve({ ok: false, error: GUVENSIZ_YONLENDIRME, kept: partSize(), guvensizYonlendirme: true });
+            return;
+          }
           download(next, destPath, onProgress, redirects + 1, resumeFrom, meta).then(resolve);
           return;
         }
@@ -2002,6 +2061,7 @@ window.K = (function () {
     nodeOK: nodeOK,
     fs: fs, path: path, os: os,
     call: call,
+    hostKodu: hostKodu,
     hostMesgul: hostMesgul,
     run: run,
     runAkis: runAkis,

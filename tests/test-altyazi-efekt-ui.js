@@ -22,6 +22,7 @@ var SS = require(path.join(KOK, "js", "style-share.js"));
 var SE = require(path.join(KOK, "js", "style-engine.js"));
 var MK = require(path.join(KOK, "js", "marka-kiti.js"));
 var AE = require(path.join(KOK, "js", "altyazi-efekt.js"));
+var GAL = require(path.join(KOK, "js", "stil-galeri.js"));
 
 /* ---------------- küçük sahte DOM ---------------- */
 function dugum(etiket, ek) {
@@ -77,6 +78,8 @@ function ortam(o) {
     "cap-efekt-vurgu": dugum("input", { type: "checkbox", checked: true }), "cap-efekt-kalin": dugum("input", { type: "checkbox", checked: true }),
     "cap-efekt-italik": dugum("input", { type: "checkbox" }), "cap-efekt-satir": dugum("select", { value: "2" }),
     "cap-efekt-kelime": dugum("input", { value: "5" }), "cap-efekt-gorunumler": dugum("div"), "cap-efekt": dugum("section", { className: "efekt" }),
+    // Stil kütüphanesi (parti 3): kategori sekmeleri ve ipucu (js/stil-galeri.js)
+    "cap-efekt-kategoriler": dugum("div"), "cap-efekt-ipucu": dugum("div", { hidden: true, id: "cap-efekt-ipucu" }),
     "cap-stil-grid": dugum("div"), "cap-ince-ayar": dugum("details"), "cap-font-sistem": dugum("optgroup"),
     "cap-guvenli-yerlesim-sar": dugum("label"), "cap-marka-kiti-cip": dugum("span"), "cap-stil-yazar": dugum("input", { value: "" }),
     // 3.3 adım 17: gölge, kutu, serbest konum, önizleme sahnesi ve artı işareti
@@ -99,6 +102,13 @@ function ortam(o) {
   dom["cap-sahne"].focus = function () {};
   var K = { settings: function () { return ayar; }, saveSettings: function () { kayit++; }, log: function () {}, MAC: !!o.mac };
   var window = { SufloStyleEngine: SE, SufloStyleShare: SS, SufloMarkaKiti: MK, SufloAltyaziEfekt: AE, KApp: { ctx: function () { return o.ctx || {}; } } };
+  if (!o.galerisiz) window.SufloStilGaleri = GAL;
+  // Yazı animasyonu seçicisi (yalnız istenince: kütüphanenin animasyonlu görünümleri)
+  if (o.anim) { window.SufloYaziAnimasyon = require(path.join(KOK, "js", "yazi-animasyonlari.js")); dom["cap-efekt-anim"] = dugum("select", { value: "" }); }
+  // Tarayıcı deposu (galerinin kategori sekmesi): verilen sahte depo; o.depoHatali: erişim fırlatır (gizli pencere gibi)
+  if (o.depo) window.localStorage = o.depo;
+  if (o.depoHatali) Object.defineProperty(window, "localStorage", { get: function () { throw new Error("SecurityError"); } });
+  if (o.aracAra) window.SufloAracAra = o.aracAra;
   // CEP köprüsü (yalnız verilirse): registerKeyEventsInterest çağrıları kaydedilir
   if (o.cep) window.__adobe_cep__ = o.cep;
   var kod = [
@@ -107,10 +117,10 @@ function ortam(o) {
     govde("function efektSonrasi("), govde("function gorunumUygula("), govde("function gorunumleriCiz("), govde("function efektKelimeSayisi("),
     govde("function stil()"), govde("function motorAyarlari("), govde("function savePrefs("), govde("function loadPrefs("), govde("function stiliYaz("),
     govde("function markaKiti("), govde("function dikeySekans("), govde("function inceAyarDurumu("), govde("function stilKredisi("),
-    govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon("),
+    govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon("), govde("function tarayiciDeposu("), govde("function galeriTuslariniTut("),
     govde("function efektVarsayilan("), govde("function sablonumUygula("),
     govde("function efektSayi("), govde("function efektSayiAlani("), govde("function serbestKonumDegeri("), govde("function efektBagimliDurum("),
-    govde("function konumAktif("), govde("function konumOlcusu("), govde("function konumOrnegi("), govde("function konumTuslariniTut("),
+    govde("function konumAktif("), govde("function konumOlcusu("), govde("function kirilimDili("), govde("function konumOrnegi("), govde("function konumTuslariniTut("),
     govde("function motorOnizlemeCueleri("), govde("function sahneNoktasi("), govde("function artiGoster("), govde("function konumYaz("),
     govde("function konumDegisti("), govde("function konumSuruklemeAdim("), govde("function konumSuruklemeBitir("), govde("function konumSifirla("),
     govde("function konumSurukleBagla("), govde("function sahneErisimi("), govde("function stilYedegi("), govde("function stilYedeginiYukle("),
@@ -128,6 +138,7 @@ function ortam(o) {
     "var SS = window.SufloStyleShare, AE = window.SufloAltyaziEfekt, EFEKT = 'efekt';\n" +
     cap.slice(cap.indexOf("  var EFEKT_SAYILARI = "), cap.indexOf("\n", cap.indexOf("\"cap-kutu-opak\": [50, 0, 100] };")) + 1) +
     "var secilenMogrt = null, secilenMotorStili = '', secilenGorunum = '', sonGorunum = '', bekleyenMogrtYolu = '', stilKrediAd = '';\n" +
+    "var katmanIptal = null, katmanHazirlaniyor = false;\n" +
     "var FONTLAR = SS.fontFiles();\n" +
     "var PRESETS = {}; window.SufloStyleEngine.list().forEach(function (p) { PRESETS[p.id] = motorPreset(p.id); });\n" +
     "var onizleme = { durdur: 0, ciz: 0, tazele: [], oynat: 0 };\n" +
@@ -330,6 +341,12 @@ ok("index.html: oluşturucunun kontrolleri (giriş, vurgu animasyonu, kelime vur
   ["cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-vurgu", "cap-efekt-kalin", "cap-efekt-italik", "cap-efekt-satir", "cap-efekt-kelime", "cap-renk-vurgu", "cap-renk",
     "cap-renk-kontur", "cap-font", "cap-boyut", "cap-kontur", "cap-konum"].every(function (id) { return html.indexOf('id="' + id + '"') !== -1; }) &&
   /<option value="glitch">Glitch<\/option>/.test(html) && /<option value="yukari">Yukarı kay<\/option>/.test(html));
+// Kalite motoru: satır sayısı bir üst sınır (sığan kısa kart bölünmez); seçicinin ipucu bunu söyler, İngilizcesi var
+var satirIpucu = /<select id="cap-efekt-satir" title="([^"]+)">/.exec(html);
+var enKaynak = fs.readFileSync(path.join(KOK, "i18n", "en.js"), "utf8");
+ok("index.html: Satır sayısı seçicisinin ipucu 'en çok' (üst sınır) der; i18n/en.js'te karşılığı var",
+  !!satirIpucu && /en çok/.test(satirIpucu[1]) && /bölünmez/.test(satirIpucu[1]) && enKaynak.indexOf(JSON.stringify(satirIpucu[1]) + ":") !== -1,
+  satirIpucu && satirIpucu[1]);
 var ou = govde("async function overlayUygula(");
 ok("timeline'a ekleme Pro.gate('overlay') (3 deneme), efekt katmanı 'Suflo Altyazı Efekti' adıyla", /Pro\.gate\("overlay", \{ deneme: true/.test(ou) &&
   /"Suflo Altyazı Efekti"/.test(ou) && /Deneme yalnız Altyazı Efektleri için/.test(ou));
@@ -381,7 +398,9 @@ var sahne = sk.dom["cap-sahne"];
 function olay(ad, e) { (sahne.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 7, button: 0, target: sahne, preventDefault: function () {} }, e || {})); }); }
 // sahnenin %'si → sayfa pikseli (400 × 225 sahne (100, 50)'de)
 function px(x, y, ek) { return Object.assign({ clientX: 100 + x / 100 * 400, clientY: 50 + y / 100 * 225 }, ek || {}); }
-var alt0 = AE.konumNoktasi(sk.api.efektAyari());   // Temiz Alt'ın kart ortası (50 · 76,9)
+// Temiz Alt'ın kart ortası (50 · 76,9). Kalite motoru: kartın satır sayısı üst sınır, nokta önizlemenin örnek kartlarıyla
+// (konumOrnegi: "Bunu *sakın* kaçırma arkadaşlar bugün" 16:9'da iki satır) hesaplanır
+var alt0 = AE.konumNoktasi(sk.api.efektAyari(), { w: 1920, h: 1080, ornek: sk.api.konumOrnegi() });
 var kayit0 = sk.kayit(), tazele0 = sk.api.onizleme.tazele.length, ciz0 = sk.api.onizleme.ciz;
 olay("pointerdown", px(alt0.x, alt0.y));
 ok("sürükle: basınca işaretçi yakalanır, artı işareti kartın şimdiki ortasında ('Alt · hazır konum'); basmak yazıyı oynatmaz, çizmez",
@@ -407,7 +426,8 @@ ok("bırakınca: işaretçi bırakılır, konum tercihe yazılır, gerçek öniz
   sk.api.onizleme.tazele.length === tazele0 + 1 && sk.api.durum().gorunum === "" && sk.dom["cap-konum-serbest"].hidden === false &&
   sk.dom["cap-konum-serbest-deger"].textContent === "X %60 · Y %20", J(prefs7 && [prefs7.konumX, prefs7.konumY]));
 var ov8 = sk.api.motorAyarlari(sk.api.stil());
-ok("serbest konum motora gider ve çizilir (1920×1080'de %60 / %20 → 1152, 216)", ov8.konumX === 60 && ov8.konumY === 20 && /\\an5\\pos\(1152,216\)/.test(ciz(Object.assign({}, ov8, { giris: "yok" })).ass));
+// 3 kelimelik kart: 16:9'da tek satır ve dar (kalite motoru), X %60'ta kadraj kenarına kırpılmaz
+ok("serbest konum motora gider ve çizilir (1920×1080'de %60 / %20 → 1152, 216)", ov8.konumX === 60 && ov8.konumY === 20 && /\\an5\\pos\(1152,216\)/.test(ciz(Object.assign({}, ov8, { giris: "yok", kelime: 3 })).ass));
 // kartın kenarından tutmak: kart ortası basılan noktaya zıplamaz, fark korunur
 olay("pointerdown", px(64, 24));
 olay("pointermove", px(70, 30));
@@ -513,7 +533,7 @@ gc.api.gorunumUygula("temiz");
 gc.api.konumSurukleBagla();
 var gs = gc.dom["cap-sahne"];
 function gOlay(ad, e) { (gs.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 3, button: 0, target: gs, preventDefault: function () {} }, e || {})); }); }
-var gAlt = AE.konumNoktasi(gc.api.efektAyari());
+var gAlt = AE.konumNoktasi(gc.api.efektAyari(), { w: 1920, h: 1080, ornek: gc.api.konumOrnegi() });
 gOlay("pointerdown", px(gAlt.x, gAlt.y));
 gOlay("pointermove", px(50, 61));
 var gecisKonum = gc.dom["cap-konum"].value;
@@ -777,6 +797,166 @@ function kayitliMogrt(liste) {
 var mVar = kayitliMogrt([{ path: "C:/gone/Suflo Pop.mogrt", display: "9x16 Suflo Pop", group: "caption" }]);
 ok("kayıtlı MOGRT listede: o seçilir (değişmedi)", mVar.api.durum().mogrt && mVar.api.durum().mogrt.path === "C:/gone/Suflo Pop.mogrt" && mVar.api.durum().motor === "" &&
   !mVar.dom["cap-efekt"].classList.contains("etkin"), J(mVar.api.durum()));
+
+/* ---------------- Stil kütüphanesi (parti 3): kategori sekmeleri, süzgeç, klavye, ipucu, Marka Kiti örneği ---------------- */
+function galeriOlay(n, ad, ek) { var e = Object.assign({ target: n, preventDefault: function () { e.onlendi = true; } }, ek || {}); (n.dinle[ad] || []).forEach(function (f) { f(e); }); return e; }
+function sahteDepo(ilk) { var v = {}; if (ilk !== undefined) v["suflo.efektKategori"] = ilk;
+  return { getItem: function (k) { return Object.prototype.hasOwnProperty.call(v, k) ? v[k] : null; }, setItem: function (k, x) { v[k] = String(x); }, v: v }; }
+function gorunenCipler(o) { return o.dom["cap-efekt-gorunumler"].childNodes.filter(function (c) { return !c.hidden; }); }
+var katSayisi = {};
+AE.GORUNUMLER.forEach(function (g) { katSayisi[g.kategori] = (katSayisi[g.kategori] || 0) + 1; });
+var gd = sahteDepo();
+var gk = ortam({ depo: gd, ayar: { userPreset: { maxlen: "l42", kase: "normal", punct: true, stil: Object.assign({ aile: "efekt" }, AE.overrides(AE.gorunum("temiz").ayar)) } } });
+gk.api.gorunumleriCiz();
+var gCip = gk.dom["cap-efekt-gorunumler"].childNodes, sekme = gk.dom["cap-efekt-kategoriler"].childNodes;
+ok("galeri: çip sayısı hâlâ GORUNUMLER + ★ Şablonum, her çipte data-kategori (Şablonum kategorisiz), sırası ve adı aynı",
+  gCip.length === AE.GORUNUMLER.length + 1 && AE.GORUNUMLER.every(function (g, i) { return gCip[i].getAttribute("data-gorunum") === g.id &&
+    gCip[i].getAttribute("data-kategori") === g.kategori && gCip[i].childNodes[1].textContent === g.ad && gCip[i].classList.contains("efekt-cip"); }) &&
+  gCip[gCip.length - 1].getAttribute("data-kategori") === null);
+ok("galeri: sekmeler Tümü + altı kategori + AutoCaptions (Türkçe adlarıyla), başta Tümü seçili ve hepsi görünür",
+  sekme.map(function (b) { return b.textContent; }).join("|") === "Tümü|Viral · Shorts|Minimal|Podcast|Eğitim|Sinematik|Marka|AutoCaptions" &&
+  sekme.every(function (b) { return b.classList.contains("efekt-kategori") && b.getAttribute("role") === "tab"; }) &&
+  sekme[0].getAttribute("aria-selected") === "true" && gorunenCipler(gk).length === gCip.length);
+ok("galeri: çip örneği yazı tipinde, yazı / kontur / vurgu rengi, kutu zemini ve yazı animasyonunun minik glifi (çeviriden muaf)", (function () {
+  var p = gCip[gIdx("patlama")].childNodes[0], k = gCip[gIdx("kagit")].childNodes[0], t = gCip[gIdx("temiz")].childNodes[0];
+  return p.getAttribute("data-i18n-skip") === "" && p.style.fontFamily === '"Bangers", sans-serif' && p.style.color === "#ffffff" && p.style["--efekt-kontur"] === "#1a0b2e" &&
+    p.childNodes[1].style.color === "#ff7a1a" && p.childNodes[2].className === "efekt-cip-anim" && p.childNodes[2].textContent === "•" &&
+    k.classList.contains("efekt-cip-ornek-kutu") && k.style["--efekt-kutu"] === "#f5efe1" && k.style.color === "#1d1b16" && t.childNodes[2].textContent === "°";
+})());
+function gIdx(id) { return AE.GORUNUMLER.map(function (g) { return g.id; }).indexOf(id); }
+galeriOlay(sekme[3], "click");
+ok("galeri: Podcast sekmesi yalnız podcast çiplerini gösterir (gizliler hidden), ★ Şablonum her sekmede, seçim depoya yazılır",
+  gorunenCipler(gk).length === katSayisi.podcast + 1 && gorunenCipler(gk).every(function (c) { return c.getAttribute("data-kategori") === "podcast" || c.getAttribute("data-sablonum") === "1"; }) &&
+  gCip.filter(function (c) { return c.hidden; }).every(function (c) { return c.getAttribute("hidden") === "" && c.getAttribute("data-kategori") !== "podcast"; }) &&
+  gd.v["suflo.efektKategori"] === "podcast" && sekme[3].classList.contains("secili") && sekme[3].getAttribute("aria-selected") === "true" && !sekme[0].classList.contains("secili"),
+  gorunenCipler(gk).map(function (c) { return c.getAttribute("data-gorunum"); }).join(","));
+ok("galeri: süzgeç çip sayısını değiştirmez (sayı = GORUNUMLER + 1), Tümü hepsini geri getirir", gCip.length === AE.GORUNUMLER.length + 1 &&
+  (galeriOlay(sekme[0], "click"), gorunenCipler(gk).length === gCip.length) && gd.v["suflo.efektKategori"] === "tumu");
+galeriOlay(sekme[6], "click");
+ok("galeri: Marka sekmesi ≥ 3 Marka görünümü", gorunenCipler(gk).filter(function (c) { return c.getAttribute("data-marka"); }).length === katSayisi.marka && katSayisi.marka >= 3);
+// yeniden çizim (ör. dil değişti, Şablonum kaydedildi) seçili sekmeyi korur
+gk.api.gorunumleriCiz();
+ok("galeri: yeniden çizim seçili sekmeyi korur", gk.dom["cap-efekt-gorunumler"].childNodes.filter(function (c) { return !c.hidden && c.getAttribute("data-kategori"); }).length === katSayisi.marka &&
+  gk.dom["cap-efekt-kategoriler"].childNodes[6].classList.contains("secili"));
+var hatirla = ortam({ depo: sahteDepo("egitim") });
+hatirla.api.gorunumleriCiz();
+ok("galeri: kategori izleyicinin tarayıcısında hatırlanır (açılışta Eğitim)", gorunenCipler(hatirla).length === katSayisi.egitim &&
+  hatirla.dom["cap-efekt-kategoriler"].childNodes[4].getAttribute("aria-selected") === "true");
+var bozukKayit = ortam({ depo: sahteDepo("__proto__") }), depoYok = ortam({ depoHatali: true });
+bozukKayit.api.gorunumleriCiz();
+var depoHatasi = null;
+try { depoYok.api.gorunumleriCiz(); galeriOlay(depoYok.dom["cap-efekt-kategoriler"].childNodes[2], "click"); } catch (e) { depoHatasi = e; }
+ok("galeri: bilinmeyen kayıt Tümü'ye döner; depo erişilemezse (gizli pencere) hata yok, süzgeç yine çalışır", gorunenCipler(bozukKayit).length === AE.GORUNUMLER.length &&
+  depoHatasi === null && gorunenCipler(depoYok).length === katSayisi.minimal, String(depoHatasi));
+
+/* klavye: ok tuşları görünen çipler arasında (gizlileri atlar, sarar), Enter / tıklama uygular */
+var kl = ortam({ depo: sahteDepo("sinematik"), anim: true }), odak = [];
+kl.api.gorunumleriCiz();
+var klG = gorunenCipler(kl);
+klG.forEach(function (c) { c.focus = function () { odak.push(c.getAttribute("data-gorunum")); }; });
+// dinleyiciler galeri kabında (olay çipten kaba kabarır): hedef çip
+var klKap = kl.dom["cap-efekt-gorunumler"];
+var k1 = galeriOlay(klKap, "keydown", { target: klG[0], key: "ArrowRight" });
+galeriOlay(klKap, "keydown", { target: klG[1].childNodes[0], key: "ArrowDown" });
+galeriOlay(klKap, "keydown", { target: klG[0], key: "ArrowLeft" });
+galeriOlay(klKap, "keydown", { target: klG[0], key: "End" });
+var k5 = galeriOlay(klKap, "keydown", { target: klG[0], key: "a" });
+ok("klavye: → / ↓ sonraki, ← sarar, End son görünen çip; yalnız görünen (sinematik) çipler; tuş varsayılanı engellenir, harf tuşu değil",
+  J(odak) === J([klG[1], klG[2], klG[klG.length - 1], klG[klG.length - 1]].map(function (c) { return c.getAttribute("data-gorunum"); })) &&
+  k1.onlendi === true && !k5.onlendi && odak.every(function (id) { return AE.gorunum(id).kategori === "sinematik"; }), J(odak));
+ok("klavye: galeri tek Tab durağı (odaktaki çip tabindex 0, diğerleri ve gizliler -1)", kl.dom["cap-efekt-gorunumler"].childNodes.filter(function (c) { return c.getAttribute("tabindex") === "0"; }).length === 1 &&
+  klG[klG.length - 1].getAttribute("tabindex") === "0" && kl.dom["cap-efekt-gorunumler"].childNodes.filter(function (c) { return c.hidden; }).every(function (c) { return c.getAttribute("tabindex") === "-1"; }));
+klG[1].click();   // Enter / Boşluk düğmenin kendi tıklamasıdır (Jenerik: yazı animasyonlu)
+galeriOlay(klKap, "click", { target: klG[1] });
+ok("Enter / tıklama görünümü uygular ve gerçek önizlemeyi ister (yazı animasyonlu kütüphane görünümü animasyonuyla)", kl.api.durum().gorunum === "jenerik" &&
+  klG[1].getAttribute("data-gorunum") === "jenerik" && J(kl.api.onizleme.tazele) === "[true]" && kl.api.stil().anim === "aralik-acil" &&
+  kl.api.motorAyarlari(kl.api.stil()).anim === "aralik-acil" && klG[1].classList.contains("secili") && klG[1].getAttribute("tabindex") === "0" &&
+  kl.dom["cap-case"].value === "upper", J([kl.api.durum(), kl.api.stil().anim]));
+
+/* ipucu: 300 ms üzerinde durunca / odaklanınca ad + açıklama; ayrılınca gizli */
+var zam = [], ipO = ortam();
+ipO.api.gorunumleriCiz();
+var ipDom = ipO.dom["cap-efekt-ipucu"];
+ipDom.ownerDocument = { createElement: function (t) { return dugum(t); } };
+var ipCip = ipO.dom["cap-efekt-gorunumler"].childNodes[gIdx("tebesir")];
+var ipKap = ipO.dom["cap-efekt-gorunumler"];
+ipKap.__stilGaleri.zaman = { kur: function (f, ms) { zam.push({ f: f, ms: ms }); return zam.length; }, sil: function (i) { if (zam[i - 1]) zam[i - 1].iptal = true; } };
+galeriOlay(ipKap, "mouseover", { target: ipCip.childNodes[0] });
+ok("ipucu: üzerine gelince 300 ms sonraya planlanır, hemen görünmez", zam.length === 1 && zam[0].ms === 300 && ipDom.hidden === true);
+zam[0].f();
+ok("ipucu: 300 ms sonra çipin adı ve açıklaması (çeviri için ayrı öğelerde), çip ipucuna bağlı", ipDom.hidden === false &&
+  metinleri(ipDom).join("|") === "Tebeşir|" + AE.gorunum("tebesir").aciklama && ipCip.getAttribute("aria-describedby") === "cap-efekt-ipucu", metinleri(ipDom).join("|"));
+galeriOlay(ipKap, "mouseout", { target: ipCip, relatedTarget: null });
+galeriOlay(ipKap, "focusin", { target: ipCip });
+galeriOlay(ipKap, "focusout", { target: ipCip, relatedTarget: null });
+ok("ipucu: ayrılınca gizlenir, odak da planlar, odak gidince bekleyen ipucu iptal", ipDom.hidden === true && zam.length === 2 && zam[1].iptal === true &&
+  ipCip.getAttribute("aria-describedby") === null);
+
+/* CEP tuş ilgisi: galeri odaktayken oklar / Enter panelde kalır (araç aramanın Ctrl+K ilgisiyle birleşik) */
+var ilgiler = [], ti = ortam({ mac: true, aracAra: { tusIlgisiAyarla: function (sahip, l) { ilgiler.push([sahip, l]); return true; } } });
+ti.api.gorunumleriCiz();
+var tiCip = ti.dom["cap-efekt-gorunumler"].childNodes[0];
+galeriOlay(ti.dom["cap-efekt-gorunumler"], "focusin", { target: tiCip });
+galeriOlay(ti.dom["cap-efekt-gorunumler"], "focusout", { target: tiCip, relatedTarget: ti.dom["cap-efekt-gorunumler"].childNodes[1] });
+galeriOlay(ti.dom["cap-efekt-gorunumler"], "focusout", { target: tiCip, relatedTarget: null });
+ok("tuş ilgisi: odakla 'galeri' sahibi macOS okları + Home / End + Return / Boşluk; çipten çipe geçiş bırakmaz, dışarı çıkınca bırakır",
+  ilgiler.length === 2 && ilgiler[0][0] === "galeri" && J(JSON.parse(ilgiler[0][1]).map(function (x) { return x.keyCode; })) === "[123,124,125,126,115,119,36,76,49]" &&
+  ilgiler[1][1] === "" && JSON.parse(GAL.tusIlgisi(false)).map(function (x) { return x.keyCode; }).join(",") === "37,38,39,40,36,35,13,32", J(ilgiler));
+
+/* Marka Kiti: Marka görünümlerinin çipi kitin örneğini gösterir, uygulamada kitin yazı tipi / renkleri */
+var kitAyar = { markaKiti: { on: true, stil: { overrides: { font: "Lora", renk: "#ff0000", konturRenk: "#101010", vurguRenk: "#00ff00" } } } };
+var mk = ortam({ ayar: kitAyar });
+mk.api.gorunumleriCiz();
+var mkG = mk.dom["cap-efekt-gorunumler"].childNodes;
+var markaCip = mkG[gIdx("marka-sade")], digerCip = mkG[gIdx("temiz")];
+ok("Marka Kiti açık: Marka çiplerinin örneği kitin yazı tipi ve renkleriyle (kit halkası), diğer çipler kendi görünümleriyle",
+  AE.GORUNUMLER.filter(function (g) { return g.marka; }).every(function (g) { var c = mkG[gIdx(g.id)], o = c.childNodes[0];
+    return c.getAttribute("data-marka") === "kit" && o.style.fontFamily === '"Lora", sans-serif' && o.style.color === "#ff0000" && o.childNodes[1].style.color === "#00ff00" &&
+      o.classList.contains("efekt-cip-ornek-kit"); }) &&
+  digerCip.childNodes[0].style.fontFamily === '"Montserrat", sans-serif' && digerCip.childNodes[0].style.color === "#ffffff" && !digerCip.childNodes[0].classList.contains("efekt-cip-ornek-kit"));
+markaCip.click();
+ok("Marka Kiti açık: Marka görünümü kitin yazı tipi / renkleriyle uygulanır, animasyon ve punto görünümden", mk.dom["cap-font"].value === "Lora" && mk.dom["cap-renk"].value === "#ff0000" &&
+  mk.dom["cap-renk-vurgu"].value === "#00ff00" && mk.dom["cap-renk-kontur"].value === "#101010" && mk.dom["cap-boyut"].value === String(AE.gorunum("marka-sade").ayar.boyut) &&
+  mk.api.durum().gorunum === "marka-sade", J([mk.dom["cap-font"].value, mk.dom["cap-renk"].value]));
+var mkKapali = ortam();
+mkKapali.api.gorunumleriCiz();
+var kapaliCip = mkKapali.dom["cap-efekt-gorunumler"].childNodes[gIdx("marka-vurgulu")];
+kapaliCip.click();
+ok("Marka Kiti kapalı: Marka görünümü nötr varsayılanlarıyla (çip kitsiz örnek)", kapaliCip.getAttribute("data-marka") === "1" && kapaliCip.childNodes[0].style.fontFamily === '"Poppins", sans-serif' &&
+  mkKapali.dom["cap-font"].value === "Poppins" && mkKapali.dom["cap-renk-vurgu"].value === AE.gorunum("marka-vurgulu").ayar.vurguRenk);
+var kitDegisiminde = govde("function markaKitiDegisti(");
+ok("kit değişince Marka çipleri yeniden çizilir (yalnız kitin stil alanı değişince)", /MK\.styleFieldsChanged\(eski, yeni\)\) gorunumleriCiz\(\);/.test(kitDegisiminde));
+
+/* galeri modülü yüklenmezse çipler (sayı, ad, tıklama) yine çalışır */
+var gs = ortam({ galerisiz: true });
+gs.api.gorunumleriCiz();
+ok("galeri modülü yoksa: çipler yalın örnekle, sayı ve ad aynı, tıklama uygular; sekme yok", gs.dom["cap-efekt-gorunumler"].childNodes.length === AE.GORUNUMLER.length &&
+  gs.dom["cap-efekt-gorunumler"].childNodes[1].childNodes[1].textContent === "Vurucu" && gs.dom["cap-efekt-kategoriler"].childNodes.length === 0 &&
+  (gs.dom["cap-efekt-gorunumler"].childNodes[1].click(), gs.api.durum().gorunum === "vurucu"));
+ok("index.html: sekmeler çiplerin üstünde, ipucu altında; stil-galeri.js captions.js'ten önce", html.indexOf('id="cap-efekt-kategoriler"') !== -1 &&
+  html.indexOf('id="cap-efekt-kategoriler"') < html.indexOf('id="cap-efekt-gorunumler"') && html.indexOf('id="cap-efekt-gorunumler"') < html.indexOf('id="cap-efekt-ipucu"') &&
+  html.indexOf('src="js/stil-galeri.js"') > html.indexOf('src="js/altyazi-efekt.js"') && html.indexOf('src="js/stil-galeri.js"') < html.indexOf('src="js/captions.js"'));
+var css = fs.readFileSync(path.join(KOK, "css", "style.css"), "utf8");
+ok("CSS: gizli çip gerçekten gizli (display: inline-flex [hidden]'ı ezmesin), dar panelde taşmaz (sekmeler kırılır, ipucu galeri genişliğinde)",
+  /\.efekt-cip\[hidden\]\s*\{\s*display:\s*none;?\s*\}/.test(css) && /\.efekt-kategoriler\s*\{[^}]*flex-wrap:\s*wrap/.test(css) &&
+  /\.efekt-galeri-ipucu\s*\{[^}]*left:\s*0;\s*right:\s*0/.test(css) && /\.efekt-galeri-ipucu\[hidden\]\s*\{\s*display:\s*none/.test(css) && /\.efekt-cip\s*\{\s*max-width:\s*calc\(100% - 6px\)/.test(css));
+/*
+ * Doğrulama (parti 3): galerinin ipucu kutusu önceden var olan ".efekt-ipucu" sınıfını (konum sürükleme ipucu
+ * paragrafı, "İpucu: önizlemede yazıyı sürükleyerek…") paylaşıyordu: yeni position: absolute / çerçeve / zemin kuralı o
+ * paragrafa da işleyip onu önizlemenin üstünde yüzen bir kutuya çeviriyordu. Galeri ipucunun sınıfı kendine ait olmalı.
+ */
+var galeriIpucuEtiketi = (html.match(/<div[^>]*id="cap-efekt-ipucu"[^>]*>/) || [""])[0];
+var galeriIpucuSinifi = ((galeriIpucuEtiketi.match(/class="([^"]*)"/) || [, ""])[1]).split(/\s+/).filter(Boolean);
+var htmlSiniflari = (html.match(/class="[^"]*"/g) || []).map(function (c) { return c.slice(7, -1).split(/\s+/); });
+ok("galeri ipucunun sınıfları index.html'de başka hiçbir öğede yok (sürükleme ipucu paragrafı yüzen kutuya dönmez)",
+  galeriIpucuSinifi.length > 0 && galeriIpucuSinifi.every(function (k) {
+    return htmlSiniflari.filter(function (l) { return l.indexOf(k) !== -1; }).length === 1;
+  }), galeriIpucuSinifi.join(" "));
+var suruklemeIpucu = (html.match(/<p class="([^"]*)">İpucu: önizlemede yazıyı sürükleyerek/) || [, ""])[1];
+var yuzenKurallar = (css.match(/[^{}]+\{[^}]*position:\s*absolute[^}]*\}/g) || []).filter(function (r) {
+  return suruklemeIpucu && r.split("{")[0].split(",").some(function (sec) { return new RegExp("\\." + suruklemeIpucu + "(?![\\w-])").test(sec); });
+});
+ok("sürükleme ipucu paragrafı (.efekt-ipucu) konumlanmış kutu değil", suruklemeIpucu === "efekt-ipucu" && yuzenKurallar.length === 0, yuzenKurallar.join(" | "));
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);
