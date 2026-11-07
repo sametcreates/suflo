@@ -297,9 +297,9 @@ ok("Kutulu görünümü motorda kutuyla, Vurucu / Zarif gölgeyle çizilir", /St
 
 /* ---------------- Parti 3: stil kütüphanesi (kategoriler, 24+ özgün görünüm, tipografi kuralları) ---------------- */
 var KAT = AE.KATEGORILER.map(function (k) { return k.id; });
-ok("KATEGORILER: altı Suflo kategorisi + AutoCaptions koleksiyonu, Türkçe adlarıyla", J(AE.KATEGORILER) === J([{ id: "viral", ad: "Viral · Shorts" }, { id: "minimal", ad: "Minimal" },
+ok("KATEGORILER: altı Suflo kategorisi + yeni koleksiyon (\"Yeni\"; panelde AutoCaptions adı yazmaz), Türkçe adlarıyla", J(AE.KATEGORILER) === J([{ id: "viral", ad: "Viral · Shorts" }, { id: "minimal", ad: "Minimal" },
   { id: "podcast", ad: "Podcast" }, { id: "egitim", ad: "Eğitim" }, { id: "sinematik", ad: "Sinematik" }, { id: "marka", ad: "Marka" },
-  { id: "autocaptions", ad: "AutoCaptions" }]), J(AE.KATEGORILER));
+  { id: "autocaptions", ad: "Yeni" }]), J(AE.KATEGORILER));
 // AutoCaptions koleksiyonu (ClashiVFX AutoCaptions, yazarın izniyle): 19 görünüm, hepsi kütüphanenin sonunda, koleksiyon işaretli
 var ACG = AE.GORUNUMLER.filter(function (g) { return g.kategori === "autocaptions"; });
 ok("AutoCaptions koleksiyonu: 19 görünüm, kimlikler ac-, koleksiyon: autocaptions yalnız onlarda, listenin sonunda, en az 8'i koleksiyonun animasyonlarıyla",

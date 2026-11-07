@@ -138,7 +138,7 @@
     { id: "sinematik", ad: "Sinematik" },
     { id: "marka", ad: "Marka" },
     // AutoCaptions koleksiyonu (aşağıda; yazarın izniyle)
-    { id: "autocaptions", ad: "AutoCaptions" }
+    { id: "autocaptions", ad: "Yeni" }
   ];
   // Kütüphane kaydı → tam ayar (VARSAYILAN alan sırasıyla; verilmeyen alan: gölge yok, kutu kapalı, serbest konum yok, klasik)
   var AYAR_SIRASI = ["giris", "aktif", "vurgu", "vurguRenk", "renk", "font", "kalin", "italik", "boyut", "kontur", "konturRenk", "konum",

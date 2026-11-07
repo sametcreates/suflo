@@ -26,7 +26,7 @@ html.replace(/data-tab="([^"]+)"/g, function (_, t) { sekmeler[t] = 1; });
   if (id) ok("madde '" + m.baslik + "': hedef öğe index.html'de", html.indexOf('id="' + id + '"') !== -1, id);
 });
 var hedefler = (Y ? Y.maddeler : []).map(function (m) { return (m.eylem ? "eylem:" + m.eylem : m.sekme + ":" + (m.hedef || m.acilir || "")); }).join(" ");
-["captions:cap-adimlar", "captions:cap-efekt-galeri", "captions:cap-senkron-sar", "captions:cap-stil-grid", "settings:set-dolgu-sil"].forEach(function (h) {
+["captions:cap-adimlar", "captions:cap-efekt-galeri", "captions:cap-senkron-sar", "captions:cap-yeni-efekt-bant", "settings:set-dolgu-sil"].forEach(function (h) {
   ok("v3.5 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
 // Senkron doğrulama Gelişmiş ayarlar katının içinde: madde katı açar
@@ -36,7 +36,7 @@ ok("madde 'Sesle senkron doğrulama' Gelişmiş ayarlar katını açar", !!mSk &
 ok("yapay zekâ köprüsü ve After Effects 3.5 Yenilikler penceresinde yok", !/MCP|köprü|After Effects/i.test(JSON.stringify(Y ? Y.maddeler : [])));
 
 // Pro kapılı içerik pencerede (Pro) işaretli: AutoCaptions yalnız Pro (deneme hakkı yok)
-["AutoCaptions koleksiyonu"].forEach(function (b) {
+["Yeni efektler"].forEach(function (b) {
   var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];
   ok("madde '" + b + "' (Pro) işaretli", !!m && /\(Pro\)\.?$/.test(m.metin), m && m.metin);
 });

@@ -1880,13 +1880,21 @@ window.KCaptions = (function () {
   function temizMogrtAdi(item) {
     var ad = String(item && item.display || "Altyazı Şablonu")
       .replace(/^\s*(?:16[•x:._-]?9|9[•x:._-]?16|1[•x:._-]?1)\s*/i, "")
-      .replace(/\s+Subtitles?\s*$/i, "") || "Altyazı Şablonu";
+      .replace(/\s+Subtitles?\s*$/i, "")
+      // Yeni şablonların dosya / vitrin adındaki koleksiyon öneki panelde gösterilmez ("AutoCaptions Aura" → "Aura")
+      .replace(/^\s*AutoCaptions[\s_-]+(?=\S)/i, "") || "Altyazı Şablonu";
     var halkaAcikAdlar = {
       "mr beast": "Creator Punch",
       "tiktok": "Social Pop",
       "obviously": "Bold Statement"
     };
     return halkaAcikAdlar[ad.toLocaleLowerCase("tr-TR")] || ad;
+  }
+
+  // Yeni altyazı şablonu: vitrinde koleksiyon "AutoCaptions", kurulu dosyada yol ya da adda koleksiyon adı
+  function yeniMogrtMi(item) {
+    if (!item) return false;
+    return /autocaptions/i.test(String(item.collection || "") + " " + String(item.path || "") + " " + String(item.display || "") + " " + String(item.styleKey || ""));
   }
 
   function mogrtStilAnahtari(item) {
@@ -2116,10 +2124,11 @@ window.KCaptions = (function () {
     var G = window.SufloStilGaleri || null;
     var kit = G ? markaKiti() : null;
     kap.innerHTML = "";
-    AE.GORUNUMLER.forEach(function (g) {
+    // Yeni efektler (koleksiyon "autocaptions") galerinin başında; diğerleri kendi sırasıyla (veri sırası değişmez)
+    yeniOnce(AE.GORUNUMLER, function (g) { return g.koleksiyon === "autocaptions"; }).forEach(function (g) {
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "efekt-cip";
+      b.className = "efekt-cip" + (g.koleksiyon === "autocaptions" ? " efekt-cip-yeni" : "");
       b.setAttribute("data-gorunum", g.id);
       if (g.kategori) b.setAttribute("data-kategori", g.kategori);
       if (g.marka) b.setAttribute("data-marka", kit ? "kit" : "1");
@@ -2166,8 +2175,37 @@ window.KCaptions = (function () {
       kap.appendChild(u);
     }
     stilKartiIsaretle(EFEKT);
-    if (G) G.kur({ doc: document, kap: kap, sekmeler: el("cap-efekt-kategoriler"), ipucu: el("cap-efekt-ipucu"), kategoriler: AE.KATEGORILER,
+    if (G) G.kur({ doc: document, kap: kap, sekmeler: el("cap-efekt-kategoriler"), ipucu: el("cap-efekt-ipucu"),
+      kategoriler: yeniOnce(AE.KATEGORILER, function (k) { return k.id === "autocaptions"; }),
       gorunumler: AE.GORUNUMLER, depo: tarayiciDeposu(), ilgi: galeriTuslariniTut });
+    yeniEfektBandiniKur();
+  }
+  // Kararlı sıralama: yeniMi(x) doğru olanlar başa, kendi aralarında ve diğerleri eski sırasıyla
+  function yeniOnce(liste, yeniMi) {
+    var yeni = [], eski = [];
+    (liste || []).forEach(function (x) { (yeniMi(x) ? yeni : eski).push(x); });
+    return yeni.concat(eski);
+  }
+  /*
+   * "Yeni efektler" bandı (#cap-yeni-efekt-bant, Altyazı Efektleri galerisinin üstünde): yeni görünümleri öne çıkarır.
+   * Tıklayınca galerinin "Yeni" sekmesi açılır; çiplerden birine tıklamak altyazıyı doğrudan o efektle hazırlar
+   * (gorunumUygula: Altyazı Efektleri seçilir). Ücretsizde önizleme açık, eklemek Pro (deneme hakkı yok).
+   */
+  function yeniEfektBandiniKur() {
+    var bant = el("cap-yeni-efekt-bant");
+    if (!bant || !AE) return;
+    var sayi = AE.GORUNUMLER.filter(function (g) { return g.koleksiyon === "autocaptions"; }).length;
+    bant.hidden = !sayi;
+    var adet = el("cap-yeni-efekt-sayi");
+    if (adet) adet.textContent = String(sayi);
+    if (bant.__bagli) return;
+    bant.__bagli = true;
+    bant.addEventListener("click", function () {
+      var sekme = document.querySelector('#cap-efekt-kategoriler .efekt-kategori[data-kategori="autocaptions"]');
+      if (sekme) sekme.click();
+      var ilk = document.querySelector('#cap-efekt-gorunumler .efekt-cip-yeni:not([hidden])');
+      if (ilk && typeof ilk.focus === "function") ilk.focus();
+    });
   }
   // İzleyicinin tarayıcı deposu (galerinin kategori sekmesi); erişilemezse null (seçim hatırlanmaz, galeri çalışır)
   function tarayiciDeposu() {
@@ -2486,7 +2524,11 @@ window.KCaptions = (function () {
       uygulamaIpucunuGuncelle();
       return;
     }
-    liste.sort(function (a, b) { return temizMogrtAdi(a).localeCompare(temizMogrtAdi(b)); });
+    // Yeni şablonlar başta (yeniMogrtMi), sonra ada göre
+    liste.sort(function (a, b) {
+      var ya = yeniMogrtMi(a) ? 0 : 1, yb = yeniMogrtMi(b) ? 0 : 1;
+      return ya - yb || temizMogrtAdi(a).localeCompare(temizMogrtAdi(b));
+    });
     if (istenenAnahtar) {
       secilenMogrt = null;
       for (var si = 0; si < liste.length; si++) {
@@ -2519,7 +2561,7 @@ window.KCaptions = (function () {
       card.setAttribute("aria-label", temizMogrtAdi(item) + (kilitli ? " · Suflo Pro ile kilidi aç" : " Premiere altyazı stilini seç"));
       var badge = document.createElement("span");
       badge.className = "ss-rozet";
-      badge.textContent = kilitli ? "PRO" : "MOGRT";
+      badge.textContent = (yeniMogrtMi(item) ? "YENİ · " : "") + (kilitli ? "PRO" : "MOGRT");
       var scene = document.createElement("span");
       scene.className = "ss-sahne";
       var previewPoster = null;
@@ -2541,7 +2583,7 @@ window.KCaptions = (function () {
       var title = document.createElement("b");
       title.textContent = temizMogrtAdi(item);
       var sub = document.createElement("i");
-      sub.textContent = kilitli ? (item.collection === "AutoCaptions" ? "Suflo Pro · AutoCaptions şablonu" : "Suflo Pro · animasyonu görmek için üzerine gel") : "Premiere Graphic Template · kullanıma hazır";
+      sub.textContent = kilitli ? (yeniMogrtMi(item) ? "Suflo Pro · yeni şablon" : "Suflo Pro · animasyonu görmek için üzerine gel") : "Premiere Graphic Template · kullanıma hazır";
       info.appendChild(title);
       info.appendChild(sub);
       card.appendChild(badge);
@@ -8032,7 +8074,8 @@ window.KCaptions = (function () {
   function efektAnimSeciminiDoldur() {
     var sel = el("cap-efekt-anim"), YA = window.SufloYaziAnimasyon;
     if (!sel || !YA || !YA.gruplar || sel.querySelector("optgroup[data-anim]")) return;
-    YA.gruplar().forEach(function (g) {
+    // Yeni animasyonlar ("Yeni · Pro") "Klasik"in hemen ardından; veri sırası değişmez
+    yeniOnce(YA.gruplar(), function (g) { return g.id === "autocaptions"; }).forEach(function (g) {
       var grup = document.createElement("optgroup");
       // AutoCaptions koleksiyonu Suflo Pro içeriği: grup adında söylenir (önizleme ücretsiz, eklemek Pro)
       grup.label = g.id === "autocaptions" ? g.ad + " · Pro" : g.ad;

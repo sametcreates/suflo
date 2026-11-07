@@ -79,7 +79,7 @@ function kur(kok) {
   var SS = modul("style-share.js"), SE = modul("style-engine.js"), MK = modul("marka-kiti.js"), AE = modul("altyazi-efekt.js");
   var GAL = modul("stil-galeri.js"), YA = modul("yazi-animasyonlari.js"), SK = modul("stil-kodu.js");
   var ISLEVLER = ["motorPreset", "motorStiliMi", "uzunlukSecimi", "applyPreset", "stilKartiIsaretle", "efektStili", "efektAyari", "efekteGec",
-    "efektSonrasi", "gorunumUygula", "gorunumleriCiz", "efektKelimeSayisi", "stil()", "motorAyarlari", "savePrefs", "loadPrefs", "stiliYaz",
+    "efektSonrasi", "gorunumUygula", "gorunumleriCiz", "yeniOnce", "yeniEfektBandiniKur", "yeniMogrtMi", "efektKelimeSayisi", "stil()", "motorAyarlari", "savePrefs", "loadPrefs", "stiliYaz",
     "markaKiti", "dikeySekans", "inceAyarDurumu", "stilKredisi", "stilKodu", "stilKoduUygula", "varsayilanaDon", "tarayiciDeposu",
     "galeriTuslariniTut", "efektVarsayilan", "sablonumUygula", "efektAnimSeciminiDoldur", "ensureUserPresetOption", "saveUserPreset",
     "efektSayi", "efektSayiAlani", "serbestKonumDegeri", "efektBagimliDurum", "konumAktif", "konumOlcusu", "kirilimDili", "konumOrnegi",

@@ -82,12 +82,23 @@ window.KLib = (function () {
     if (/^SUFLO\s+BUTON\b/i.test(ad)) return "buton";
     if (sourceKind === "adobe" && /(?:^|\/)(?:Captioneer|Captions?(?: and)? Subtitles?)(?:\/|$)/i.test(hay)) return "caption";
     if (/\b(?:subtitles?|captions?)\b/i.test(hay)) return "caption";
+    // Yeni başlık MOGRT'leri (Pro paketinde "AutoCaptions Titles/"): vitrindeki gibi Yazı Animasyonları
+    // ("Comment Your Word" adındaki "comment" onu Diğer'e düşürmesin)
+    if (/(?:^|\/)AutoCaptions Titles(?:\/|$)/i.test(String(relativePath || "").replace(/\\/g, "/"))) return "text";
     // Bir MOGRT metin kontrolu tasisa bile asil isi logo, yorum, lower third,
     // liste, ikon veya sosyal arayuzse saf "Yazi Animasyonu" degildir.
     if (/\b(?:icons?|speech bubble|thinking bubble|logo|lower[\s_-]*third|comments?|list elements?|podcast title|camera overlay|focus frame|shapes?|transition|electro|energy seamless|grid|magic sparks?)\b/i.test(hay)) return "other";
     if (/^SUFLO\s+TEXT\b/i.test(ad) || textAnimationMi(relativePath)) return "text";
     return "other";
   }
+
+  /*
+   * Yeni eklenen içerik (AutoCaptions koleksiyonu: altyazı şablonları ve başlık MOGRT'leri): her bölümde başta ve
+   * YENİ rozetli. Koleksiyon adı panelde yazılmaz (adAyikla); yeni altyazı şablonları Yazı Animasyonları'nda da görünür.
+   */
+  function yeniIcerikMi(metin) { return /autocaptions/i.test(String(metin || "")); }
+  function adAyikla(ad) { return String(ad || "").replace(/^\s*AutoCaptions[\s_-]+(?=\S)/i, ""); }
+  function yaziBolumunde(p) { return p.group === "text" || (p.group === "caption" && !!p.yeni); }
 
   function pathHash(value) {
     var h = 2166136261, text = pathKey(value);
@@ -223,7 +234,7 @@ window.KLib = (function () {
   function vitrinEkle(items, gorulen) {
     (items || []).forEach(function (item, si) {
       if (!item || !item.name) return;
-      var display = String(item.name);
+      var display = adAyikla(String(item.name));
       var uniqueKey = mogrtNameKey(item.match || display) || display.toLowerCase();
       if (gorulen[uniqueKey]) return;
       var preview = showcasePreview(item);
@@ -237,6 +248,7 @@ window.KLib = (function () {
         builtin: false,
         pro: true,
         showcase: true,
+        yeni: yeniIcerikMi(String(item.collection || "") + " " + String(item.match || "") + " " + String(item.name || "")),
         group: item.group === "caption" || item.group === "other" || item.group === "buton" ? item.group : "text",
         category: String(item.category || "Text Animation")
       });
@@ -334,7 +346,7 @@ window.KLib = (function () {
       // Katalogdaki kaynak adlari bu kopyalari yakalar; yerlesik kart tek kalir.
       if (!isBuiltin && catalogInfo.aliases[mogrtNameKey(ad)]) continue;
       var butonMu = /^SUFLO\s+BUTON\b/i.test(ad);
-      var display = meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO\s+(?:TEXT|BUTON|MOGRT)\s*-\s*(?:\d+[.\)]?\s*)?/i, "");
+      var display = adAyikla(meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO\s+(?:TEXT|BUTON|MOGRT)\s*-\s*(?:\d+[.\)]?\s*)?/i, ""));
       var uniqueKey = mogrtNameKey(display) || display.toLowerCase();
       if (gorulen[uniqueKey]) continue;
       gorulen[uniqueKey] = 1;
@@ -353,6 +365,7 @@ window.KLib = (function () {
         builtin: isBuiltin,
         pro: isPro,
         localAdobe: isAdobe,
+        yeni: !isAdobe && yeniIcerikMi((relPro || relPath || "") + " " + ad),
         group: group,
         category: meta && meta.category ? String(meta.category) :
           (group === "text" ? "Text Animation" : (group === "caption" ? "Premiere Subtitle Template" : (proFolder ? proFolder.replace(/[-_]+/g, " ") : "Other Animation")))
@@ -401,7 +414,7 @@ window.KLib = (function () {
 
   function sayaclar() {
     var s1 = el("yazi-sayac");
-    if (s1) s1.textContent = String(paketler.filter(function (p) { return p.group === "text"; }).length);
+    if (s1) s1.textContent = String(paketler.filter(yaziBolumunde).length);
     var s0 = el("custom-sayac");
     if (s0) s0.textContent = String(paketler.filter(function (p) { return p.group === "other"; }).length);
     var sc = el("caption-sayac");
@@ -422,7 +435,7 @@ window.KLib = (function () {
       },
       captions: {
         fallback: 31, title: "31 gerçek altyazı şablonu",
-        description: "17 stil 9:16, 16:9 ve 1:1 oranına hazır, yanında 14 AutoCaptions stili. Stilini gör; Pro'da altyazıya doğrudan uygula.",
+        description: "17 stil 9:16, 16:9 ve 1:1 oranına hazır, yanında 14 yeni stil. Stilini gör; Pro'da altyazıya doğrudan uygula.",
         cta: "Altyazı şablonlarını aç — 749 TL"
       },
       custom: {
@@ -445,7 +458,7 @@ window.KLib = (function () {
     var grup = kategori === "mogrt" ? "text" : (kategori === "custom" ? "other" : kategori);
     var visibleCount = kategori === "fav"
       ? paketler.filter(function (p) { return p.showcase; }).length
-      : paketler.filter(function (p) { return p.group === grup; }).length;
+      : paketler.filter(function (p) { return grup === "text" ? yaziBolumunde(p) : p.group === grup; }).length;
     var count = visibleCount || cfg.fallback;
     var title = el("yazi-tanitim-baslik"); if (title) title.textContent = cfg.title.replace(/^\d+/, String(count));
     var detail = el("yazi-tanitim-aciklama"); if (detail) detail.textContent = cfg.description;
@@ -473,13 +486,15 @@ window.KLib = (function () {
     if (!grid) return;
 
     var liste = paketler.filter(function (p) {
-      if (kategori === "mogrt" && p.group !== "text") return false;
+      if (kategori === "mogrt" && !yaziBolumunde(p)) return false;
       if (kategori === "captions" && p.group !== "caption") return false;
       if (kategori === "custom" && p.group !== "other") return false;
       if (kategori === "buton" && p.group !== "buton") return false;
       if (kategori === "fav" && !favMi(p.ad)) return false;
       return !arama || (p.display + " " + p.ad + " " + p.category).toLowerCase().indexOf(arama) !== -1;
     });
+    // Yeni eklenenler her bölümde başta (kendi aralarında ve diğerleri tarama / katalog sırasıyla)
+    liste = liste.filter(function (p) { return p.yeni; }).concat(liste.filter(function (p) { return !p.yeni; }));
 
     var baslik = el("ki-baslik"), alt = el("ki-alt");
     if (baslik) baslik.textContent = kategori === "fav"
@@ -524,6 +539,7 @@ window.KLib = (function () {
             ? '<img src="' + p.thumb + '" alt="" loading="lazy">'
             : '<span class="mogrt-yazi">' + esc(p.display.split(/[\s_-]/)[0] || "Aa") + "</span>") +
           '<span class="mogrt-source">' + kaynak + "</span>" +
+          (p.yeni ? '<span class="mogrt-yeni">YENİ</span>' : "") +
           '<button type="button" class="mogrt-kalp' + (favMi(p.ad) ? " sevildi" : "") + '" title="Favori" aria-label="' + esc(p.display) + (favMi(p.ad) ? " favorilerden çıkar" : " favorilere ekle") + '" aria-pressed="' + (favMi(p.ad) ? "true" : "false") + '">♥</button>' +
           (kilitli ? '<span class="mogrt-lock"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg></span>' : "") +
         "</span>" +

@@ -2234,7 +2234,7 @@ window.KApp = (function () {
       { ikon: "①", baslik: "Üç adımda altyazı", metin: "Oluştur, stil seç, uygula; gelişmiş ayarlar katlı, akış sade.", sekme: "captions", hedef: "cap-adimlar" },
       { ikon: "✦", baslik: "Yazı animasyonları", metin: "25 özgün animasyon ve 30 hazır görünüm; önizlemek ücretsiz, eklemek Pro.", sekme: "captions", hedef: "cap-efekt-galeri" },
       { ikon: "∿", baslik: "Sesle senkron doğrulama", metin: "Kelimeler ve kartlar ses dalgasına oturur; raporla kontrol et, tek tıkla geri al.", sekme: "captions", acilir: "cap-gelismis", hedef: "cap-senkron-sar" },
-      { ikon: "A", baslik: "AutoCaptions koleksiyonu", metin: "19 görünüm, 12 animasyon ve 14 Premiere şablonu (Pro).", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "✧", baslik: "Yeni efektler", metin: "19 yeni altyazı efekti, 12 animasyon ve 14 Premiere şablonu; altyazını doğrudan bunlarla yaz (Pro).", sekme: "captions", hedef: "cap-yeni-efekt-bant" },
       { ikon: "⌫", baslik: "Metin temizliği", metin: "Dolgu seslerini çıkar, küfürleri yalnız çıktıda maskele.", sekme: "settings", hedef: "set-dolgu-sil" }
     ]
   };

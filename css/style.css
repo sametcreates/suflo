@@ -1752,8 +1752,12 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .doctor-scope span.good { color: #a9dcb9; }
 .doctor-scope span.warn { color: #e9cf8f; }
 .doctor-scope span.bad { color: #ffaaaa; }
-.doctor-actions { flex-wrap: wrap; margin: 0 0 0 56px; }
-.doctor-actions .btn:not([hidden]) { min-height: 30px; margin-top: 11px; }
+/* Düğmeler ve "Panel menüde görünmüyor mu?" bağlantısı aynı satırda ortalı, aralarında boşluk (CEF 74'te flex gap
+   yok: aralık margin ile); dar panelde alt satıra kırılır, bağlantı düğmeye yapışmaz */
+.doctor-actions { flex-wrap: wrap; align-items: center; gap: 0; margin: 3px 0 0 56px; }
+.doctor-actions > :not([hidden]) { margin: 8px 12px 0 0; }
+.doctor-actions .btn:not([hidden]) { min-height: 30px; }
+.doctor-actions .link-btn { padding: 6px 0; line-height: 1.3; white-space: nowrap; }
 @media (max-width: 560px) {
   .doctor-head { grid-template-columns: 40px minmax(0,1fr); align-items: start; }
   .doctor-mark { width: 40px; height: 40px; border-radius: 13px; }
@@ -3787,6 +3791,28 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-cip-ornek-kit { box-shadow: 0 0 0 1px var(--accent); }
 /* AutoCaptions (Suflo Pro içeriği): Pro'suzken çipte küçük PRO rozeti */
 .efekt-cip-pro { flex: none; margin-left: 5px; padding: 0 4px; border-radius: 4px; background: rgba(139, 124, 246, .18); color: var(--accent); font-style: normal; font-weight: 700; font-size: 8.5px; letter-spacing: .04em; }
+/* Yeni efektler (captions.js yeniEfektBandiniKur / yeniOnce, library.js yeni rozet): bant, "Yeni" sekmesi, yeni çipler */
+.yeni-efekt-bant {
+  display: flex; align-items: center; width: 100%; min-width: 0; margin: 0 0 8px; padding: 8px 10px;
+  border: 1px solid rgba(139, 124, 246, .45); border-radius: 10px; cursor: pointer; text-align: left; font: inherit; color: var(--text);
+  background: linear-gradient(100deg, rgba(139, 124, 246, .20), rgba(88, 166, 255, .10));
+  transition: border-color .16s var(--ease), background .16s var(--ease);
+}
+.yeni-efekt-bant[hidden] { display: none; }
+.yeni-efekt-bant:hover { border-color: var(--accent); }
+.yeni-efekt-bant:focus-visible { outline: none; box-shadow: var(--glow-sm); border-color: var(--accent); }
+.yeni-efekt-bant-rozet { flex: none; margin-right: 9px; padding: 2px 6px; border-radius: 5px; background: var(--accent); color: #fff; font-size: 8.5px; font-weight: 800; letter-spacing: .08em; }
+.yeni-efekt-bant-metin { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.yeni-efekt-bant-metin b { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yeni-efekt-bant-metin i { font-style: normal; font-size: 10px; color: var(--dim); line-height: 1.3; }
+.yeni-efekt-bant-ok { flex: none; margin-left: 9px; color: var(--accent); font-weight: 700; }
+.efekt-kategori[data-kategori="autocaptions"] { color: var(--accent); }
+.efekt-kategori[data-kategori="autocaptions"].secili { border-color: rgba(139, 124, 246, .55); background: rgba(139, 124, 246, .14); }
+.efekt-cip-yeni { box-shadow: inset 0 0 0 1px rgba(139, 124, 246, .35); }
+.mogrt-yeni {
+  position: absolute; left: 7px; bottom: 7px; z-index: 2; padding: 2px 6px; border-radius: 4px;
+  background: var(--accent); color: #fff; font-size: 7.2px; font-weight: 850; letter-spacing: .1em;
+}
 .efekt-cip-anim { margin-left: 3px; font-style: normal; font-weight: 600; font-size: 9px; font-family: var(--mono, monospace); color: var(--faint); text-shadow: none; }
 .efekt-galeri-ipucu {
   position: absolute; left: 0; right: 0; z-index: 5; padding: 6px 9px; border: 1px solid var(--line2); border-radius: 9px;
@@ -4784,3 +4810,4 @@ body.host-ae [data-yalniz-premiere], body.host-ae [data-ae-gizli] { display: non
 .seg-senkron-uyari { padding: 0 5px; border: 1px solid rgba(234, 200, 119, .4); border-radius: 4px; background: rgba(234, 200, 119, .08);
   color: var(--warn); font-size: 10px; line-height: 1.5; cursor: pointer; }
 .seg-senkron-uyari:hover, .seg-senkron-uyari:focus { outline: none; border-color: var(--warn); box-shadow: 0 0 0 2px rgba(234, 200, 119, .25); }
+
