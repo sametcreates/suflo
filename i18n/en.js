@@ -255,7 +255,7 @@
     "Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Bir stil seçersen animasyonlu MOGRT olarak da ekleyebilirsin.": "A regular add creates Premiere's editable caption track. Pick a style to add animated MOGRT captions instead.",
     "Altyazın hazırsa tasarım da hazır olsun.": "Captions done? Make the design ready too.",
     "31 gerçek animasyonlu stil; Reels, YouTube ve kare video oranı otomatik.": "31 real animated styles; Reels, YouTube and square ratios handled automatically.",
-    "17 STİL →": "17 STYLES →",
+    "31 STİL →": "31 STYLES →",
 
     /* ---- auto cut ---- */
     "Konuşma videon mu?": "Talking-head video?",
@@ -819,6 +819,18 @@
     "Kaydırıcılar kesimleri anında günceller; sekans ya da In → Out, müzik bölünmez (Pro).": "Sliders update the cuts instantly; cut a sequence or In → Out without splitting the music (Pro).",
     "Hız Rampası'nda kendi hız eğrini çiz (Pro).": "Draw your own speed curve in Speed Ramp (Pro).",
     "Ctrl+K (⌘K) ile her araca ve eyleme saniyede ulaş.": "Reach any tool or action in seconds with Ctrl+K (⌘K).",
+    // 3.5 "What's new"
+    "Altyazı yenilemesi ve sesle senkron doğrulama": "Caption overhaul and audio sync check",
+    "Üç adımda altyazı": "Captions in three steps",
+    "Oluştur, stil seç, uygula; gelişmiş ayarlar katlı, akış sade.": "Create, choose a style, apply; advanced settings are folded away.",
+    "Yazı animasyonları": "Text animations",
+    "25 özgün animasyon ve 30 hazır görünüm; önizlemek ücretsiz, eklemek Pro.": "25 original animations and 30 preset looks; previewing is free, adding is Pro.",
+    "Sesle senkron doğrulama": "Audio sync check",
+    "Kelimeler ve kartlar ses dalgasına oturur; raporla kontrol et, tek tıkla geri al.": "Words and cards snap to the waveform; check the report, undo in one click.",
+    "AutoCaptions koleksiyonu": "AutoCaptions collection",
+    "19 görünüm, 12 animasyon ve 14 Premiere şablonu (Pro).": "19 looks, 12 animations and 14 Premiere templates (Pro).",
+    "Metin temizliği": "Text cleanup",
+    "Dolgu seslerini çıkar, küfürleri yalnız çıktıda maskele.": "Remove filler sounds, mask profanity in the output only.",
     "Göster →": "Show →",
     "Başlayalım": "Let's go"
   });

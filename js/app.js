@@ -2221,21 +2221,21 @@ window.KApp = (function () {
   }
 
   /*
-   * "Suflo 3.4'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
-   * derinliginde (Egri sol menude, Ozel egri Hiz Rampasi kartlarinda);
+   * "Suflo 3.5'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (senkron dogrulama Gelismis ayarlar katinda, metin temizligi Ayarlar'da);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
    * Eski surumden yukselten kullanicida yeniliklerGoruldu eski surum oldugundan pencere bir kez acilir.
    * eylem: "aracAra" sekme yerine Arac ara paletini acar (KApp.aracAra).
    */
   var YENILIKLER = {
-    surum: "3.4",
-    alt: "Eğri, canlı sessizlik kesimi ve Araç ara",
+    surum: "3.5",
+    alt: "Altyazı yenilemesi ve sesle senkron doğrulama",
     maddeler: [
-      { ikon: "~", baslik: "Eğri", metin: "Kendi anahtar karelerine hazır ya da çizdiğin eğri; düzenlemek ücretsiz, uygulamak Pro.", sekme: "egri", hedef: "egri-editor" },
-      { ikon: "∿", baslik: "Varışta yaylan", metin: "Hareket inişte hedefi biraz aşar, salınıp oturur (Pro).", sekme: "egri", hedef: "egri-yaylan" },
-      { ikon: "✂", baslik: "Canlı eşikli kesim", metin: "Kaydırıcılar kesimleri anında günceller; sekans ya da In → Out, müzik bölünmez (Pro).", sekme: "cut", hedef: "cut-scope" },
-      { ikon: "»", baslik: "Özel hız eğrisi", metin: "Hız Rampası'nda kendi hız eğrini çiz (Pro).", sekme: "hiz", hedef: "hiz-grid" },
-      { ikon: "⌘", baslik: "Araç ara", metin: "Ctrl+K (⌘K) ile her araca ve eyleme saniyede ulaş.", eylem: "aracAra" }
+      { ikon: "①", baslik: "Üç adımda altyazı", metin: "Oluştur, stil seç, uygula; gelişmiş ayarlar katlı, akış sade.", sekme: "captions", hedef: "cap-adimlar" },
+      { ikon: "✦", baslik: "Yazı animasyonları", metin: "25 özgün animasyon ve 30 hazır görünüm; önizlemek ücretsiz, eklemek Pro.", sekme: "captions", hedef: "cap-efekt-galeri" },
+      { ikon: "∿", baslik: "Sesle senkron doğrulama", metin: "Kelimeler ve kartlar ses dalgasına oturur; raporla kontrol et, tek tıkla geri al.", sekme: "captions", acilir: "cap-gelismis", hedef: "cap-senkron-sar" },
+      { ikon: "A", baslik: "AutoCaptions koleksiyonu", metin: "19 görünüm, 12 animasyon ve 14 Premiere şablonu (Pro).", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "⌫", baslik: "Metin temizliği", metin: "Dolgu seslerini çıkar, küfürleri yalnız çıktıda maskele.", sekme: "settings", hedef: "set-dolgu-sil" }
     ]
   };
 
