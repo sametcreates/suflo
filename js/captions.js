@@ -1933,6 +1933,8 @@ window.KCaptions = (function () {
           previewVideo: mogrtVitrinDosyasi(item, "video", "webm"),
           showcase: true,
           pro: true,
+          // AutoCaptions kartlarının önizlemesi şablonun durağan küçük resmi (hareketli önizleme yok)
+          collection: String(item.collection || ""),
           group: "caption"
         };
       }).filter(function (item) { return item.styleKey && item.thumb; });
@@ -2094,6 +2096,20 @@ window.KCaptions = (function () {
    * "Hazır görünümler": küçük çipler (yazı tipinde örnek + ad); rozet yok. Stil kütüphanesi (parti 3): çipin örneği,
    * kategori sekmeleri, süzgeç, klavye ve ipucu js/stil-galeri.js'te (yüklenmemişse yalın örnekli çipler, süzgeçsiz).
    */
+  /*
+   * AutoCaptions koleksiyonu (ClashiVFX, yazarın izniyle) Suflo Pro içeriğidir: seçili / son hazır görünüm, ayarın
+   * eşleştiği görünüm ya da yazı animasyonu koleksiyondansa true. Ücretsizde önizleme açık, katmana yazmak denemesiz Pro.
+   */
+  function autoCaptionsIcerigi() {
+    if (secilenMotorStili !== EFEKT || secilenMogrt) return false;
+    var acMi = function (id) { var g = id && AE && AE.gorunum(id); return !!(g && g.koleksiyon === "autocaptions"); };
+    if (acMi(secilenGorunum) || acMi(sonGorunum)) return true;
+    var a = efektAyari();
+    if (AE && acMi(AE.gorunumuBul(a))) return true;
+    var k = a.anim && window.SufloYaziAnimasyon ? window.SufloYaziAnimasyon.bul(a.anim) : null;
+    return !!(k && k.koleksiyon === "autocaptions");
+  }
+
   function gorunumleriCiz() {
     var kap = el("cap-efekt-gorunumler");
     if (!kap || !AE) return;
@@ -2121,6 +2137,17 @@ window.KCaptions = (function () {
       ad.textContent = g.ad;
       b.appendChild(ornek);
       b.appendChild(ad);
+      // AutoCaptions: Suflo Pro içeriği (ücretsizde önizlenir, eklemek Pro); rozet yalnız Pro'suzken
+      if (g.koleksiyon === "autocaptions") {
+        b.setAttribute("data-pro", "1");
+        if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro()) {
+          var rozet = document.createElement("i");
+          rozet.className = "efekt-cip-pro";
+          rozet.textContent = "PRO";
+          b.appendChild(rozet);
+          b.title = "Suflo Pro · önizleme ücretsiz, eklemek Pro";
+        }
+      }
       b.addEventListener("click", function () { gorunumUygula(g.id); });
       kap.appendChild(b);
     });
@@ -2451,7 +2478,7 @@ window.KCaptions = (function () {
       empty.className = "stil-mogrt-empty";
       var vitrinBekleniyor = typeof Pro !== "undefined" && !Pro.isPro() && !!mogrtVitriniIsi;
       empty.innerHTML = vitrinBekleniyor
-        ? "<b>17 stil hazırlanıyor…</b><span>Gerçek MOGRT önizlemeleri yükleniyor.</span>"
+        ? "<b>31 stil hazırlanıyor…</b><span>Gerçek MOGRT önizlemeleri yükleniyor.</span>"
         : "<b>Altyazı şablonu bulunamadı</b><span>Pro lisansını etkinleştirip Ayarlar → Pro İçerikleri bölümünden eşitlemeyi çalıştır.</span>";
       grid.appendChild(empty);
       secilenMogrt = null;
@@ -2514,7 +2541,7 @@ window.KCaptions = (function () {
       var title = document.createElement("b");
       title.textContent = temizMogrtAdi(item);
       var sub = document.createElement("i");
-      sub.textContent = kilitli ? "Suflo Pro · animasyonu görmek için üzerine gel" : "Premiere Graphic Template · kullanıma hazır";
+      sub.textContent = kilitli ? (item.collection === "AutoCaptions" ? "Suflo Pro · AutoCaptions şablonu" : "Suflo Pro · animasyonu görmek için üzerine gel") : "Premiere Graphic Template · kullanıma hazır";
       info.appendChild(title);
       info.appendChild(sub);
       card.appendChild(badge);
@@ -7000,6 +7027,8 @@ window.KCaptions = (function () {
     // Katman zaten çiziliyor: ikinci tık ikinci render başlatmaz (İptal düğmesi görünür)
     if (katmanIptal || katmanHazirlaniyor) { uygulaDurumu("Altyazı katmanı zaten hazırlanıyor: bitmesini bekle ya da İptal'e bas.", "warn"); return; }
     // Pro: animasyonlu katman (ucretsizde kanca basligiyla ortak 3 deneme hakki; deneme ciktisi filigranli)
+    // AutoCaptions koleksiyonu (görünüm ya da animasyon) yalnız Pro: deneme hakkı onda geçmez, ücretsizde yalnız önizlenir
+    if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro() && typeof autoCaptionsIcerigi === "function" && autoCaptionsIcerigi()) { Pro.gate("overlay"); return; }
     if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { overlayUygula().then(uygulaEtiketiniSifirla); } })) return;
     // Deneme yalniz Altyazi Efektleri icin: tercihlerden geri yuklenen bir MOGRT stili deneme kapisindan sizmasin
     if (typeof Pro !== "undefined" && !Pro.isPro() && secilenMogrt) {
@@ -8005,7 +8034,8 @@ window.KCaptions = (function () {
     if (!sel || !YA || !YA.gruplar || sel.querySelector("optgroup[data-anim]")) return;
     YA.gruplar().forEach(function (g) {
       var grup = document.createElement("optgroup");
-      grup.label = g.ad;
+      // AutoCaptions koleksiyonu Suflo Pro içeriği: grup adında söylenir (önizleme ücretsiz, eklemek Pro)
+      grup.label = g.id === "autocaptions" ? g.ad + " · Pro" : g.ad;
       grup.setAttribute("data-anim", g.id);
       g.animasyonlar.forEach(function (a) {
         var o = document.createElement("option");

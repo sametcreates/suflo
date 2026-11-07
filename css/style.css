@@ -3785,6 +3785,8 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-cip-ornek-kutu { background: var(--efekt-kutu, #11131b); }
 .efekt-cip-ornek-yalin { text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
 .efekt-cip-ornek-kit { box-shadow: 0 0 0 1px var(--accent); }
+/* AutoCaptions (Suflo Pro içeriği): Pro'suzken çipte küçük PRO rozeti */
+.efekt-cip-pro { flex: none; margin-left: 5px; padding: 0 4px; border-radius: 4px; background: rgba(139, 124, 246, .18); color: var(--accent); font-style: normal; font-weight: 700; font-size: 8.5px; letter-spacing: .04em; }
 .efekt-cip-anim { margin-left: 3px; font-style: normal; font-weight: 600; font-size: 9px; font-family: var(--mono, monospace); color: var(--faint); text-shadow: none; }
 .efekt-galeri-ipucu {
   position: absolute; left: 0; right: 0; z-index: 5; padding: 6px 9px; border: 1px solid var(--line2); border-radius: 9px;

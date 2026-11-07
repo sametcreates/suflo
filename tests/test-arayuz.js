@@ -76,9 +76,9 @@ DOSYALAR.forEach(function (d) {
 ok("korumasiz addEventListener hedefleri markup'ta var",
   korumasiz.length === 0, korumasiz.length ? korumasiz.join(" | ") : "tamam");
 
-ok("Stil bolumu 17 gercek Premiere altyazi sablonu icin acik",
+ok("Stil bolumu 31 gercek Premiere altyazi sablonu icin acik",
   /class="card stil-katmani-card"/.test(html) &&
-  /hazır görünümlerden birini seç ya da efekti kendin kur; 17 Premiere şablonu en altta\./.test(html) && !/aşağıdaki 17 gerçek altyazı şablonundan/.test(html) &&
+  /hazır görünümlerden birini seç ya da efekti kendin kur; 31 Premiere şablonu en altta\./.test(html) && !/aşağıdaki 17 gerçek altyazı şablonundan/.test(html) &&
   !/class="card stil-katmani-card" hidden/.test(html));
 
 /* ---------- 4) Vazgeçilmez öğeler: silinirse ürün işlevini kaybeder ---------- */

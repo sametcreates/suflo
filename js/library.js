@@ -421,8 +421,8 @@ window.KLib = (function () {
         cta: "Yazı animasyonlarını aç — 749 TL"
       },
       captions: {
-        fallback: 17, title: "17 gerçek altyazı şablonu",
-        description: "Her stil 9:16, 16:9 ve 1:1 oranına hazır. Stilini gör; Pro'da altyazıya doğrudan uygula.",
+        fallback: 31, title: "31 gerçek altyazı şablonu",
+        description: "17 stil 9:16, 16:9 ve 1:1 oranına hazır, yanında 14 AutoCaptions stili. Stilini gör; Pro'da altyazıya doğrudan uygula.",
         cta: "Altyazı şablonlarını aç — 749 TL"
       },
       custom: {

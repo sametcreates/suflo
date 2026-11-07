@@ -241,8 +241,12 @@ SOFTWARE.
   animations in `js/yazi-animasyonlari.js` (category `autocaptions`). They are rebuilt for Suflo's own
   style engine (`js/style-engine.js`) and After Effects plan (`js/ae-plan.js`) from values read out of the
   plugin's preset data: colors from its preview images, shadow / glow values from its style presets,
-  durations and curves from its motion metadata. No code, `.ffx`, `.mogrt`, `.prfpset` or preview files
-  from the plugin are in this repository.
+  durations and curves from its motion metadata. No code, `.ffx`, `.mogrt` or `.prfpset` files from the
+  plugin are in this repository.
+  Previews `assets/pro-caption-showcase/previews/18-autocaptions-*` … `31-autocaptions-*` (the locked Pro
+  showcase cards of the 14 Premiere caption MOGRTs) are made from those templates' own `thumb.png`
+  (`tools/build-autocaptions-showcase.js`). The templates name fonts (Arial Bold, Tempting, Apple Garamond
+  Italic, Tactic Sans Bold) that are not bundled; Premiere substitutes missing fonts.
   The plugin's engine, license / copy-protection components and bundled third-party binaries were not
   taken: whisper.cpp / ggml (MIT), SDL2 (zlib), parakeet, Anton and Inter fonts (OFL-1.1), React (MIT).
   Suflo already ships its own copies of Anton and Inter from google/fonts (see above).
@@ -250,7 +254,8 @@ SOFTWARE.
   39 `.ffx`) are prepared as a separate Pro content add-on outside this repository and are not in the
   public package.
   Kaynak: ClashiVFX AutoCaptions, yazarın izniyle; stiller ve hareketler Suflo motorunda yeniden kuruldu,
-  eklentiden kod / şablon dosyası alınmadı; ücretli şablonlar depo dışındaki Pro içerik ekinde.
+  eklentiden kod / şablon dosyası alınmadı; ücretli şablonlar depo dışındaki Pro içerik ekinde, vitrin
+  önizlemeleri onların küçük resimlerinden. AutoCaptions görünüm, animasyon ve şablonları yalnız Suflo Pro'da.
 - `js/CSInterface.js` is Suflo's own minimal wrapper around Adobe's CEP runtime; Adobe CEP
   itself is provided by the host application under Adobe's terms.
 

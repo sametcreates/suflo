@@ -105,9 +105,9 @@ ok("Özelleştir: renkler, yazı tipi, boyut, kontur, gölge, kutu, satır, keli
 ok("'Paylaş ve kaydet' (#cap-ince-ayar) Özelleştir'in içinde, kendi <details>'i olarak",
   id("cap-ince-ayar").tag === "details" && icinde("cap-ince-ayar", "cap-ozellestir") && ilkDetails("cap-stil-paylas") === "cap-ince-ayar");
 var ms = id("cap-mogrt-sar");
-ok("Premiere şablonları <details> 'Premiere şablonları (17)', katlı, yalnız Premiere; #cap-stil-grid içinde",
+ok("Premiere şablonları <details> 'Premiere şablonları (31)', katlı, yalnız Premiere; #cap-stil-grid içinde",
   ms.tag === "details" && !("open" in ms.attrs) && "data-yalniz-premiere" in ms.attrs && ilkDetails("cap-stil-grid") === "cap-mogrt-sar" &&
-  /^Premiere şablonları \(17\)/.test(H.metni(ms.children.filter(function (c) { return c.tag === "summary"; })[0])) && icinde("cap-mogrt-sar", "cap-adim-stil"));
+  /^Premiere şablonları \(31\)/.test(H.metni(ms.children.filter(function (c) { return c.tag === "summary"; })[0])) && icinde("cap-mogrt-sar", "cap-adim-stil"));
 ok("eski değer taşıyıcıları (.ia-eski) gizli kalır, 2. adımda",
   icinde("cap-yogunluk", "cap-adim-stil") && "hidden" in H.ata(id("cap-yogunluk"), function (p) { return H.sinifVar(p, "ia-eski"); }).attrs);
 

@@ -24,7 +24,12 @@ function govde(imza) {
 /* ---------------- 1) Pro kapısı çağrı kümesi ---------------- */
 var TABAN = JSON.parse(oku("tests/fixtures/pro-kapi-5d153e7.json")).satirlar;
 // Bilinçli olarak eklenen kapı satırları ("js/dosya.js: kırpılmış satır" → adet). Yenilemede YOK.
-var BILINCLI_EK = {};
+// AutoCaptions koleksiyonu (ClashiVFX, yazarın izniyle) yalnız Suflo Pro içeriği: görünümü ya da animasyonu seçiliyken
+// stilli katman denemesiz Pro.gate("overlay") ister (ücretsizde yalnız önizleme); galeride Pro'suzken PRO rozeti.
+var BILINCLI_EK = {
+  'js/captions.js: if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro() && typeof autoCaptionsIcerigi === "function" && autoCaptionsIcerigi()) { Pro.gate("overlay"); return; }': 1,
+  'js/captions.js: if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro()) {': 1
+};
 var simdi = {};
 fs.readdirSync(path.join(KOK, "js")).filter(function (f) { return /\.js$/.test(f); }).sort().forEach(function (f) {
   oku("js/" + f).split("\n").forEach(function (l) {
@@ -39,10 +44,36 @@ var beklenen = JSON.parse(J(TABAN));
 Object.keys(BILINCLI_EK).forEach(function (k) { beklenen[k] = (beklenen[k] || 0) + BILINCLI_EK[k]; });
 var fazla = Object.keys(simdi).filter(function (k) { return simdi[k] !== beklenen[k]; });
 var eksik = Object.keys(beklenen).filter(function (k) { return !simdi[k]; });
-ok("Pro.gate / isPro / denemeAcik çağrı yerleri ve argümanları 5d153e7 ile aynı (+ yalnız bilinçli eklemeler: yok)",
+ok("Pro.gate / isPro / denemeAcik çağrı yerleri ve argümanları 5d153e7 ile aynı (+ yalnız bilinçli eklemeler: AutoCaptions Pro kapısı)",
   fazla.length === 0 && eksik.length === 0 && Object.keys(TABAN).length > 50, "fazla: " + fazla.join(" || ") + " eksik: " + eksik.join(" || "));
 ok("Premiere stilli katman: Pro.gate(\"overlay\", { deneme: true, … }) (3 deneme + filigran)",
   /Pro\.gate\("overlay", \{ deneme: true, yeniden: function \(\) \{ overlayUygula\(\)/.test(govde("async function overlayUygula(")));
+// AutoCaptions koleksiyonu yalnız Pro: kontrol deneme kapısından ÖNCE, denemesiz Pro.gate("overlay"); görünüm, eşleşen ayar ya da animasyon koleksiyondansa
+var ovl = govde("async function overlayUygula("), acGovde = govde("function autoCaptionsIcerigi(");
+ok("AutoCaptions görünüm / animasyonu: deneme hakkı geçmez (denemesiz Pro.gate(\"overlay\") deneme kapısından önce), ücretsizde yalnız önizleme",
+  ovl.indexOf("autoCaptionsIcerigi()) { Pro.gate(\"overlay\"); return; }") > 0 &&
+  ovl.indexOf("autoCaptionsIcerigi()") < ovl.indexOf('Pro.gate("overlay", { deneme: true') &&
+  /koleksiyon === "autocaptions"/.test(acGovde) && /secilenGorunum\) \|\| acMi\(sonGorunum\)/.test(acGovde) && /gorunumuBul\(a\)/.test(acGovde) &&
+  /SufloYaziAnimasyon\.bul\(a\.anim\)/.test(acGovde));
+// Gerçek işlev, gerçek görünüm kütüphanesi ve animasyon kataloğuyla: hangi durumda AutoCaptions sayılır
+(function () {
+  var AEm = require(path.join(KOK, "js", "altyazi-efekt.js")), YAm = require(path.join(KOK, "js", "yazi-animasyonlari.js"));
+  function dene(d) {
+    var f = new Function("AE", "window", "EFEKT", "secilenMotorStili", "secilenMogrt", "secilenGorunum", "sonGorunum", "efektAyari",
+      acGovde + "\nreturn autoCaptionsIcerigi();");
+    return f(AEm, { SufloYaziAnimasyon: YAm }, "efekt", d.motor === undefined ? "efekt" : d.motor, d.mogrt || null, d.secilen || "", d.son || "",
+      function () { return d.ayar || { anim: "" }; });
+  }
+  var temiz = AEm.gorunum("temiz") ? "temiz" : AEm.GORUNUMLER.filter(function (g) { return !g.koleksiyon; })[0].id;
+  var suflo = AEm.gorunum(temiz).ayar;
+  ok("AutoCaptions kapısı (gerçek işlev): AC görünümü seçili ya da son görünüm AC → Pro; Suflo görünümü + Suflo animasyonu → deneme yolu açık",
+    dene({ secilen: "ac-azul", ayar: suflo }) === true && dene({ son: "ac-rojo", ayar: suflo }) === true &&
+    dene({ secilen: temiz, son: temiz, ayar: suflo }) === false);
+  ok("AutoCaptions kapısı (gerçek işlev): Suflo görünümüne AC animasyonu takılınca da Pro; Premiere şablonu seçiliyken bu kapı devreye girmez",
+    dene({ secilen: "", son: temiz, ayar: Object.assign({}, suflo, { anim: "esnet" }) }) === true &&
+    dene({ secilen: "", son: temiz, ayar: Object.assign({}, suflo, { anim: "" }) }) === false &&
+    dene({ secilen: "ac-azul", mogrt: { path: "x.mogrt" }, ayar: suflo }) === false);
+})();
 var aePanel = oku("js/ae-panel.js");
 ok("After Effects stilli: denemesiz P.gate(\"overlay\", { yeniden }) ; düz AE çıktısı kapısız", /if \(stilli && P && !P\.gate\("overlay", \{ yeniden: /.test(aePanel) &&
   !/P\.gate\("overlay", \{[^}]*deneme/.test(aePanel));

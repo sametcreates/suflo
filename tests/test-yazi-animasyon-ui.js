@@ -196,8 +196,8 @@ e.api.efektAnimSeciminiDoldur();
 e.api.efektAnimSeciminiDoldur();
 var sec = e.dom["cap-efekt-anim"];
 var gruplar = sec.childNodes.filter(function (c) { return c.tagName === "OPTGROUP"; });
-ok("seçici: ilk seçenek Klasik (değer \"\"), kategori başına bir optgroup, her animasyon bir kez", sec.childNodes[0].tagName === "OPTION" && sec.childNodes[0].value === "" &&
-  gruplar.length === YA.gruplar().length && J(gruplar.map(function (g) { return g.label; })) === J(YA.gruplar().map(function (g) { return g.ad; })) &&
+ok("seçici: ilk seçenek Klasik (değer \"\"), kategori başına bir optgroup (AutoCaptions grubu \"· Pro\"), her animasyon bir kez", sec.childNodes[0].tagName === "OPTION" && sec.childNodes[0].value === "" &&
+  gruplar.length === YA.gruplar().length && J(gruplar.map(function (g) { return g.label; })) === J(YA.gruplar().map(function (g) { return g.id === "autocaptions" ? g.ad + " · Pro" : g.ad; })) &&
   J(sec.secenekler().slice(1).map(function (o) { return o.value; }).sort()) === J(YA.kimlikler().sort()), J(gruplar.map(function (g) { return g.label; })));
 ok("seçici: seçenek adı Türkçe ad, açıklama title'da", sec.secenekler().slice(1).every(function (o) { var a = YA.bul(o.value); return o.textContent === a.ad && o.title === a.aciklama; }));
 ok("index.html: #cap-efekt-anim #cap-efekt-ayarlar'ın başında, Klasik seçeneği ve ipucu", /id="cap-efekt-ayarlar">\s*<!--[^>]*-->\s*<div class="field efekt-anim">\s*<label for="cap-efekt-anim">Animasyon<\/label>\s*<select id="cap-efekt-anim">\s*<option value="" selected>Klasik \(giriş \+ vurgu ayrı\)<\/option>/.test(html) &&

@@ -3794,7 +3794,8 @@ function KS_placeMogrt(encoded) {
 function KS_captionMogrtTextProp(component) {
   if (!component || !component.properties) return null;
   var props = component.properties;
-  var names = ["Text", "Source Text", "Edit Text 01 - Text", "Title", "Subtitle"];
+  // "Texto": AutoCaptions (ClashiVFX) sablonlarinin metin kontrolu
+  var names = ["Text", "Source Text", "Edit Text 01 - Text", "Title", "Subtitle", "Texto"];
   if (props.getParamForDisplayName) {
     for (var ni = 0; ni < names.length; ni++) {
       try {
@@ -3809,7 +3810,7 @@ function KS_captionMogrtTextProp(component) {
     var prop = props[i];
     var display = "";
     try { display = String(prop.displayName || ""); } catch (eDisplay) {}
-    if (/(?:^|\s)(?:source\s+)?text(?:$|\s)|altyaz|subtitle|title/i.test(display)) return prop;
+    if (/(?:^|\s)(?:source\s+)?texto?(?:$|\s)|altyaz|subtitle|title/i.test(display)) return prop;
     // AE MOGRT metin kontrolleri getValue() ile JSON metin belgesi verir.
     try {
       var raw = prop.getValue();
