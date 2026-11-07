@@ -1,3 +1,16 @@
+## Suflo 3.5.1 — Yeni efektler öne çıktı
+
+### İyileştirildi
+- **Yeniler en üstte:** Yazı Animasyonları, Altyazı Şablonları ve Premiere Şablonları'nda yeni eklenenler listenin başında ve **YENİ** rozetiyle görünür.
+- **Yeni sekmesi ve bant:** Altyazı Efektleri'nde Tümü'nün hemen yanında **Yeni** sekmesi var; galerinin üstündeki **19 yeni altyazı efekti** bandına tıkla, birini seç, altyazın doğrudan o efektle yazılsın. Animasyon seçiminde yeni animasyonlar **Klasik**'in hemen ardından gelir. Önizleme ücretsiz, eklemek Pro (deneme hakkı yok).
+- **Yeni altyazı şablonları Yazı Animasyonları'nda da:** 14 yeni altyazı şablonu playhead'e başlık gibi de eklenebilir (Pro).
+- **Daha sade adlar:** yeni görünümler ve şablonlar kısa adlarıyla görünür (ör. **Aura**, **Azul**).
+
+### Düzeltildi
+- Pro'da yeni başlık MOGRT'lerinden bazıları (ör. Comment Your Word) Diğer Animasyonlar'a düşüyordu; artık Yazı Animasyonları'nda.
+- Ayarlar › Suflo Doctor: logo ve **Taramayı başlat** kart kenarına yapışıktı, alttaki düğmeler ile "Panel menüde görünmüyor mu?" bağlantısı dip dibeydi.
+- Fiyatlar, ücretsiz / Pro sınırı, stil kodları ve kayıtlı stiller değişmedi.
+
 ## Suflo 3.5.0 — Altyazı yenilemesi, sesle senkron doğrulama ve After Effects (deneysel)
 
 ### Yeni

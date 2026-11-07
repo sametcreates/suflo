@@ -41,7 +41,7 @@
     { id: "karaoke", ad: "Konuşulan kelime" },
     { id: "surekli", ad: "Sürekli" },
     // AutoCaptions koleksiyonu (ClashiVFX AutoCaptions'ın giriş hareketleri; yazarın izniyle, aşağıda)
-    { id: "autocaptions", ad: "AutoCaptions" }
+    { id: "autocaptions", ad: "Yeni" }
   ];
 
   var ANIMASYONLAR = [

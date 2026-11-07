@@ -631,7 +631,7 @@
       (isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 267 animasyon ve grafik' :
       (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' :
       (isPreset ? '290 preset doğrudan Suflo panelinde' : label)));
-    var desc = isCaption ? 'Creator Punch, Karaoke, Glitch, Typewriter, 14 AutoCaptions stili ve 13 stil daha. Birini seç; Suflo tüm altyazı satırlarına ve sekans oranına kendisi uygulasın.' :
+    var desc = isCaption ? 'Creator Punch, Karaoke, Glitch, Typewriter, 14 yeni stil ve 13 stil daha. Birini seç; Suflo tüm altyazı satırlarına ve sekans oranına kendisi uygulasın.' :
       (isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
       (isSfx ? '14 koleksiyondaki 1.076 sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
       (isPreset ? '12 yerleşik hareket + Suflo Smooth paketindeki 270 preset seçili klibe doğrudan uygulanır; 8 özel preset uyumluluk modunda açılır.' :
@@ -660,7 +660,7 @@
       visual = '<div class="pro-upsell-tool"><i>\u2726</i><span><b>Daha h\u0131zl\u0131 bitir</b><small>Tekrarlanan kurgu i\u015fini Suflo\'ya b\u0131rak</small></span></div>';
     }
     var proof = isCaption
-      ? '<div class="pro-upsell-proof"><i><b>31</b> gerçek stil</i><i><b>14</b> AutoCaptions</i><i><b>65</b> MOGRT</i></div>'
+      ? '<div class="pro-upsell-proof"><i><b>31</b> gerçek stil</i><i><b>14</b> yeni stil</i><i><b>65</b> MOGRT</i></div>'
       : '<div class="pro-upsell-proof"><i><b>267</b> animasyon</i><i><b>290</b> preset</i><i><b>1.076</b> SFX</i></div>';
     var benefits = isCaption
       ? '<ul class="pro-upsell-liste"><li>Reels, YouTube ve kare video için otomatik oran</li><li>Bir seçimle tüm altyazı satırlarına uygula</li><li>Lisansı gir; dosyalar ve yenileri otomatik gelsin</li></ul>'

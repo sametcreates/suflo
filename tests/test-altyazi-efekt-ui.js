@@ -23,6 +23,9 @@ var SE = require(path.join(KOK, "js", "style-engine.js"));
 var MK = require(path.join(KOK, "js", "marka-kiti.js"));
 var AE = require(path.join(KOK, "js", "altyazi-efekt.js"));
 var GAL = require(path.join(KOK, "js", "stil-galeri.js"));
+// Galerinin çizim sırası: yeni koleksiyon ("autocaptions") başta, sonra veri sırası (AE.GORUNUMLER değişmez)
+var GSIRA = AE.GORUNUMLER.filter(function (g) { return g.koleksiyon === "autocaptions"; }).concat(AE.GORUNUMLER.filter(function (g) { return g.koleksiyon !== "autocaptions"; }));
+function cipId(kap, id) { return kap.childNodes.filter(function (c) { return c.getAttribute("data-gorunum") === id; })[0]; }
 
 /* ---------------- küçük sahte DOM ---------------- */
 function dugum(etiket, ek) {
@@ -114,7 +117,7 @@ function ortam(o) {
   var kod = [
     govde("function motorPreset("), govde("function motorStiliMi("), govde("function uzunlukSecimi("), govde("function applyPreset("),
     govde("function stilKartiIsaretle("), govde("function efektStili("), govde("function efektAyari("), govde("function efekteGec("),
-    govde("function efektSonrasi("), govde("function gorunumUygula("), govde("function gorunumleriCiz("), govde("function efektKelimeSayisi("),
+    govde("function efektSonrasi("), govde("function gorunumUygula("), govde("function gorunumleriCiz("), govde("function yeniOnce("), govde("function yeniEfektBandiniKur("), govde("function yeniMogrtMi("), govde("function efektKelimeSayisi("),
     govde("function stil()"), govde("function motorAyarlari("), govde("function savePrefs("), govde("function loadPrefs("), govde("function stiliYaz("),
     govde("function markaKiti("), govde("function dikeySekans("), govde("function inceAyarDurumu("), govde("function stilKredisi("),
     govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon("), govde("function tarayiciDeposu("), govde("function galeriTuslariniTut("),
@@ -179,17 +182,18 @@ ok("Suflo Stilleri galerisi kaldırıldı: motorStilleriniCiz / stil-motor kartl
 ok("hazır görünüm çipleri: her görünüm için bir düğme, rozet (SUFLO / PRO) yok, kart sınıfı (.stil-sec) yok",
   cipler.length === AE.GORUNUMLER.length && cipler.every(function (c) { return c.classList.contains("efekt-cip") && !c.classList.contains("stil-sec"); }) &&
   metinleri(e.dom["cap-efekt-gorunumler"]).every(function (t) { return !/^(SUFLO|PRO|MOGRT)$/.test(t); }), metinleri(e.dom["cap-efekt-gorunumler"]).join(","));
-ok("çip adı görünüm adı, örnek harfler çeviriden muaf", cipler.map(function (c) { return c.childNodes[1].textContent; }).join(",") === AE.GORUNUMLER.map(function (g) { return g.ad; }).join(",") &&
+ok("çip adı görünüm adı (yeni efektler başta), örnek harfler çeviriden muaf", cipler.map(function (c) { return c.childNodes[1].textContent; }).join(",") === GSIRA.map(function (g) { return g.ad; }).join(",") &&
   cipler.every(function (c) { return c.childNodes[0].getAttribute("data-i18n-skip") === ""; }));
 
 /* ---------------- 2) çip → kontroller, seçim, tercih, önizleme ---------------- */
-cipler[1].click();   // Vurucu
+var vurucuCip = cipId(e.dom["cap-efekt-gorunumler"], "vurucu"), temizCip = cipId(e.dom["cap-efekt-gorunumler"], "temiz");
+vurucuCip.click();
 var d = e.dom;
 ok("çip kontrolleri doldurur (Vurucu: Pop + Zıpla, Anton, BÜYÜK HARF, 2 satır, 3 kelime, orta)", d["cap-efekt-giris"].value === "pop" && d["cap-efekt-aktif"].value === "zipla" &&
   d["cap-font"].value === "Anton" && d["cap-case"].value === "upper" && d["cap-efekt-satir"].value === "2" && d["cap-efekt-kelime"].value === "3" && d["cap-konum"].value === "5" &&
   d["cap-boyut"].value === "112", J([d["cap-efekt-giris"].value, d["cap-font"].value, d["cap-case"].value]));
 ok("çip efekti seçer, çip seçili, bölüm etkin, paylaş / kaydet görünür", e.api.durum().motor === "efekt" && e.api.durum().gorunum === "vurucu" &&
-  cipler[1].classList.contains("secili") && cipler[1].getAttribute("aria-pressed") === "true" && !cipler[0].classList.contains("secili") &&
+  vurucuCip.classList.contains("secili") && vurucuCip.getAttribute("aria-pressed") === "true" && !temizCip.classList.contains("secili") &&
   d["cap-efekt"].classList.contains("etkin") && d["cap-ince-ayar"].hidden === false && d["cap-style-family"].value === "efekt");
 ok("çip tercihe yazılır (motorStili efekt, görünüm) ve gerçek önizlemeyi hemen ister", e.ayar.capPrefs && e.ayar.capPrefs.motorStili === "efekt" &&
   e.ayar.capPrefs.gorunum === "vurucu" && e.ayar.capPrefs.gorunumTaban === "vurucu" && J(e.api.onizleme.tazele) === "[true]", J(e.ayar.capPrefs && e.ayar.capPrefs.stil));
@@ -281,7 +285,7 @@ ilk.api.gorunumleriCiz();
 ilk.api.loadPrefs();
 ok("ilk açılış (tercih yok): Altyazı Efektleri › Temiz seçili gelir; tercih yazılmaz, önizleme çizilmez",
   ilk.api.durum().motor === "efekt" && ilk.api.durum().gorunum === "temiz" && ilk.dom["cap-style-family"].value === "efekt" &&
-  ilk.dom["cap-efekt-gorunumler"].childNodes[0].classList.contains("secili") && !ilk.ayar.capPrefs && ilk.api.onizleme.tazele.length === 0, JSON.stringify(ilk.api.durum()));
+  cipId(ilk.dom["cap-efekt-gorunumler"], "temiz").classList.contains("secili") && !ilk.ayar.capPrefs && ilk.api.onizleme.tazele.length === 0, JSON.stringify(ilk.api.durum()));
 var ozel = ortam({ ayar: { capPrefs: { maxlen: "l42", kase: "normal", punct: true, preset: "", stil: { aile: "custom", font: "Arial", boyut: 64, renk: "#ff0000",
   konturRenk: "#000000", vurguRenk: "#00ff00", kontur: 4, konum: 2 } } } });
 ozel.api.loadPrefs();
@@ -304,7 +308,7 @@ ok("★ Şablonum çipi kayıtlı ayarı uygular, seçili görünür, tercihe ya
   sab.dom["cap-efekt-aktif"].value === "glitch" && sab.dom["cap-preset"].value === "user" && sab.api.durum().motor === "efekt" && sabCip.classList.contains("secili") &&
   sab.ayar.capPrefs && sab.ayar.capPrefs.preset === "user" && JSON.stringify(sab.api.onizleme.tazele) === "[true]", JSON.stringify([sab.dom["cap-preset"].value, sab.api.durum()]));
 sab.api.gorunumUygula("temiz");
-ok("başka görünüm seçilince ★ Şablonum çipi seçili kalmaz", !sabCip.classList.contains("secili") && sabCipler[0].classList.contains("secili"));
+ok("başka görünüm seçilince ★ Şablonum çipi seçili kalmaz", !sabCip.classList.contains("secili") && cipId(sab.dom["cap-efekt-gorunumler"], "temiz").classList.contains("secili"));
 ok("Şablonum kaydı çipi hemen gösterir, bildirim çipi anlatır (menü yok)", /gorunumleriCiz\(\);/.test(govde("function saveUserPreset(")) &&
   /Hazır görünümlerde ★ Şablonum/.test(govde("function saveUserPreset(")) && govde("function saveUserPreset(").indexOf("menüde") === -1);
 
@@ -809,12 +813,12 @@ var gd = sahteDepo();
 var gk = ortam({ depo: gd, ayar: { userPreset: { maxlen: "l42", kase: "normal", punct: true, stil: Object.assign({ aile: "efekt" }, AE.overrides(AE.gorunum("temiz").ayar)) } } });
 gk.api.gorunumleriCiz();
 var gCip = gk.dom["cap-efekt-gorunumler"].childNodes, sekme = gk.dom["cap-efekt-kategoriler"].childNodes;
-ok("galeri: çip sayısı hâlâ GORUNUMLER + ★ Şablonum, her çipte data-kategori (Şablonum kategorisiz), sırası ve adı aynı",
-  gCip.length === AE.GORUNUMLER.length + 1 && AE.GORUNUMLER.every(function (g, i) { return gCip[i].getAttribute("data-gorunum") === g.id &&
+ok("galeri: çip sayısı hâlâ GORUNUMLER + ★ Şablonum, her çipte data-kategori (Şablonum kategorisiz), sırası (yeniler başta) ve adı aynı",
+  gCip.length === AE.GORUNUMLER.length + 1 && GSIRA.every(function (g, i) { return gCip[i].getAttribute("data-gorunum") === g.id &&
     gCip[i].getAttribute("data-kategori") === g.kategori && gCip[i].childNodes[1].textContent === g.ad && gCip[i].classList.contains("efekt-cip"); }) &&
   gCip[gCip.length - 1].getAttribute("data-kategori") === null);
-ok("galeri: sekmeler Tümü + altı kategori + AutoCaptions (Türkçe adlarıyla), başta Tümü seçili ve hepsi görünür",
-  sekme.map(function (b) { return b.textContent; }).join("|") === "Tümü|Viral · Shorts|Minimal|Podcast|Eğitim|Sinematik|Marka|AutoCaptions" &&
+ok("galeri: sekmeler Tümü + Yeni (başta; AutoCaptions adı yazmaz) + altı kategori (Türkçe adlarıyla), başta Tümü seçili ve hepsi görünür",
+  sekme.map(function (b) { return b.textContent; }).join("|") === "Tümü|Yeni|Viral · Shorts|Minimal|Podcast|Eğitim|Sinematik|Marka" &&
   sekme.every(function (b) { return b.classList.contains("efekt-kategori") && b.getAttribute("role") === "tab"; }) &&
   sekme[0].getAttribute("aria-selected") === "true" && gorunenCipler(gk).length === gCip.length);
 ok("galeri: çip örneği yazı tipinde, yazı / kontur / vurgu rengi, kutu zemini ve yazı animasyonunun minik glifi (çeviriden muaf)", (function () {
@@ -823,29 +827,29 @@ ok("galeri: çip örneği yazı tipinde, yazı / kontur / vurgu rengi, kutu zemi
     p.childNodes[1].style.color === "#ff7a1a" && p.childNodes[2].className === "efekt-cip-anim" && p.childNodes[2].textContent === "•" &&
     k.classList.contains("efekt-cip-ornek-kutu") && k.style["--efekt-kutu"] === "#f5efe1" && k.style.color === "#1d1b16" && t.childNodes[2].textContent === "°";
 })());
-function gIdx(id) { return AE.GORUNUMLER.map(function (g) { return g.id; }).indexOf(id); }
-galeriOlay(sekme[3], "click");
+function gIdx(id) { return GSIRA.map(function (g) { return g.id; }).indexOf(id); }
+galeriOlay(sekme[4], "click");   // Podcast (Tümü, Yeni, Viral, Minimal, Podcast…)
 ok("galeri: Podcast sekmesi yalnız podcast çiplerini gösterir (gizliler hidden), ★ Şablonum her sekmede, seçim depoya yazılır",
   gorunenCipler(gk).length === katSayisi.podcast + 1 && gorunenCipler(gk).every(function (c) { return c.getAttribute("data-kategori") === "podcast" || c.getAttribute("data-sablonum") === "1"; }) &&
   gCip.filter(function (c) { return c.hidden; }).every(function (c) { return c.getAttribute("hidden") === "" && c.getAttribute("data-kategori") !== "podcast"; }) &&
-  gd.v["suflo.efektKategori"] === "podcast" && sekme[3].classList.contains("secili") && sekme[3].getAttribute("aria-selected") === "true" && !sekme[0].classList.contains("secili"),
+  gd.v["suflo.efektKategori"] === "podcast" && sekme[4].classList.contains("secili") && sekme[4].getAttribute("aria-selected") === "true" && !sekme[0].classList.contains("secili"),
   gorunenCipler(gk).map(function (c) { return c.getAttribute("data-gorunum"); }).join(","));
 ok("galeri: süzgeç çip sayısını değiştirmez (sayı = GORUNUMLER + 1), Tümü hepsini geri getirir", gCip.length === AE.GORUNUMLER.length + 1 &&
   (galeriOlay(sekme[0], "click"), gorunenCipler(gk).length === gCip.length) && gd.v["suflo.efektKategori"] === "tumu");
-galeriOlay(sekme[6], "click");
+galeriOlay(sekme[7], "click");
 ok("galeri: Marka sekmesi ≥ 3 Marka görünümü", gorunenCipler(gk).filter(function (c) { return c.getAttribute("data-marka"); }).length === katSayisi.marka && katSayisi.marka >= 3);
 // yeniden çizim (ör. dil değişti, Şablonum kaydedildi) seçili sekmeyi korur
 gk.api.gorunumleriCiz();
 ok("galeri: yeniden çizim seçili sekmeyi korur", gk.dom["cap-efekt-gorunumler"].childNodes.filter(function (c) { return !c.hidden && c.getAttribute("data-kategori"); }).length === katSayisi.marka &&
-  gk.dom["cap-efekt-kategoriler"].childNodes[6].classList.contains("secili"));
+  gk.dom["cap-efekt-kategoriler"].childNodes[7].classList.contains("secili"));
 var hatirla = ortam({ depo: sahteDepo("egitim") });
 hatirla.api.gorunumleriCiz();
 ok("galeri: kategori izleyicinin tarayıcısında hatırlanır (açılışta Eğitim)", gorunenCipler(hatirla).length === katSayisi.egitim &&
-  hatirla.dom["cap-efekt-kategoriler"].childNodes[4].getAttribute("aria-selected") === "true");
+  hatirla.dom["cap-efekt-kategoriler"].childNodes[5].getAttribute("aria-selected") === "true");
 var bozukKayit = ortam({ depo: sahteDepo("__proto__") }), depoYok = ortam({ depoHatali: true });
 bozukKayit.api.gorunumleriCiz();
 var depoHatasi = null;
-try { depoYok.api.gorunumleriCiz(); galeriOlay(depoYok.dom["cap-efekt-kategoriler"].childNodes[2], "click"); } catch (e) { depoHatasi = e; }
+try { depoYok.api.gorunumleriCiz(); galeriOlay(depoYok.dom["cap-efekt-kategoriler"].childNodes[3], "click"); } catch (e) { depoHatasi = e; }
 ok("galeri: bilinmeyen kayıt Tümü'ye döner; depo erişilemezse (gizli pencere) hata yok, süzgeç yine çalışır", gorunenCipler(bozukKayit).length === AE.GORUNUMLER.length &&
   depoHatasi === null && gorunenCipler(depoYok).length === katSayisi.minimal, String(depoHatasi));
 
@@ -931,8 +935,8 @@ ok("kit değişince Marka çipleri yeniden çizilir (yalnız kitin stil alanı d
 var gs = ortam({ galerisiz: true });
 gs.api.gorunumleriCiz();
 ok("galeri modülü yoksa: çipler yalın örnekle, sayı ve ad aynı, tıklama uygular; sekme yok", gs.dom["cap-efekt-gorunumler"].childNodes.length === AE.GORUNUMLER.length &&
-  gs.dom["cap-efekt-gorunumler"].childNodes[1].childNodes[1].textContent === "Vurucu" && gs.dom["cap-efekt-kategoriler"].childNodes.length === 0 &&
-  (gs.dom["cap-efekt-gorunumler"].childNodes[1].click(), gs.api.durum().gorunum === "vurucu"));
+  cipId(gs.dom["cap-efekt-gorunumler"], "vurucu").childNodes[1].textContent === "Vurucu" && gs.dom["cap-efekt-kategoriler"].childNodes.length === 0 &&
+  (cipId(gs.dom["cap-efekt-gorunumler"], "vurucu").click(), gs.api.durum().gorunum === "vurucu"));
 ok("index.html: sekmeler çiplerin üstünde, ipucu altında; stil-galeri.js captions.js'ten önce", html.indexOf('id="cap-efekt-kategoriler"') !== -1 &&
   html.indexOf('id="cap-efekt-kategoriler"') < html.indexOf('id="cap-efekt-gorunumler"') && html.indexOf('id="cap-efekt-gorunumler"') < html.indexOf('id="cap-efekt-ipucu"') &&
   html.indexOf('src="js/stil-galeri.js"') > html.indexOf('src="js/altyazi-efekt.js"') && html.indexOf('src="js/stil-galeri.js"') < html.indexOf('src="js/captions.js"'));
