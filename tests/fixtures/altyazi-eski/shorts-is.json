@@ -1,0 +1,181 @@
+{
+  "is": {
+    "v": 1,
+    "ts": 1700000000000,
+    "kaynakId": "seq-1",
+    "kaynakAd": "Röportaj",
+    "lang": "tr",
+    "dikey": true,
+    "metinAI": false,
+    "logoAcik": false,
+    "secim": {
+      "stilId": "efekt",
+      "gorunum": "vurucu",
+      "efekt": {
+        "giris": "pop",
+        "aktif": "zipla",
+        "vurgu": true,
+        "kalin": true,
+        "italik": false,
+        "satir": 2,
+        "kelime": 3,
+        "font": "Anton",
+        "renk": "#ffffff",
+        "konturRenk": "#000000",
+        "vurguRenk": "#ffe600",
+        "boyut": 112,
+        "kontur": 8,
+        "konum": 5,
+        "kase": "upper",
+        "punct": false,
+        "golge": {
+          "renk": "#000000",
+          "opak": 85,
+          "mesafe": 7,
+          "yumusak": 0
+        },
+        "kutu": false,
+        "kutuRenk": "#000000",
+        "kutuOpak": 50,
+        "konumX": null,
+        "konumY": null
+      },
+      "altyazi": true,
+      "kanca": true,
+      "ilerleme": true,
+      "ilerlemeKonum": "ust",
+      "ilerlemeRenk": "#8b7cf6",
+      "ilerlemeStil": "ince",
+      "cta": true,
+      "ctaSecim": "takip",
+      "ctaOzel": "",
+      "logo": false,
+      "metin": false,
+      "kredi": false,
+      "yatay": false
+    },
+    "durum": "durdu",
+    "kisalar": [
+      {
+        "no": 1,
+        "anId": "a1",
+        "start": 10,
+        "end": 40,
+        "ad": "Shorts 1 · İlk an",
+        "baslik": "İlk an",
+        "kanca": "Bunu bilmiyordun",
+        "neden": "r",
+        "puan": 80,
+        "seqId": "s1",
+        "dikeyId": "d1",
+        "adimlar": {
+          "sekans": "tamam",
+          "altyazi": "tamam",
+          "kanca": "hata",
+          "cerceve": "bekliyor",
+          "metin": "atlandi"
+        },
+        "notlar": {
+          "metin": "kapali"
+        },
+        "hatalar": {
+          "kanca": "Premiere yanıt vermedi"
+        },
+        "paylasim": null
+      },
+      {
+        "no": 2,
+        "anId": "a2",
+        "start": 60,
+        "end": 95,
+        "ad": "Shorts 2 · İkinci an",
+        "baslik": "İkinci an",
+        "kanca": "Dur ve izle",
+        "neden": "r",
+        "puan": 70,
+        "seqId": "",
+        "dikeyId": "",
+        "adimlar": {
+          "sekans": "bekliyor",
+          "altyazi": "bekliyor",
+          "kanca": "bekliyor",
+          "cerceve": "bekliyor",
+          "metin": "atlandi"
+        },
+        "notlar": {
+          "metin": "kapali"
+        },
+        "hatalar": {},
+        "paylasim": null
+      }
+    ]
+  },
+  "secim": {
+    "stilId": "efekt",
+    "gorunum": "vurucu",
+    "efekt": {
+      "font": "Anton",
+      "renk": "#ffffff",
+      "konturRenk": "#000000",
+      "vurguRenk": "#ffe600",
+      "boyut": 112,
+      "kontur": 8,
+      "konum": 5,
+      "giris": "pop",
+      "aktif": "zipla",
+      "vurgu": true,
+      "kalin": true,
+      "italik": false,
+      "satir": 2,
+      "kelime": 3,
+      "golge": {
+        "renk": "#000000",
+        "opak": 85,
+        "mesafe": 7,
+        "yumusak": 0
+      },
+      "kutu": false,
+      "kutuRenk": "#000000",
+      "kutuOpak": 50,
+      "konumX": null,
+      "konumY": null,
+      "kase": "upper",
+      "punct": false
+    },
+    "altyazi": true,
+    "kanca": true,
+    "ilerleme": true,
+    "cta": true,
+    "metin": false
+  },
+  "altyazi": {
+    "mod": "k1",
+    "segs": [
+      {
+        "start": 0.2,
+        "end": 0.64,
+        "text": "Bunu"
+      },
+      {
+        "start": 0.7,
+        "end": 1.14,
+        "text": "*gören*"
+      },
+      {
+        "start": 1.2,
+        "end": 1.64,
+        "text": "herkes"
+      },
+      {
+        "start": 1.7,
+        "end": 2.14,
+        "text": "şaşırdı"
+      },
+      {
+        "start": 2.2,
+        "end": 2.64,
+        "text": "bugün"
+      }
+    ]
+  }
+}

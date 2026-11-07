@@ -23,7 +23,8 @@
  *                                   kayıtlar (sırayla); kopya sekans dalları ve aynı sekansta art arda kesimler dahil
  *   yolUzlastir(yol), izliYol(uz, hedef, iz) -> yolu host'un kurgu izleriyle uzlaştır (Premiere'de geri alınan /
  *                                   yeniden uygulanan kesim) ve bugünkü kurguya (taze iz) uyan kısmını bul
- *   zincirEsle(cues, yol, o)     -> yoldaki kesimleri sırayla uygular (her kesim bir öncekinin kurgusunda ölçülmüştür)
+ *   zincirEsle(cues, yol, o)     -> yoldaki kesimleri sırayla uygular (her kesim bir öncekinin kurgusunda ölçülmüştür);
+ *                                   o.dil: yeniden kırılan satırların dili (kalite motoru)
  *
  * Kesim nesnesi { start, end, kayma? } (sekans zamanı, sn). kayma: host'un ripple'da ölçtüğü gerçek kayma (aralığın
  * içindeki kliplerin toplam süresi). Sekans kapsamında hiçbir katmanda klip olmayan boşluk da kesim aralığına girebilir;
@@ -300,7 +301,8 @@
       satirlar.forEach(function (s) { var n = s.replace(/^\s+|\s+$/g, "").length; if (n > enUzun) enUzun = n; });
       var maxChars = sayi(o && o.maxChars) > 0 ? sayi(o.maxChars) : Math.max(42, enUzun);
       var maxLines = sayi(o && o.maxLines) > 1 ? sayi(o.maxLines) : satirlar.length;
-      return CL.dengeliSar(duz, maxChars, maxLines);
+      // o.dil: altyazının dili (kalite motoru: satır kırılımı Türkçe-duyarlı; verilmezse tr + en)
+      return CL.dengeliSar(duz, maxChars, maxLines, o && o.dil);
     }
     return duz;
   }
@@ -446,7 +448,7 @@
   }
 
   /*
-   * Belgenin satırlarını kesimlere göre eşle. o: { mod, kare, maxChars, maxLines, uygulanan: [imza], kelimeModu }.
+   * Belgenin satırlarını kesimlere göre eşle. o: { mod, kare, maxChars, maxLines, uygulanan: [imza], kelimeModu, dil }.
    *   - kelimeli cue kalan kelimelerinden yeniden kurulur (metin ve zaman); 'gap'te kesimin iki yanı ayrı cue olur
    *   - kelimesiz cue'nun uçları eşlenir; tamamen kesimde kalan ya da kesimle 0,2 sn'nin altına inen düşer
    *   - kelimeModu "k1" / "kc" (belgenin segmentsMode'u): kelimesiz cue'lar kelime cue'su (karaokeCueEsle)
@@ -638,12 +640,12 @@
     return { yol: uz.yol, durum: "degisti" };
   }
 
-  // Yoldaki kayıtları sırayla uygula. o: { maxChars, maxLines, kelimeModu }. Döner: { cues, dusen, kirpilan }
+  // Yoldaki kayıtları sırayla uygula. o: { maxChars, maxLines, kelimeModu, dil }. Döner: { cues, dusen, kirpilan }
   function zincirEsle(cues, yol, o) {
     o = o || {};
     var cur = (dizi(cues) ? cues : []).filter(Boolean).map(cueKopya), dusen = 0, kirpilan = 0;
     (dizi(yol) ? yol : []).forEach(function (k) {
-      var r = satirEsle(cur, k.cuts, { mod: k.mod, kare: k.kare, maxChars: o.maxChars, maxLines: o.maxLines, kelimeModu: o.kelimeModu });
+      var r = satirEsle(cur, k.cuts, { mod: k.mod, kare: k.kare, maxChars: o.maxChars, maxLines: o.maxLines, kelimeModu: o.kelimeModu, dil: o.dil });
       cur = r.cues; dusen += r.dusen; kirpilan += r.kirpilan;
     });
     return { cues: cur, dusen: dusen, kirpilan: kirpilan };

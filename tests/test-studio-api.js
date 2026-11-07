@@ -6,7 +6,11 @@
  *  - sunucu yeniden baslayinca veri ve oturum kalir; cikis ve "tum oturumlari kapat" cerezi gecersiz kilar; bosta kalma suresi
  *  - ice aktarma: onizleme degistirmez, uygulama oncesi anlik kopya, ikinci kez aktarmada mukerrer yok, hatali dosya hic yazmaz
  *  - disa aktarma -> tum veriyi degistir (onayli) -> ayni veri; anlik kopyaya donus; sifre degistirme; hatali giris kilidi
- * php yoksa ATLA (CI'da php isi ayrica php -l calistirir).
+ *  - tekrarlanan istek (istemci kimligi) ikinci kayit olusturmaz; gunluk otomatik kopya (14, ayri sayilir); ayar.sonYedek;
+ *    Turkce onay ('GERİ YÜKLE') ve Turkce sunucu mesajlari
+ *  - takvim: calisma blogu (blok) ve ozel gun (ozelgun) kayitlari, etkinlik.tamamZaman, ayar calisma saatleri / haftalik hedef;
+ *    yedek / ice aktarma / anlik kopya bunlari tasir; eski index.php (git'teki onceki surum) bu satirlarla cokmez
+ * php yoksa ATLA (CI'da php isi ayrica php -l calistirir). STUDIO_TEST_MYSQL verilirse ayni test MySQL / MariaDB'de kosar.
  */
 "use strict";
 var fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process"), http = require("http"), net = require("net");
@@ -14,14 +18,21 @@ var ROOT = path.join(__dirname, "..");
 var gecen = 0, kalan = 0;
 function ok(ad, k, ek) { if (k) gecen++; else kalan++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined && !k ? "   [" + String(ek).slice(0, 500) + "]" : "")); }
 function j(x) { return JSON.stringify(x); }
+// Istanbul takvim gunu (UTC+3, yaz saati yok), bugunden ek gun sonra. Sunucu gecmis gun istisnalarini kendi gercek
+// saatine gore budar: sabit bir tarih yazilirsa test o tarih gecince kendiliginden kalir.
+function istanbulGunu(ek) { return new Date(Date.now() + 3 * 3600 * 1000 + ek * 86400 * 1000).toISOString().slice(0, 10); }
 
 var phpVar = cp.spawnSync("php", ["-v"], { encoding: "utf8" });
 if (phpVar.error || phpVar.status !== 0) {
   console.log("ATLA php bulunamadi: Studio sunucu testi calismadi (CI php isi php -l ile sozdizimini denetler)");
   process.exit(0);
 }
-var sqliteVar = cp.spawnSync("php", ["-r", "echo in_array('sqlite', PDO::getAvailableDrivers()) ? 'var' : 'yok';"], { encoding: "utf8" });
-["server/studio-v1/index.php", "server/studio-v1/config.example.php", "server/studio-v1/sifre-ozeti.php"].forEach(function (f) {
+// Varsayilan: gecici SQLite. STUDIO_TEST_MYSQL="host=127.0.0.1;port=3306" verilirse ayni test MySQL / MariaDB'de kosar
+// (STUDIO_TEST_DB_USER / STUDIO_TEST_DB_PASS; kullanici studio_test_* adli veritabanlarini acip silebilmeli, test sonunda siler).
+var MY = process.env.STUDIO_TEST_MYSQL || "";
+var DB_USER = MY ? (process.env.STUDIO_TEST_DB_USER || "root") : "", DB_PASS = MY ? (process.env.STUDIO_TEST_DB_PASS || "") : "";
+var sqliteVar = cp.spawnSync("php", ["-r", "echo in_array($argv[1], PDO::getAvailableDrivers()) ? 'var' : 'yok';", MY ? "mysql" : "sqlite"], { encoding: "utf8" });
+["server/studio-v1/index.php", "server/studio-v1/studio-ortak.php", "server/studio-v1/config.example.php", "server/studio-v1/sifre-ozeti.php"].forEach(function (f) {
   var r = cp.spawnSync("php", ["-l", path.join(ROOT, f)], { encoding: "utf8" });
   ok("php -l " + f, r.status === 0, r.stdout + r.stderr);
 });
@@ -29,9 +40,13 @@ var kaynak = fs.readFileSync(path.join(ROOT, "server", "studio-v1", "index.php")
 var ornek = fs.readFileSync(path.join(ROOT, "server", "studio-v1", "config.example.php"), "utf8");
 ok("ornek config: sifre ozeti bos, gizli bilgi yok", /'password_hash' => ''/.test(ornek) && /'db_pass' => ''/.test(ornek) && !/\$2y\$|\$argon2/.test(ornek));
 ok("Pro lisans servisinden ayri: pro-v1 ayari / lisans okunmaz", !/pro-v1|license|lisans/i.test(kaynak.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")));
-ok("ayar yolu yalniz public_html disindaki private/studio-v1 (ortam degiskeni yok)", /private\/studio-v1\/config\.php/.test(kaynak) && !/getenv\(/.test(kaynak));
+// Ayar yolu uygulama klasorunden: public_html/studio/v1 -> private/studio-v1 (canli, degismedi), studio-test -> private/studio-test-v1
+// (calisma kaniti: test-studio-paket.js, gercek Apache'de iki klasor yan yana)
+ok("ayar yolu yalniz public_html disindaki private/<uygulama>-v1 (klasor adindan; ortam degiskeni yok)",
+  /'\/private\/' \. studio_uygulama\(\) \. '-v1\/config\.php'/.test(kaynak) && !/private\/studio-v1\/config\.php';/.test(kaynak) && !/getenv\(/.test(kaynak));
 ok("sifre-ozeti yalniz komut satirinda", /PHP_SAPI !== 'cli'/.test(fs.readFileSync(path.join(ROOT, "server", "studio-v1", "sifre-ozeti.php"), "utf8")));
 if (sqliteVar.stdout !== "var") {
+  if (MY) { ok("STUDIO_TEST_MYSQL verildi ama php pdo_mysql yok", false); process.exit(1); }
   console.log("ATLA php pdo_sqlite yok: Studio sunucu testinin kalani calismadi");
   console.log("\n" + gecen + "/" + (gecen + kalan) + " gecti");
   process.exit(kalan ? 1 : 0);
@@ -44,7 +59,28 @@ var PUB = path.join(TMP, "public_html"), API_DIR = path.join(PUB, "studio", "v1"
 fs.mkdirSync(API_DIR, { recursive: true });
 fs.mkdirSync(PRIV, { recursive: true });
 fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "index.php"), path.join(API_DIR, "index.php"));
+fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "studio-ortak.php"), path.join(API_DIR, "studio-ortak.php"));
 var ozet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE], { encoding: "utf8" }).stdout;
+// Test veritabani yardimcilari (SQLite: PRIV altinda dosya; MySQL: studio_test_<pid>_<ad> veritabani)
+var DB_ONEK = "studio_test_" + process.pid + "_", acilanDblar = [];
+function dbPdo(dsn, sqller, sorgu) {
+  var r = cp.spawnSync("php", ["-r", "$p = new PDO($argv[1], $argv[2], $argv[3], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); " +
+    "foreach (json_decode($argv[4]) as $s) $p->exec($s); if ($argv[5] !== '') echo json_encode($p->query($argv[5])->fetchAll(PDO::FETCH_NUM));",
+    dsn, DB_USER, DB_PASS, JSON.stringify(sqller || []), sorgu || ""], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error("test veritabani: " + r.stdout + r.stderr);
+  return r.stdout;
+}
+function dbAc(ad, sqller) {
+  var dsn = "sqlite:" + path.join(PRIV, ad + ".sqlite").split("\\").join("/");
+  if (MY) {
+    dbPdo("mysql:" + MY + ";charset=utf8mb4", ["CREATE DATABASE `" + DB_ONEK + ad + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"]);
+    acilanDblar.push(DB_ONEK + ad);
+    dsn = "mysql:" + MY + ";dbname=" + DB_ONEK + ad + ";charset=utf8mb4";
+  }
+  if (sqller && sqller.length) dbPdo(dsn, sqller);
+  return dsn;
+}
+var ANA_DSN = dbAc("studio");
 // JSON -> PHP dizi sozdizimi (yalniz duz anahtar/deger ve dizi listeleri)
 function phpDizi(o) {
   if (Array.isArray(o)) return "[" + o.map(phpDizi).join(", ") + "]";
@@ -55,13 +91,14 @@ function phpDizi(o) {
 }
 function ayarYaz(ek) {
   fs.writeFileSync(path.join(PRIV, "config.php"), "<?php\nreturn " + phpDizi(Object.assign({
-    password_hash: ozet, dsn: "sqlite:" + path.join(PRIV, "studio.sqlite").split("\\").join("/"), db_user: "", db_pass: "",
+    password_hash: ozet, dsn: ANA_DSN, db_user: DB_USER, db_pass: DB_PASS,
     allowed_origins: [ORIGIN], login_max_fail: 5, login_window: 900, cookie_secure: false
   }, ek || {})) + ";\n");
 }
 ayarYaz();
-// Calisan sunucuda ayar degisikligi: PHP opcache config.php'yi en cok 2 sn onbellekte tutar (revalidate_freq)
-async function ayarDegistir(ek) { ayarYaz(ek); await bekle(3200); }
+// Calisan sunucuda ayar degisikligi: php -S opcache kapali baslatilir (baslat), config.php her istekte yeniden okunur;
+// beklemek gerekmez (opcache acik olsaydi config.php en cok 2 sn onbellekte kalirdi: revalidate_freq)
+async function ayarDegistir(ek) { ayarYaz(ek); }
 
 var PORT = 0, phpSurec = null;
 function bosPort() {
@@ -73,7 +110,7 @@ function ham(o) {
     var govde = o.govde === undefined ? "" : (typeof o.govde === "string" ? o.govde : JSON.stringify(o.govde));
     var bas = Object.assign({}, o.baslik || {});
     if (govde) bas["Content-Length"] = Buffer.byteLength(govde);
-    var r = http.request({ host: "127.0.0.1", port: PORT, path: "/studio/v1/index.php", method: o.yontem || "POST", headers: bas }, function (y) {
+    var r = http.request({ host: "127.0.0.1", port: PORT, path: o.yol || "/studio/v1/index.php", method: o.yontem || "POST", headers: bas }, function (y) {
       var p = [];
       y.on("data", function (c) { p.push(c); });
       y.on("end", function () {
@@ -97,7 +134,7 @@ function ist(govde, ek) {
   if (cerezler.length) bas.Cookie = cerezler.join("; ");
   Object.assign(bas, ek.baslik || {});
   (ek.sil || []).forEach(function (k) { delete bas[k]; });
-  return ham({ govde: govde, baslik: bas }).then(function (r) {
+  return ham({ govde: govde, baslik: bas, yol: ek.yol }).then(function (r) {
     var sc = [].concat(r.headers["set-cookie"] || []).filter(function (c) { return /^suflo_studio=/.test(c); })[0];
     r.setCookie = sc || null;
     var cz = [].concat(r.headers["set-cookie"] || []).filter(function (c) { return /^suflo_studio_cihaz=/.test(c); })[0];
@@ -111,7 +148,8 @@ function baslat() {
   return new Promise(function (res, rej) {
     // birden cok isci: eszamanli istekler gercekten ayni anda islenir (SQLite kilitleri denensin)
     // display_errors acik: en kotu barindirma ayari; bir PHP uyarisi yanita karisirsa JSON bozulur ve test kalir
-    phpSurec = cp.spawn("php", ["-d", "display_errors=1", "-d", "error_reporting=-1", "-S", "127.0.0.1:" + PORT, "-t", PUB], { stdio: ["ignore", "ignore", "pipe"], env: Object.assign({}, process.env, { PHP_CLI_SERVER_WORKERS: "4" }) });
+    // opcache kapali: ayarDegistir'in yazdigi config.php bir sonraki istekte okunur (opcache.enable_cli php -S'e etki etmez)
+    phpSurec = cp.spawn("php", ["-d", "display_errors=1", "-d", "error_reporting=-1", "-d", "opcache.enable=0", "-S", "127.0.0.1:" + PORT, "-t", PUB], { stdio: ["ignore", "ignore", "pipe"], env: Object.assign({}, process.env, { PHP_CLI_SERVER_WORKERS: "4" }) });
     phpSurec.stderr.on("data", function () {});
     var n = 0;
     (function dene() {
@@ -188,13 +226,15 @@ async function calis() {
   /* ---- Giris ---- */
   r = await ist({ islem: "giris", sifre: "yanlis-sifre-0000" });
   ok("yanlis sifre: 401, cerez yok", r.status === 401 && r.json.hata === "sifre" && !r.setCookie);
+  ok("sunucu mesaji Turkce harfli (kod ayni)", r.json.mesaj === "Şifre yanlış.", r.json.mesaj);
   r = await ist({ islem: "giris", sifre: SIFRE });
   ok("dogru sifre: 200 + cerez", r.status === 200 && r.json.girisli === true && !!cerez, j(r.json));
   ok("cerez: HttpOnly, SameSite=Strict, Path=/, Max-Age (alan adi yok)", /HttpOnly/i.test(r.setCookie) && /SameSite=Strict/i.test(r.setCookie) &&
     /path=\/(;|$)/i.test(r.setCookie) && /Max-Age=\d+/i.test(r.setCookie) && !/domain=/i.test(r.setCookie), r.setCookie);
   ok("taninan cihaz cerezi verildi (yalniz kilidi asmak icin, 400 gun)", !!cihazCerezi && /Max-Age=345600\d\d/.test(r.cihazCookie || ""), r.cihazCookie);
   var oturumCerezi = cerez;
-  var dbHam = fs.readFileSync(path.join(PRIV, "studio.sqlite")).toString("latin1") + (fs.existsSync(path.join(PRIV, "studio.sqlite-wal")) ? fs.readFileSync(path.join(PRIV, "studio.sqlite-wal")).toString("latin1") : "");
+  var dbHam = MY ? ["ayar", "oturumlar", "cihazlar", "girisler"].map(function (t) { return dbPdo(ANA_DSN, [], "SELECT * FROM " + t); }).join("") :
+    fs.readFileSync(path.join(PRIV, "studio.sqlite")).toString("latin1") + (fs.existsSync(path.join(PRIV, "studio.sqlite-wal")) ? fs.readFileSync(path.join(PRIV, "studio.sqlite-wal")).toString("latin1") : "");
   ok("veritabaninda oturum anahtarinin kendisi yok (yalniz ozeti)", dbHam.indexOf(oturumCerezi) === -1);
   r = await ist({ islem: "oturum" });
   ok("oturum: girisli", r.json.girisli === true);
@@ -213,11 +253,16 @@ async function calis() {
   var mA = r.json && r.json.kayit;
   ok("musteri eklendi: kirpilmis ad, gunler sirali tekil, beyaz liste disi alan yok", r.status === 200 && mA.ad === "Örnek  Müşteri A" && j(mA.siklik.gunler) === "[1,4]" &&
     mA.gizli === undefined && mA.surum > 0 && /^[a-f0-9]{24}$/.test(mA.id), j(r.json));
+  r = await ist({ islem: "anliklar" });
+  ok("gunluk kopya: bos veride ilk yazmadan once alinmaz", r.status === 200 && r.json.anliklar.length === 0, j(r.json));
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "örnek  müşteri a", kurum: "ÖRNEK KURUM" } });
   ok("ayni ad + kurum (buyuk/kucuk harf farkli) ikinci kez eklenmez: 409", r.status === 409 && r.json.hata === "ayni_ad", j(r.json));
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Örnek Müşteri B", ucret: null, siklik: { tur: "belirsiz" } } });
   var mB = r.json.kayit;
   ok("ucreti belirsiz musteri: ucret null (0 degil)", r.status === 200 && mB.ucret === null && mB.siklik.tur === "belirsiz", j(mB));
+  r = await ist({ islem: "anliklar" });
+  ok("gunluk kopya: gunun ilk basarili yazmasindan once bir kez (409 alan yazma kopya birakmaz)", r.json.anliklar.length === 1 && r.json.anliklar[0].neden === "gunluk" &&
+    r.json.anliklar[0].ozet === "1 müşteri, 0 içerik, 0 çekim / etkinlik", j(r.json.anliklar));
   var gecersizler = [
     [{ ad: "" }, "bos ad"], [{ ad: "X", ucret: -5 }, "negatif ucret"], [{ ad: "X", siklik: { tur: "ayda" } }, "siklik"],
     [{ ad: "X", siklik: { tur: "uc_gun", baslangic: "2030-02-30" } }, "tarih"], [{ ad: "X", siklik: { tur: "haftalik", gunler: [8] } }, "gun 8"], [{ ad: ["X"] }, "dizi ad"]
@@ -225,6 +270,8 @@ async function calis() {
   var gs = [];
   for (i = 0; i < gecersizler.length; i++) gs.push((await ist({ islem: "kaydet", tur: "musteri", veri: gecersizler[i][0] })).status);
   ok("gecersiz musteri verileri 422", gs.every(function (s) { return s === 422; }), j(gs));
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "X", ucret: -5 } });
+  ok("dogrulama mesaji arayuzdeki alan adiyla, Turkce", r.status === 422 && r.json.hata === "gecersiz" && r.json.mesaj === "Aylık ücret 0 ile 100.000.000 arasında tam sayı olmalı", r.json.mesaj);
   r = await ist({ islem: "kaydet", tur: "kullanici", veri: { ad: "X" } });
   ok("bilinmeyen tur 422", r.status === 422);
 
@@ -333,7 +380,8 @@ async function calis() {
   v = (await ist({ islem: "veri" })).json.veri;
   ok("hatali kayit iceren dosya hic yazilmaz (422 + onizleme hatalari)", r.status === 422 && r.json.onizleme.hataSayisi === 1 && !v.musteriler.some(function (x) { return x.ad === "Örnek Müşteri E"; }), j(r.json));
   r = await ist({ islem: "ice_aktar", veriler: { icerikler: [{ musteriAdi: "Olmayan Kişi", baslik: "x" }] }, onizleme: true });
-  ok("bulunamayan musteri adi onizlemede hata", r.status === 200 && r.json.onizleme.hataSayisi === 1 && /musteri bulunamadi/.test(r.json.onizleme.hatalar[0]), j(r.json));
+  ok("bulunamayan musteri adi onizlemede hata (satir: sira, tur ve baslik)", r.status === 200 && r.json.onizleme.hataSayisi === 1 &&
+    r.json.onizleme.hatalar[0] === "1. içerik (x): “Olmayan Kişi” adlı müşteri bulunamadı", j(r.json));
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Olmayan Kişi", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
   ok("etkinlikte de bulunamayan musteri adi hata (sessizce musterisiz olmaz)", r.status === 200 && r.json.onizleme.hataSayisi === 1 && r.json.onizleme.sayilar.etkinlik === 0, j(r.json));
 
@@ -384,7 +432,7 @@ async function calis() {
   r = await ist({ islem: "ice_aktar", onizleme: true, veriler: { icerikler: [
     { musteriAdi: "Örnek Müşteri C", musteriKurum: 2024, baslik: "Kurum sayi" },
     { musteriAdi: "Örnek Müşteri C", baslik: "Geçmişli", gecmis: [{ z: "2030-01-01 10:00", m: "Eklendi", kim: "biri" }] }] } });
-  ok("musteriKurum sayi: hata; gecmis[].kim: uyari", r.status === 200 && r.json.onizleme.hatalar.some(function (x) { return /musteriKurum metin olmali/.test(x); }) &&
+  ok("musteriKurum sayi: hata; gecmis[].kim: uyari", r.status === 200 && r.json.onizleme.hatalar.some(function (x) { return /musteriKurum\) metin olmalı/.test(x); }) &&
     r.json.onizleme.uyarilar.some(function (x) { return /gecmis\[\]\.kim/.test(x); }), j(r.json.onizleme));
 
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Örnek gün türlü", siklik: { tur: "haftalik", gunler: [2, 5], gunTurleri: { "5": "post", "3": "story", "2": "" } } } });
@@ -435,7 +483,7 @@ async function calis() {
   await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Aynı Ad", kurum: "Kurum 1" } });
   await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Aynı Ad", kurum: "Kurum 2" } });
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Aynı Ad", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
-  ok("ayni adda iki musteri: kurum yazilmadan baglanmaz (hata)", r.json.onizleme.hataSayisi === 1 && /birden cok/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
+  ok("ayni adda iki musteri: kurum yazilmadan baglanmaz (hata)", r.json.onizleme.hataSayisi === 1 && /birden çok/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Aynı Ad", musteriKurum: "Kurum 3", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
   ok("kurum eslesmezse baska musteriye baglanmaz (hata)", r.json.onizleme.hataSayisi === 1, j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "aynı ad", musteriKurum: "KURUM 2", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
@@ -448,20 +496,20 @@ async function calis() {
   await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Kurumsuz İkiz" } });
   await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Kurumsuz İkiz", kurum: "Kurum Y" } });
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Kurumsuz İkiz", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
-  ok("kurumsuz + kurumlu ayni ad, kurum yazilmadan: hata (sessizce kurumsuza baglanmaz)", r.json.onizleme.hataSayisi === 1 && /birden cok/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
+  ok("kurumsuz + kurumlu ayni ad, kurum yazilmadan: hata (sessizce kurumsuza baglanmaz)", r.json.onizleme.hataSayisi === 1 && /birden çok/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Kurumsuz İkiz", musteriKurum: "", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
   ok("musteriKurum bos yazilinca kurumsuz musteriye baglanir", r.json.onizleme.hataSayisi === 0 && r.json.onizleme.ekle[0].bag === "Kurumsuz İkiz", j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [
     { musteriAdi: "Kurumsuz İkiz", musteriKurum: "Kurum Y", baslik: "Tekrarlanan", tumGun: true, basTarih: "2030-03-05" },
     { musteriAdi: "Kurumsuz İkiz", musteriKurum: "Kurum Y", baslik: "Tekrarlanan", tumGun: true, basTarih: "2030-03-05" }] }, onizleme: true });
   ok("kimliksiz ayni satir dosyada iki kez: bir kez eklenir, ikincisi atlanir", r.json.onizleme.sayilar.etkinlik === 1 && r.json.onizleme.sayilar.atlanan === 1 &&
-    /dosyada ayni satir/.test(r.json.onizleme.atla[0].neden), j(r.json.onizleme));
+    /dosyada aynı satır/.test(r.json.onizleme.atla[0].neden), j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Alan hatasi", aylikUcret: 12000 }, { ad: "Alan hatasi 2", ucret: 3000, siklik: { tur: "gunluk" } }] }, onizleme: true });
   ok("bilinmeyen alan uyarisi ve ucret ozeti (bilinen 1, belirsiz 1, toplam 3000)", r.json.onizleme.uyarilar.length === 1 && /aylikUcret/.test(r.json.onizleme.uyarilar[0]) &&
     r.json.onizleme.ucret.bilinen === 1 && r.json.onizleme.ucret.belirsiz === 1 && r.json.onizleme.ucret.toplam === 3000 &&
     r.json.onizleme.ekle[1].ucret === 3000 && r.json.onizleme.ekle[1].siklik === "gunluk", j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Yanlis siklik", siklik: "gunluk" }] }, onizleme: true });
-  ok("siklik metin olarak yazilmissa hata (sessizce 'belirsiz' olmaz)", r.json.onizleme.hataSayisi === 1 && /siklik nesne/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
+  ok("siklik metin olarak yazilmissa hata (sessizce 'belirsiz' olmaz)", r.json.onizleme.hataSayisi === 1 && /Yayın sıklığı biçimi hatalı/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
   var beklenenOz = (await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Beklenen örnek" }] }, onizleme: true })).json.onizleme;
   await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Beklenen örnek" } }); // baska cihaz arada ekledi
   r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Beklenen örnek" }] }, beklenen: beklenenOz.sayilar });
@@ -472,12 +520,14 @@ async function calis() {
   var mK2 = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Çekim sahibi 2" } })).json.kayit;
   var eK1 = (await ist({ islem: "kaydet", tur: "etkinlik", veri: { musteriId: mK1.id, baslik: "K1 çekim", tumGun: true, basTarih: "2030-04-01" } })).json.kayit;
   r = await ist({ islem: "kaydet", tur: "icerik", veri: { musteriId: mK2.id, baslik: "Yanlış bağ", cekimId: eK1.id } });
-  ok("icerik baska musterinin cekimine baglanamaz (422)", r.status === 422 && /baska musteriye/.test(r.json.mesaj), j(r.json));
+  ok("icerik baska musterinin cekimine baglanamaz (422)", r.status === 422 && /başka bir müşteriye/.test(r.json.mesaj), j(r.json));
   var ayarK = (await ist({ islem: "veri" })).json.veri.ayar;
   r = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ayarK.surum + 999999, veri: { varsayilanStokUyari: 9 } });
   ok("ayar eski surumle yazilamaz (409)", r.status === 409, j(r.json));
-  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası", siklik: { tur: "gunluk" }, slotIstisna: { "2030-04-02": "post", "2030-04-03": "" } } });
-  ok("gun bazinda paylasim turu istisnasi saklanir (bos atlanir)", r.status === 200 && j(r.json.kayit.slotIstisna) === '{"2030-04-02":"post"}', j(r.json));
+  var istisnaGunu = istanbulGunu(7), istisna = {};
+  istisna[istisnaGunu] = "post"; istisna[istanbulGunu(8)] = "";
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası", siklik: { tur: "gunluk" }, slotIstisna: istisna } });
+  ok("gun bazinda paylasim turu istisnasi saklanir (bos atlanir)", r.status === 200 && j(r.json.kayit.slotIstisna) === '{"' + istisnaGunu + '":"post"}', j(r.json));
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası 2", slotIstisna: { "2030-02-30": "post" } } });
   ok("gecersiz istisna tarihi 422", r.status === 422);
 
@@ -498,7 +548,7 @@ async function calis() {
   var iB = (await ist({ islem: "kaydet", tur: "icerik", veri: { musteriId: mB1.id, baslik: "Bağlı içerik", cekimId: eB.id } })).json.kayit;
   var yedekB = (await ist({ islem: "disa_aktar" })).json.yedek;
   r = await ist({ islem: "kaydet", tur: "etkinlik", id: eB.id, surum: eB.surum, veri: Object.assign({}, eB, { musteriId: mB2.id }) });
-  ok("cekimin musterisi, baska musterinin icerigi bagliyken degistirilemez (422, acik mesaj)", r.status === 422 && /bagli/.test(r.json.mesaj), j(r.json));
+  ok("cekimin musterisi, baska musterinin icerigi bagliyken degistirilemez (422, acik mesaj)", r.status === 422 && /bağlı/.test(r.json.mesaj), j(r.json));
   // icerik once ayrilirsa cekim tasinabilir
   var iB2 = (await ist({ islem: "kaydet", tur: "icerik", id: iB.id, surum: iB.surum, veri: Object.assign({}, iB, { cekimId: null }) })).json.kayit;
   r = await ist({ islem: "kaydet", tur: "etkinlik", id: eB.id, surum: eB.surum, veri: Object.assign({}, eB, { musteriId: mB2.id }) });
@@ -510,11 +560,11 @@ async function calis() {
   var yedekC = JSON.parse(JSON.stringify(yedekB.veriler));
   yedekC.etkinlikler.filter(function (e) { return e.id === eB.id; })[0].musteriId = mB2.id;
   r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekC, onizleme: true });
-  ok("geri yuklemede capraz musteri bagi: hata degil, uyari + bag kaldirilir", r.json.onizleme.hataSayisi === 0 && r.json.onizleme.uyarilar.some(function (u) { return /bag kaldirilacak/.test(u); }), j(r.json.onizleme));
+  ok("geri yuklemede capraz musteri bagi: hata degil, uyari + bag kaldirilir", r.json.onizleme.hataSayisi === 0 && r.json.onizleme.uyarilar.some(function (u) { return /bağ kaldırılacak/.test(u); }), j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "İç alan", siklik: { tur: "gunluk", siklikTuru: "x" } }], icerikler: [] }, onizleme: true });
   ok("ic ice bilinmeyen alan (siklik.siklikTuru) uyarisi", r.json.onizleme.uyarilar.some(function (u) { return /siklik\.siklikTuru/.test(u); }), j(r.json.onizleme.uyarilar));
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Liste siklik", siklik: ["gunluk"] } });
-  ok("liste bicimli siklik hata (sessizce bos sayilmaz)", r.status === 422 && /siklik nesne/.test(r.json.mesaj), j(r.json));
+  ok("liste bicimli siklik hata (sessizce bos sayilmaz)", r.status === 422 && /Yayın sıklığı biçimi hatalı/.test(r.json.mesaj), j(r.json));
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Geçmiş istisna", slotIstisna: { "2001-01-01": "post", "2099-01-01": "story" } } });
   ok("gecmis gun istisnalari budanir, gelecekteki kalir", r.status === 200 && j(r.json.kayit.slotIstisna) === '{"2099-01-01":"story"}', j(r.json));
   // tumunu degistir: onizlemeden sonra baska degisiklik olursa uygulanmaz
@@ -523,6 +573,405 @@ async function calis() {
   r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekB.veriler, onay: "GERI YUKLE", beklenen: Object.assign({}, dOz.sayilar, { durum: dOz.durum }) });
   ok("tumunu degistir: onizlemeden sonra eklenen kayit varsa 409 onizleme_eski (silinmez)", r.status === 409 && r.json.hata === "onizleme_eski" &&
     (await ist({ islem: "veri" })).json.veri.musteriler.some(function (m) { return m.ad === "Önizleme sonrası"; }), j(r.json));
+
+  /* ---- Tekrarlanan istek: yaniti kaybolan kaydetme yeniden gonderilince ikinci kayit olusmaz ---- */
+  var tId = "a1b2c3d4e5f6a7b8c9d0e1f2", tVeri = { ad: "Tekrar örnek", ucret: 5000 };
+  var t1 = await ist({ islem: "kaydet", tur: "musteri", id: tId, veri: tVeri });
+  var t2 = await ist({ islem: "kaydet", tur: "musteri", id: tId, veri: tVeri });
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("yeni kayit istemci kimligiyle iki kez: ikisi de 200, ayni kayit ve surum, tek kayit (ayni_ad yok)", t1.status === 200 && t2.status === 200 &&
+    t1.json.kayit.id === tId && t2.json.kayit.id === tId && t2.json.kayit.surum === t1.json.kayit.surum &&
+    v.musteriler.filter(function (x) { return x.ad === "Tekrar örnek"; }).length === 1, j([t1.json, t2.json]));
+  r = await ist({ islem: "kaydet", tur: "musteri", id: tId, veri: { ad: "Tekrar örnek", ucret: 6000 } });
+  ok("ayni kimlik, farkli icerik: 409 + guncel kayit (sessizce ezilmez)", r.status === 409 && r.json.hata === "cakisma" && r.json.guncel.id === tId && r.json.guncel.ucret === 5000, j(r.json));
+  var tGovde = { islem: "kaydet", tur: "musteri", id: tId, surum: t1.json.kayit.surum, veri: Object.assign({}, tVeri, { not: "tekrar notu" }) };
+  var tg = (await ist(tGovde)).json.kayit;
+  r = await ist(tGovde);
+  ok("guncelleme tekrari (eski surum, ayni icerik): 200, guncel kayit doner, yeni surum yazilmaz", r.status === 200 && r.json.kayit.surum === tg.surum && r.json.kayit.not === "tekrar notu", j(r.json));
+  var tIdler = ["b1b2c3d4e5f6a7b8c9d0e1f2", "b1b2c3d4e5f6a7b8c9d0e1f3", "b1b2c3d4e5f6a7b8c9d0e1f4"];
+  var tToplu = { islem: "toplu", kayitlar: tIdler.map(function (id, i) {
+    return { tur: "icerik", id: id, veri: { musteriId: tId, baslik: "Tekrar toplu " + i, durum: "hazir", gecmis: [{ z: "2030-01-01 10:00", m: "Stok girişiyle eklendi" }] } };
+  }).concat([{ tur: "musteri", id: tId, surum: tg.surum, veri: Object.assign({}, tVeri, { not: "tekrar notu", stokGirisi: true }) }]) };
+  var tt1 = await ist(tToplu), tt2 = await ist(tToplu);
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("toplu tekrari (3 yeni icerik + musteri guncellemesi): ikisi de 200, 6 degil 3 icerik", tt1.status === 200 && tt2.status === 200 &&
+    j(tt2.json.kayitlar.map(function (x) { return x.id; })) === j(tIdler.concat([tId])) && tt2.json.kayitlar[3].surum === tt1.json.kayitlar[3].surum &&
+    v.icerikler.filter(function (x) { return /^Tekrar toplu /.test(x.baslik); }).length === 3, j([tt1.json, tt2.json && tt2.json.hata]));
+  tToplu.kayitlar[0].veri.gecmis[0].z = "2030-01-01 10:01";
+  r = await ist(tToplu);
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("toplu tekrari farkli icerikle: 409 (sira + guncel), hicbir sey yazilmaz", r.status === 409 && r.json.sira === 0 && r.json.guncel.id === tIdler[0] &&
+    v.icerikler.filter(function (x) { return /^Tekrar toplu /.test(x.baslik); }).length === 3 && v.icerikler.filter(function (x) { return x.id === tIdler[0]; })[0].gecmis[0].z === "2030-01-01 10:00", j(r.json));
+
+  /* ---- Ayar: son JSON yedeginin indirildigi gun (istege bagli) ---- */
+  var ayS = (await ist({ islem: "veri" })).json.veri.ayar;
+  r = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ayS.surum, veri: { varsayilanStokUyari: ayS.varsayilanStokUyari, sonYedek: "2030-01-15" } });
+  ok("ayar: son yedek tarihi saklanir", r.status === 200 && r.json.kayit.sonYedek === "2030-01-15", j(r.json));
+  r = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: r.json.kayit.surum, veri: { varsayilanStokUyari: 6 } });
+  ok("ayar: son yedek gonderilmeden (eski arayuz) esik kaydedilince tarih korunur", r.status === 200 && r.json.kayit.varsayilanStokUyari === 6 && r.json.kayit.sonYedek === "2030-01-15", j(r.json));
+  var ayS2 = r.json.kayit;
+  r = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ayS2.surum, veri: { varsayilanStokUyari: 6, sonYedek: "2030-02-30" } });
+  ok("ayar: gecersiz son yedek tarihi 422 (Turkce mesaj)", r.status === 422 && /^Son yedek tarihi geçerli bir tarih olmalı/.test(r.json.mesaj), j(r.json));
+  var ayYedek = (await ist({ islem: "disa_aktar" })).json.yedek;
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: ayYedek.veriler, onizleme: true });
+  ok("yedekteki ayar.sonYedek taninir (bilinmeyen alan uyarisi yok)", ayYedek.veriler.ayar.sonYedek === "2030-01-15" && r.json.onizleme.ayar === true &&
+    !r.json.onizleme.uyarilar.some(function (u) { return /sonYedek/.test(u); }), j(r.json.onizleme.uyarilar));
+  r = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ayS2.surum, veri: { varsayilanStokUyari: 6, sonYedek: null } });
+  ok("ayar: son yedek acikca bosaltilabilir", r.status === 200 && r.json.kayit.sonYedek === null, j(r.json));
+
+  /* ---- Takvim: calisma bloklari (blok), ozel gunler (ozelgun), etkinlik.tamamZaman, ayar calisma saatleri ---- */
+  function kaydetK(tur, veri, id, surum, ek) {
+    var g = { islem: "kaydet", tur: tur, veri: veri };
+    if (id !== undefined && id !== null) g.id = id;
+    if (surum !== undefined && surum !== null) g.surum = surum;
+    return ist(g, ek);
+  }
+  var tm1 = (await kaydetK("musteri", { ad: "Takvim örnek 1" })).json.kayit;
+  var tm2 = (await kaydetK("musteri", { ad: "Takvim örnek 2" })).json.kayit;
+  var tic = (await ist({ islem: "toplu", kayitlar: [
+    { tur: "icerik", veri: { musteriId: tm1.id, baslik: "Takvim reels 1", durum: "kurguda" } },
+    { tur: "icerik", veri: { musteriId: tm1.id, baslik: "Takvim reels 2", durum: "cekildi" } },
+    { tur: "icerik", veri: { musteriId: tm2.id, baslik: "Takvim başka müşteri", durum: "kurguda" } }] })).json.kayitlar;
+  var ti1 = tic[0], ti2 = tic[1], ti3 = tic[2];
+  r = await kaydetK("blok", { musteriId: tm1.id, icerikIdler: [ti2.id, ti1.id], basTarih: "2030-06-10", basSaat: "23:00", bitTarih: "2030-06-11", bitSaat: "01:30", gizli: "<x>", surum: 99 });
+  var bk = r.json && r.json.kayit;
+  ok("blok: gece yarisini asan calisma blogu eklenir; baslik bos olabilir, sira korunur, bilinmeyen alan saklanmaz", r.status === 200 && bk.baslik === "" &&
+    j(bk.icerikIdler) === j([ti2.id, ti1.id]) && bk.bitTarih === "2030-06-11" && bk.durum === "planlandi" && bk.tamamZaman === null && bk.arsiv === false &&
+    bk.gizli === undefined && bk.not === "", j(r.json));
+  r = await kaydetK("blok", Object.assign({}, bk, { durum: "tamamlandi", tamamZaman: "2030-06-11 01:20", baslik: "Edit: iki reels" }), bk.id, bk.surum);
+  var bk2 = r.json && r.json.kayit;
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("blok tamamlanir (tamamZaman); bloktaki iceriklerin durumu degismez", r.status === 200 && bk2.surum > bk.surum && bk2.durum === "tamamlandi" && bk2.tamamZaman === "2030-06-11 01:20" &&
+    v.icerikler.filter(function (x) { return x.id === ti1.id; })[0].durum === "kurguda" && v.icerikler.filter(function (x) { return x.id === ti2.id; })[0].durum === "cekildi" &&
+    v.bloklar.length === 1 && v.bloklar[0].id === bk.id, j(r.json));
+  r = await kaydetK("blok", Object.assign({}, bk, { basSaat: "22:00" }), bk.id, bk.surum);
+  ok("blok eski surumle yazilamaz: 409 + guncel kayit", r.status === 409 && r.json.hata === "cakisma" && r.json.guncel.surum === bk2.surum && r.json.guncel.durum === "tamamlandi", j(r.json));
+  r = await kaydetK("blok", { musteriId: tm1.id, basTarih: "2030-06-12", basSaat: "10:00", bitSaat: "11:00" }, null, null, { cerez: "", cereziSakla: true });
+  var r401 = await kaydetK("ozelgun", { baslik: "x", tarih: "2030-01-01" }, null, null, { cerez: "", cereziSakla: true });
+  ok("girissiz blok / ozel gun kaydi 401", r.status === 401 && r.json.hata === "oturum" && r401.status === 401, r.status + " " + r401.status);
+  r = await kaydetK("musteri", { ad: "x" }, bk.id, bk2.surum);
+  ok("blok kaydinin turu degistirilemez (422)", r.status === 422, j(r.json));
+
+  // arsivlenmis icerik / musteri referansi gecerli kalir (blok sessizce bozulmaz, silinmez)
+  var ti2a = (await kaydetK("icerik", Object.assign({}, ti2, { arsiv: true }), ti2.id, ti2.surum)).json.kayit;
+  r = await kaydetK("blok", Object.assign({}, bk2, { not: "arşivli içerikle" }), bk.id, bk2.surum);
+  ok("bloktaki icerik arsivlenince blok gecerli kalir ve guncellenebilir", ti2a.arsiv === true && r.status === 200 && j(r.json.kayit.icerikIdler) === j([ti2.id, ti1.id]), j(r.json));
+  var bk3 = r.json.kayit;
+  var tmA = (await kaydetK("musteri", { ad: "Takvim arşiv müşteri", arsiv: true })).json.kayit;
+  r = await kaydetK("blok", { musteriId: tmA.id, basTarih: "2030-06-12", basSaat: "10:00", bitSaat: "11:00" });
+  ok("arsivli musteriye blok (icerik listesi bos) kaydedilebilir", r.status === 200 && j(r.json.kayit.icerikIdler) === "[]", j(r.json));
+  r = await kaydetK("blok", Object.assign({}, r.json.kayit, { arsiv: true }), r.json.kayit.id, r.json.kayit.surum);
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("blok arsivlenir (silme yok): kayit veride arsiv isaretli durur", r.status === 200 && v.bloklar.some(function (b) { return b.id === r.json.kayit.id && b.arsiv === true; }), j(r.json));
+
+  // yanlis veri
+  var elliBir = [];
+  for (i = 0; i < 51; i++) elliBir.push("c" + String(i).padStart(23, "0"));
+  var bTaban = { musteriId: tm1.id, icerikIdler: [ti1.id], basTarih: "2030-06-15", basSaat: "10:00", bitTarih: "2030-06-15", bitSaat: "12:00" };
+  var yanlisBloklar = [
+    [{ icerikIdler: [ti1.id, ti3.id] }, /^Bloktaki içeriklerden biri başka bir müşteriye ait/, "baska musterinin icerigi"],
+    [{ icerikIdler: ["ffffffffffffffffffffffff"] }, /^Bloktaki içeriklerden biri bulunamadı$/, "olmayan icerik"],
+    [{ icerikIdler: [tm2.id] }, /bulunamadı/, "icerik yerine musteri kimligi"],
+    [{ icerikIdler: [ti1.id, ti1.id] }, /iki kez/, "ayni icerik iki kez"],
+    [{ icerikIdler: elliBir }, /en çok 50 içerik/, "51 icerik"],
+    [{ icerikIdler: { a: ti1.id } }, /^Bloktaki içerikler biçimi hatalı$/, "icerikIdler nesne"],
+    [{ icerikIdler: ti1.id }, /biçimi hatalı/, "icerikIdler metin"],
+    [{ bitSaat: "10:00" }, /^Bitiş başlangıçtan sonra olmalı$/, "bitis = baslangic"],
+    [{ bitTarih: "2030-06-14", bitSaat: "23:00" }, /^Bitiş başlangıçtan sonra/, "bitis tarihi once"],
+    [{ bitTarih: null, bitSaat: "09:00" }, /^Bitiş başlangıçtan sonra/, "bitis tarihi yok, saat once (gece asimi tahmin edilmez)"],
+    [{ bitSaat: null }, /saatini gir/, "bitis saati yok"],
+    [{ basSaat: "24:00" }, /^Başlangıç saati geçerli bir saat olmalı/, "24:00"],
+    [{ basTarih: "2030-02-30" }, /^Başlangıç tarihi geçerli bir tarih olmalı/, "gecersiz tarih"],
+    [{ musteriId: null }, /^Müşteri bulunamadı$/, "musterisiz"],
+    [{ musteriId: ti1.id }, /^Müşteri bulunamadı$/, "musteri yerine icerik kimligi"],
+    [{ baslik: "x".repeat(201) }, /^Başlık çok uzun \(en çok 200 karakter\)$/, "201 karakter baslik"],
+    [{ not: "x".repeat(5001) }, /^Not çok uzun/, "5001 karakter not"],
+    [{ baslik: ["x"] }, /^Başlık metin olmalı$/, "dizi baslik"],
+    [{ durum: "iptal" }, /^Durum geçersiz$/, "blokta iptal durumu yok"],
+    [{ tamamZaman: "2030-06-15T12:00" }, /^Tamamlanma zamanı geçerli bir zaman olmalı/, "tamamZaman bicimi"],
+    [{ tamamZaman: "2030-02-30 10:00" }, /^Tamamlanma zamanı geçerli/, "tamamZaman gecersiz gun"]
+  ];
+  var yb = [];
+  for (i = 0; i < yanlisBloklar.length; i++) {
+    var yr = await kaydetK("blok", Object.assign({}, bTaban, yanlisBloklar[i][0]));
+    if (!(yr.status === 422 && yr.json.hata === "gecersiz" && yanlisBloklar[i][1].test(yr.json.mesaj))) yb.push(yanlisBloklar[i][2] + ": " + yr.status + " " + (yr.json && yr.json.mesaj));
+  }
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("yanlis bloklar 422 + Turkce mesaj, hicbiri yazilmaz (" + yanlisBloklar.length + " durum)", yb.length === 0 && v.bloklar.length === 2, yb.join(" | "));
+  r = await kaydetK("blok", Object.assign({}, bTaban, { bitTarih: "2030-06-17", bitSaat: "09:00" }));
+  ok("birden cok gune yayilan blok gecerli", r.status === 200 && r.json.kayit.bitTarih === "2030-06-17", j(r.json));
+  var bkCok = r.json.kayit;
+
+  // icerigin musterisi, baska musterinin blogundayken degistirilemez; bloktan cikarilinca degisir
+  r = await kaydetK("icerik", Object.assign({}, ti1, { musteriId: tm2.id }), ti1.id, ti1.surum);
+  ok("bloktaki icerigin musterisi degistirilemez (422, acik mesaj)", r.status === 422 && /çalışma bloğunda/.test(r.json.mesaj), j(r.json));
+  // toplu: once iceriklerin bloktan cikarilmasi, sonra icerigin tasinmasi tek islemde
+  r = await ist({ islem: "toplu", kayitlar: [
+    { tur: "blok", id: bk.id, surum: bk3.surum, veri: Object.assign({}, bk3, { icerikIdler: [ti2.id] }) },
+    { tur: "blok", id: bkCok.id, surum: bkCok.surum, veri: Object.assign({}, bkCok, { icerikIdler: [] }) },
+    { tur: "icerik", id: ti1.id, surum: ti1.surum, veri: Object.assign({}, ti1, { musteriId: tm2.id }) }] });
+  ok("icerik bloklardan cikarilinca baska musteriye tasinabilir (ayni toplu islemde)", r.status === 200 && r.json.kayitlar[2].musteriId === tm2.id, j(r.json));
+  var bk4 = r.json.kayitlar[0];
+  r = await kaydetK("blok", Object.assign({}, bk4, { icerikIdler: [ti2.id, ti1.id] }), bk.id, bk4.surum);
+  ok("tasinan icerik eski musterinin bloguna eklenemez (422)", r.status === 422 && /başka bir müşteriye/.test(r.json.mesaj), j(r.json));
+  // toplu: yeni icerik ve onu kullanan blok ayni istekte (istemci kimlikleri)
+  var yeniIcId = "d1b2c3d4e5f6a7b8c9d0e1f2", yeniBlokId = "d1b2c3d4e5f6a7b8c9d0e1f3";
+  var bToplu = { islem: "toplu", kayitlar: [
+    { tur: "icerik", id: yeniIcId, veri: { musteriId: tm1.id, baslik: "Takvim reels 3", durum: "kurguda" } },
+    { tur: "blok", id: yeniBlokId, veri: { musteriId: tm1.id, icerikIdler: [yeniIcId], basTarih: "2030-06-20", basSaat: "14:00", bitSaat: "16:00" } }] };
+  var bt1 = await ist(bToplu), bt2 = await ist(bToplu);
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("toplu: yeni icerik + onu kullanan blok; tekrarlanan istek ikinci kayit olusturmaz", bt1.status === 200 && bt2.status === 200 &&
+    bt2.json.kayitlar[1].surum === bt1.json.kayitlar[1].surum && v.bloklar.filter(function (b) { return b.id === yeniBlokId; }).length === 1 &&
+    v.icerikler.filter(function (x) { return x.id === yeniIcId; }).length === 1, j([bt1.json, bt2.json]));
+  var bTekrar = Object.assign({}, bToplu.kayitlar[1].veri, { basSaat: "15:00" });
+  r = await kaydetK("blok", bTekrar, yeniBlokId);
+  ok("ayni blok kimligi farkli icerikle: 409 (sessizce ezilmez)", r.status === 409 && r.json.guncel.basSaat === "14:00", j(r.json));
+  // Geri donus: blogu tanimayan eski index.php bloktaki bir icerigin musterisini degistirmis (blok denetimi yok). Yeni surumde
+  // blok yine tasinabilir / tamamlanabilir: o icerik bloktan cikar; yeni eklenen baska musteri icerigi yine reddedilir.
+  var rbI = (await kaydetK("icerik", { musteriId: tm1.id, baslik: "Geri dönüş reels", durum: "kurguda" })).json.kayit;
+  var rbI2 = (await kaydetK("icerik", { musteriId: tm1.id, baslik: "Geri dönüş reels 2", durum: "kurguda" })).json.kayit;
+  var rbB = (await kaydetK("blok", { musteriId: tm1.id, icerikIdler: [rbI.id, rbI2.id], basTarih: "2030-06-24", basSaat: "10:00", bitSaat: "11:00" })).json.kayit;
+  var rbVeri = JSON.parse(JSON.parse(dbPdo(ANA_DSN, [], "SELECT veri FROM kayitlar WHERE id = '" + rbI.id + "'"))[0][0]);
+  rbVeri.musteriId = tm2.id;
+  dbPdo(ANA_DSN, ["UPDATE kayitlar SET veri = '" + JSON.stringify(rbVeri).replace(/'/g, "''") + "' WHERE id = '" + rbI.id + "'"]);
+  r = await kaydetK("blok", Object.assign({}, rbB, { basSaat: "13:00", bitSaat: "14:00" }), rbB.id, rbB.surum);
+  ok("eski surumde musterisi degisen icerik: blok yine tasinir, o icerik bloktan cikar (diger icerik kalir)", r.status === 200 && r.json.kayit.basSaat === "13:00" &&
+    j(r.json.kayit.icerikIdler) === j([rbI2.id]), j(r.json));
+  var rbB2 = r.json.kayit;
+  r = await kaydetK("blok", Object.assign({}, rbB2, { icerikIdler: [rbI2.id, rbI.id] }), rbB.id, rbB2.surum);
+  ok("bloktan cikan baska musteri icerigi yeniden eklenemez (422)", r.status === 422 && /başka bir müşteriye/.test(r.json.mesaj), j(r.json));
+  r = await kaydetK("blok", Object.assign({}, rbB2, { musteriId: tm2.id, icerikIdler: [rbI2.id] }), rbB.id, rbB2.surum);
+  ok("blogun musterisi degisirken eski musterinin icerigi sessizce cikarilmaz (422)", r.status === 422, j(r.json));
+
+  // ozel gunler
+  var ogId = "e1b2c3d4e5f6a7b8c9d0e1f2", ogVeri = { baslik: "Örnek doğum günü", tarih: "2028-02-29", tur: "dogum", herYil: true, bilinmeyen: 1 };
+  var og1 = await kaydetK("ozelgun", ogVeri, ogId), og2 = await kaydetK("ozelgun", ogVeri, ogId);
+  var og = og1.json && og1.json.kayit;
+  ok("ozel gun eklenir (her yil, dogum gunu); bilinmeyen alan saklanmaz; tekrar eden istek ayni kayit", og1.status === 200 && og.tur === "dogum" && og.herYil === true &&
+    og.tarih === "2028-02-29" && og.bilinmeyen === undefined && og.arsiv === false && og2.status === 200 && og2.json.kayit.surum === og.surum, j([og1.json, og2.json]));
+  r = await kaydetK("ozelgun", { baslik: "Örnek kampanya günü", tarih: "2030-05-05" });
+  ok("ozel gun varsayilanlari: tur ozel, her yil degil", r.status === 200 && r.json.kayit.tur === "ozel" && r.json.kayit.herYil === false, j(r.json));
+  r = await kaydetK("ozelgun", Object.assign({}, og, { baslik: "Örnek doğum günü (güncel)" }), og.id, og.surum);
+  var ogG = r.json.kayit;
+  var ogEski = await kaydetK("ozelgun", Object.assign({}, og, { baslik: "Eski sekme" }), og.id, og.surum);
+  ok("ozel gun guncellenir; eski surumle yazma 409", r.status === 200 && ogG.baslik === "Örnek doğum günü (güncel)" && ogEski.status === 409 && ogEski.json.guncel.baslik === ogG.baslik, j([r.json, ogEski.json]));
+  r = await kaydetK("ozelgun", Object.assign({}, ogG, { arsiv: true }), og.id, ogG.surum);
+  ok("ozel gun arsivlenir", r.status === 200 && r.json.kayit.arsiv === true, j(r.json));
+  var ogArsiv = r.json.kayit;
+  var yanlisOzel = [
+    [{ baslik: "" }, /^Başlık boş olamaz$/], [{ baslik: "x".repeat(121) }, /en çok 120 karakter/], [{ tarih: "" }, /^Tarih gerekli$/],
+    [{ tarih: "2030-02-29" }, /^Tarih geçerli bir tarih olmalı/], [{ tur: "bayram" }, /^Tür geçersiz$/], [{ baslik: { a: 1 } }, /metin olmalı/], [{ tarih: 20300101 }, /^Tarih geçerli/]
+  ];
+  var yo = [];
+  for (i = 0; i < yanlisOzel.length; i++) {
+    var or = await kaydetK("ozelgun", Object.assign({ baslik: "Geçerli", tarih: "2030-01-01" }, yanlisOzel[i][0]));
+    if (!(or.status === 422 && yanlisOzel[i][1].test(or.json.mesaj))) yo.push(i + ": " + or.status + " " + (or.json && or.json.mesaj));
+  }
+  ok("yanlis ozel gunler 422 + Turkce mesaj", yo.length === 0, yo.join(" | "));
+
+  // etkinlik.tamamZaman (istege bagli)
+  r = await kaydetK("etkinlik", { musteriId: tm1.id, baslik: "Takvim çekimi", basTarih: "2030-06-09", basSaat: "10:00", bitSaat: "12:00" });
+  var te = r.json.kayit;
+  ok("etkinlik: tamamZaman verilmezse null", r.status === 200 && te.tamamZaman === null, j(r.json));
+  r = await kaydetK("etkinlik", Object.assign({}, te, { durum: "tamamlandi", tamamZaman: "2030-06-09 12:05" }), te.id, te.surum);
+  var te2 = r.json.kayit;
+  var teY = await kaydetK("etkinlik", Object.assign({}, te2, { tamamZaman: "dün" }), te.id, te2.surum);
+  ok("etkinlik: tamamZaman saklanir; gecersiz bicim 422", r.status === 200 && te2.tamamZaman === "2030-06-09 12:05" && teY.status === 422 && /^Tamamlanma zamanı/.test(teY.json.mesaj), j([r.json, teY.json]));
+
+  // ayar: calisma saatleri ve haftalik hedef; gonderilmeyen alan saklisini korur
+  var ayT = (await ist({ islem: "veri" })).json.veri.ayar;
+  r = await kaydetK("ayar", { varsayilanStokUyari: ayT.varsayilanStokUyari, sonYedek: "2030-01-20", calismaBas: 480, calismaBit: 1200, haftalikHedef: 12 }, "ayar", ayT.surum);
+  var ayT2 = r.json.kayit;
+  ok("ayar: calisma saatleri ve haftalik hedef saklanir", r.status === 200 && ayT2.calismaBas === 480 && ayT2.calismaBit === 1200 && ayT2.haftalikHedef === 12, j(r.json));
+  r = await kaydetK("ayar", { varsayilanStokUyari: 3 }, "ayar", ayT2.surum);
+  var ayT3 = r.json.kayit;
+  ok("ayar: yalniz esik gonderilince (eski arayuz) son yedek, calisma saatleri ve hedef korunur", r.status === 200 && ayT3.varsayilanStokUyari === 3 && ayT3.sonYedek === "2030-01-20" &&
+    ayT3.calismaBas === 480 && ayT3.calismaBit === 1200 && ayT3.haftalikHedef === 12, j(r.json));
+  r = await kaydetK("ayar", { sonYedek: "2030-01-21", varsayilanStokUyari: 3 }, "ayar", ayT3.surum);
+  var ayT4 = r.json.kayit;
+  ok("ayar: son yedek kaydi (arayuzun yedek akisi) takvim ayarlarini silmez", r.status === 200 && ayT4.sonYedek === "2030-01-21" && ayT4.calismaBas === 480 && ayT4.haftalikHedef === 12, j(r.json));
+  r = await kaydetK("ayar", { calismaBit: 1300, haftalikHedef: null }, "ayar", ayT4.surum);
+  var ayT5 = r.json.kayit;
+  ok("ayar: tek alan degisir, acikca null gonderilen hedef bosalir, digerleri korunur", r.status === 200 && ayT5.calismaBit === 1300 && ayT5.haftalikHedef === null &&
+    ayT5.calismaBas === 480 && ayT5.sonYedek === "2030-01-21" && ayT5.varsayilanStokUyari === null, j(r.json));
+  var ayYanlis = [
+    [{ calismaBas: 1300 }, /^Çalışma saati bitişi başlangıcından sonra olmalı$/], [{ calismaBas: 600, calismaBit: 600 }, /bitişi başlangıcından sonra/],
+    [{ calismaBit: 1441 }, /^Çalışma saati bitişi 0 ile 1.440 arasında/], [{ calismaBas: -1 }, /^Çalışma saati başlangıcı 0 ile/],
+    [{ haftalikHedef: 100 }, /^Haftalık hedef 0 ile 99 arasında/], [{ haftalikHedef: "çok" }, /^Haftalık hedef/], [{ calismaBas: 1.5 }, /^Çalışma saati başlangıcı/]
+  ];
+  var ay = [];
+  for (i = 0; i < ayYanlis.length; i++) {
+    var ar = await kaydetK("ayar", ayYanlis[i][0], "ayar", ayT5.surum);
+    if (!(ar.status === 422 && ayYanlis[i][1].test(ar.json.mesaj))) ay.push(i + ": " + ar.status + " " + (ar.json && ar.json.mesaj));
+  }
+  r = await kaydetK("ayar", { haftalikHedef: 0, calismaBas: null, calismaBit: null }, "ayar", ayT5.surum);
+  ok("ayar: yanlis calisma saati / hedef 422 (sakli bitisle karsilastirilir); 0 hedef ve bos saatler kabul", ay.length === 0 && r.status === 200 &&
+    r.json.kayit.haftalikHedef === 0 && r.json.kayit.calismaBas === null && r.json.kayit.sonYedek === "2030-01-21", ay.join(" | ") + " " + j(r.json));
+  r = await kaydetK("ayar", { calismaBas: 480, calismaBit: 1200, haftalikHedef: 12, sonYedek: "2030-01-21", varsayilanStokUyari: 4 }, "ayar", r.json.kayit.surum);
+  ok("ayar takvim degerleri geri yazildi", r.status === 200, j(r.json));
+
+  // disa aktar -> tumunu degistir -> ayni veri (yeni turler dahil)
+  var tOnce = (await ist({ islem: "veri" })).json.veri;
+  var tYedek = (await ist({ islem: "disa_aktar" })).json.yedek;
+  ok("disa aktarma: bloklar, ozel gunler, etkinlik.tamamZaman ve takvim ayarlari yedekte", tYedek.veriler.bloklar.length === tOnce.bloklar.length && tOnce.bloklar.length >= 4 &&
+    tYedek.veriler.ozelgunler.length === 2 && tYedek.veriler.etkinlikler.some(function (e) { return e.tamamZaman === "2030-06-09 12:05"; }) &&
+    tYedek.veriler.ayar.calismaBas === 480 && tYedek.veriler.ayar.haftalikHedef === 12, j(tYedek.veriler.bloklar.length));
+  await kaydetK("ozelgun", { baslik: "Yedekten sonra eklenen gün", tarih: "2030-07-01" });
+  var tBk = (await ist({ islem: "veri" })).json.veri.bloklar.filter(function (b) { return b.id === bk.id; })[0];
+  await kaydetK("blok", Object.assign({}, tBk, { arsiv: true }), bk.id, tBk.surum);
+  var tOz = (await ist({ islem: "ice_aktar", kip: "degistir", veriler: tYedek.veriler, onizleme: true })).json.onizleme;
+  ok("tumunu degistir onizlemesi: blok ve ozel gun sayilari, kaldirilacaklar; hata / uyari yok", tOz.hataSayisi === 0 && tOz.uyarilar.length === 0 &&
+    tOz.sayilar.blok === tOnce.bloklar.length && tOz.sayilar.ozelgun === 2 && tOz.kaldirilacak.blok === tOnce.bloklar.length && tOz.kaldirilacak.ozelgun === 3 && tOz.ayar === true, j(tOz));
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: tYedek.veriler, onay: "GERI YUKLE", beklenen: Object.assign({}, tOz.sayilar, { durum: tOz.durum }) });
+  var tSonra = (await ist({ islem: "veri" })).json.veri;
+  var surumsuz = function (l) {
+    return j(l.map(function (x) { var y = Object.assign({}, x); delete y.surum; return y; }).sort(function (a, b) { return a.id < b.id ? -1 : 1; }));
+  };
+  ok("disa aktar -> tumunu degistir: bloklar, ozel gunler, etkinlikler ve ayar alanlari aynen geri gelir", r.status === 200 &&
+    surumsuz(tSonra.bloklar) === surumsuz(tOnce.bloklar) && surumsuz(tSonra.ozelgunler) === surumsuz(tOnce.ozelgunler) &&
+    surumsuz(tSonra.etkinlikler) === surumsuz(tOnce.etkinlikler) && tSonra.ayar.calismaBit === 1200 && tSonra.ayar.haftalikHedef === 12, j(r.json));
+  r = await ist({ islem: "ice_aktar", veriler: tYedek.veriler, onizleme: true });
+  ok("ayni yedek birlestir kipinde: bloklar ve ozel gunler de atlanir", r.json.onizleme.sayilar.blok === 0 && r.json.onizleme.sayilar.ozelgun === 0 && r.json.onizleme.hataSayisi === 0, j(r.json.onizleme.sayilar));
+  var tBk2 = tSonra.bloklar.filter(function (b) { return b.id === bk.id; })[0];
+  r = await kaydetK("blok", Object.assign({}, tBk2, { not: "geri yükleme sonrası" }), bk.id, tBk2.surum);
+  ok("geri yuklemeden sonra blok duzenlenebilir (surum tutarli)", r.status === 200, j(r.json));
+
+  // elle hazirlanmis dosya: kimlikli musteri / icerik + onlari kullanan blok, kimliksiz ozel gun (tekrari atlanir)
+  var fM = "f1b2c3d4e5f6a7b8c9d0e1f2", fI = "f1b2c3d4e5f6a7b8c9d0e1f3";
+  var dosyaT = { musteriler: [{ id: fM, ad: "Dosya takvim müşterisi" }], icerikler: [{ id: fI, musteriId: fM, baslik: "Dosya reels" }],
+    bloklar: [{ musteriId: fM, icerikIdler: [fI], basTarih: "2030-08-01", basSaat: "10:00", bitSaat: "12:00", renk: "mor" },
+      { musteriAdi: "Takvim örnek 1", icerikIdler: [ti2.id, ti1.id], basTarih: "2030-08-02", basSaat: "10:00", bitSaat: "11:00" }],
+    ozelgunler: [{ baslik: "Dosya günü", tarih: "2030-08-03" }, { baslik: "DOSYA GÜNÜ", tarih: "2030-08-03" }] };
+  r = await ist({ islem: "ice_aktar", veriler: dosyaT, onizleme: true });
+  var fo = r.json.onizleme;
+  ok("ice aktarma onizlemesi: blok kimlikleri dosyadan eslenir, baska musterinin icerigi uyariyla cikarilir, tekrar eden ozel gun atlanir, bilinmeyen alan uyarisi",
+    r.status === 200 && fo.hataSayisi === 0 && fo.sayilar.blok === 2 && fo.sayilar.ozelgun === 1 && fo.sayilar.atlanan === 1 &&
+    fo.uyarilar.some(function (u) { return /^2\. çalışma bloğu: 1 içerik başka müşteriye ait; bloktan çıkarılacak$/.test(u); }) &&
+    fo.uyarilar.some(function (u) { return /bloklar\.renk/.test(u); }) && fo.ekle.some(function (e) { return e.tur === "blok" && e.bag === "Dosya takvim müşterisi" && e.ad === "Çalışma bloğu 2030-08-01 10:00"; }), j(fo));
+  r = await ist({ islem: "ice_aktar", veriler: dosyaT, beklenen: Object.assign({}, fo.sayilar, { blok: 5 }) });
+  ok("ice aktarma: onizlemedeki blok sayisi tutmazsa 409 onizleme_eski", r.status === 409 && r.json.hata === "onizleme_eski", j(r.json));
+  r = await ist({ islem: "ice_aktar", veriler: dosyaT, beklenen: fo.sayilar });
+  v = (await ist({ islem: "veri" })).json.veri;
+  var fb = v.bloklar.filter(function (b) { return b.basTarih === "2030-08-02"; })[0];
+  ok("ice aktarma uygulandi: blok dogru musteriye ve iceriklere bagli", r.status === 200 && v.bloklar.some(function (b) { return b.musteriId === fM && j(b.icerikIdler) === j([fI]); }) &&
+    fb && fb.musteriId === tm1.id && j(fb.icerikIdler) === j([ti2.id]), j(r.json));
+  r = await ist({ islem: "ice_aktar", onizleme: true, veriler: { bloklar: [
+    { musteriId: tm1.id, icerikIdler: ["ffffffffffffffffffffffff"], basTarih: "2030-08-04", basSaat: "10:00", bitSaat: "11:00" },
+    { musteriId: tm1.id, basTarih: "2030-08-04", basSaat: "10:00", bitTarih: "2030-08-03", bitSaat: "11:00" }], ozelgunler: "liste değil" } });
+  ok("ice aktarma: olmayan icerik / ters tarihli blok ve liste olmayan ozel gunler hata", r.json.onizleme.hataSayisi === 3 &&
+    r.json.onizleme.hatalar[0] === "1. çalışma bloğu: Bloktaki içeriklerden biri bulunamadı" && /^2\. çalışma bloğu: Bitiş/.test(r.json.onizleme.hatalar[1]) &&
+    /^Özel günler \(ozelgunler\) liste biçiminde olmalı$/.test(r.json.onizleme.hatalar[2]), j(r.json.onizleme.hatalar));
+
+  // anlik kopya: ozet yeni turleri sayar; kopyaya donus bloklari ve ozel gunleri geri getirir
+  var tAnl = (await ist({ islem: "anliklar" })).json.anliklar.filter(function (a) { return a.neden === "ice_aktarma_oncesi"; })[0];
+  ok("anlik kopya ozeti calisma bloklarini ve ozel gunleri de sayar", /^\d+ müşteri, \d+ içerik, \d+ çekim \/ etkinlik, \d+ çalışma bloğu, \d+ özel gün$/.test(tAnl.ozet), tAnl.ozet);
+  var anlOnce = (await ist({ islem: "veri" })).json.veri; // kopya bu ice aktarmadan onceki hal: dosyadaki bloklar yok
+  var silinecekOg = (await kaydetK("ozelgun", { baslik: "Kopyadan sonra", tarih: "2030-09-01" })).json.kayit;
+  r = await ist({ islem: "anlik_geri", id: tAnl.id, onay: "GERI YUKLE" });
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("anliga donus: bloklar ve ozel gunler kopyadaki haline doner", r.status === 200 && !v.ozelgunler.some(function (o) { return o.id === silinecekOg.id; }) &&
+    !v.bloklar.some(function (b) { return b.musteriId === fM; }) && v.bloklar.some(function (b) { return b.id === bk.id && b.not === "geri yükleme sonrası"; }) &&
+    v.bloklar.length === anlOnce.bloklar.length - 2 && v.ozelgunler.length === anlOnce.ozelgunler.length - 1, j([v.bloklar.length, anlOnce.bloklar.length]));
+  var bkG = v.bloklar.filter(function (b) { return b.id === bk.id; })[0];
+  r = await kaydetK("blok", Object.assign({}, bkG, { not: "anlık sonrası" }), bk.id, bkG.surum);
+  var ogG2 = v.ozelgunler.filter(function (o) { return o.id === og.id; })[0];
+  var r2o = await kaydetK("ozelgun", Object.assign({}, ogG2, { arsiv: false }), og.id, ogG2.surum);
+  ok("anliga donusten sonra blok ve ozel gun duzenlenebilir", r.status === 200 && r2o.status === 200 && ogArsiv.arsiv === true && r2o.json.kayit.arsiv === false, j([r.json, r2o.json]));
+
+  /* ---- Geri donus: bu turleri bilmeyen onceki index.php ayni veritabaniyla cokmez, onlari yok sayar ---- */
+  // git gecmisinde index.php'nin bu turleri bilmeyen en yeni hali (sabit kimlik yok: yeniden yazilan / birlestirilen dalda da bulunur)
+  var eskiKaynak = null;
+  var eskiAdaylar = cp.spawnSync("git", ["-C", ROOT, "rev-list", "-n", "40", "HEAD", "--", "server/studio-v1/index.php"], { encoding: "utf8" });
+  String(eskiAdaylar.stdout || "").split(/\s+/).filter(Boolean).some(function (h) {
+    var g = cp.spawnSync("git", ["-C", ROOT, "show", h + ":server/studio-v1/index.php"], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+    if (g.status === 0 && /const TURLER = \['musteri', 'icerik', 'etkinlik', 'ayar'\];/.test(g.stdout)) { eskiKaynak = g.stdout; return true; }
+    return false;
+  });
+  if (eskiKaynak === null) {
+    console.log("ATLA eski index.php git gecmisinde yok (sig kopya): geri donus testi calismadi");
+  } else {
+    fs.mkdirSync(path.join(PUB, "studio", "eski"), { recursive: true });
+    fs.writeFileSync(path.join(PUB, "studio", "eski", "index.php"), eskiKaynak);
+    var ESKI = { yol: "/studio/eski/index.php" };
+    var temiz = function (x) { return !!x.json && !/Warning|Notice|Deprecated|Fatal|<br/.test(x.metin); };
+    var yeniVeri = (await ist({ islem: "veri" })).json.veri;
+    var ev = await ist({ islem: "veri" }, ESKI);
+    var ed = await ist({ islem: "disa_aktar" }, ESKI);
+    var ea = await ist({ islem: "anliklar" }, ESKI);
+    var eo = await ist({ islem: "ice_aktar", veriler: tYedek.veriler, onizleme: true }, ESKI);
+    ok("eski surum: veri / disa aktarma / kopyalar / onizleme 200, PHP uyarisi yok, bloklar ve ozel gunler gorunmez", [ev, ed, ea, eo].every(temiz) &&
+      ev.status === 200 && ed.status === 200 && ea.status === 200 && eo.status === 200 && ev.json.veri.bloklar === undefined && ev.json.veri.ozelgunler === undefined &&
+      ev.json.veri.musteriler.length === yeniVeri.musteriler.length && ev.json.veri.icerikler.length === yeniVeri.icerikler.length && ed.json.yedek.veriler.bloklar === undefined,
+      [ev, ed, ea, eo].map(function (x) { return x.status + " " + String(x.metin).slice(0, 150); }).join(" | "));
+    var eskiM = ev.json.veri.musteriler.filter(function (m) { return m.id === tm1.id; })[0];
+    var ek1 = await ist({ islem: "kaydet", tur: "musteri", id: tm1.id, surum: eskiM.surum, veri: Object.assign({}, eskiM, { not: "eski sürümden" }) }, ESKI);
+    var ek2 = await ist({ islem: "kaydet", tur: "blok", veri: { musteriId: tm1.id, basTarih: "2030-06-10", basSaat: "10:00", bitSaat: "11:00" } }, ESKI);
+    var eskiIc = ev.json.veri.icerikler.filter(function (x) { return x.id === ti2.id; })[0];
+    var ek3 = await ist({ islem: "kaydet", tur: "icerik", id: ti2.id, surum: eskiIc.surum, veri: Object.assign({}, eskiIc, { not: "eski sürümden" }) }, ESKI);
+    var ek4 = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ev.json.veri.ayar.surum, veri: { varsayilanStokUyari: 5 } }, ESKI);
+    var sonraYeni = (await ist({ islem: "veri" })).json.veri;
+    ok("eski surum: musteri / icerik kaydeder, bilinmeyen 'blok' turunu 422 ile reddeder; yeni surum bloklari aynen gorur",
+      [ek1, ek2, ek3, ek4].every(temiz) && ek1.status === 200 && ek2.status === 422 && ek3.status === 200 && ek4.status === 200 &&
+      surumsuz(sonraYeni.bloklar) === surumsuz(yeniVeri.bloklar) && surumsuz(sonraYeni.ozelgunler) === surumsuz(yeniVeri.ozelgunler),
+      [ek1, ek2, ek3, ek4].map(function (x) { return x.status + " " + String(x.metin).slice(0, 150); }).join(" | "));
+    // bilinen sinir: eski surumun ayar kaydi takvim alanlarini bilmez, yazinca dusurur (yeni surum varsayilana doner, cokmez)
+    ok("eski surumun yazdigi ayar kaydi yeni surumde okunur (takvim alanlari bos)", sonraYeni.ayar && sonraYeni.ayar.varsayilanStokUyari === 5 && sonraYeni.ayar.calismaBas === undefined, j(sonraYeni.ayar));
+    r = await kaydetK("ayar", { varsayilanStokUyari: 5, calismaBas: 480, calismaBit: 1200, haftalikHedef: 12 }, "ayar", sonraYeni.ayar.surum);
+    ok("eski surumden sonra yeni surum ayari yeniden yazabilir (eski surumun korudugu son yedek de kalir)", r.status === 200 && r.json.kayit.calismaBas === 480 &&
+      r.json.kayit.sonYedek === "2030-01-21", j(r.json));
+    fs.rmSync(path.join(PUB, "studio", "eski"), { recursive: true, force: true });
+  }
+
+  /* ---- Geri yukleme onayi: Turkce harfli ve buyuk / kucuk harf farkli yazim ---- */
+  var onayOz = (await ist({ islem: "ice_aktar", kip: "degistir", veriler: ayYedek.veriler, onizleme: true })).json.onizleme;
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: ayYedek.veriler, onay: "GERI", beklenen: Object.assign({}, onayOz.sayilar, { durum: onayOz.durum }) });
+  var onayRed = r.status === 422 && r.json.hata === "onay";
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: ayYedek.veriler, onay: "GERİ YÜKLE", beklenen: Object.assign({}, onayOz.sayilar, { durum: onayOz.durum }) });
+  ok("tumunu degistir: 'GERİ YÜKLE' kabul, eksik onay ('GERI') ret", onayRed && r.status === 200, j(r.json));
+
+  /* ---- Gunluk otomatik kopya: gunun ilk yazmasindan once; 14 gunluk, digerlerinden ayri sayilir ---- */
+  function gunIsareti(deger) {
+    if (deger !== undefined) dbPdo(ANA_DSN, ["UPDATE ayar SET deger = '" + deger + "' WHERE anahtar = 'gunluk_anlik'"]);
+    return (JSON.parse(dbPdo(ANA_DSN, [], "SELECT deger FROM ayar WHERE anahtar = 'gunluk_anlik'"))[0] || [])[0];
+  }
+  async function kopyalar() { return (await ist({ islem: "anliklar" })).json.anliklar; }
+  function gunlukler(l) { return l.filter(function (a) { return a.neden === "gunluk"; }); }
+  var kOnce = await kopyalar();
+  ok("gunluk kopya bugune isaretli; ayni gunun sonraki yazmalari yeni kopya almaz", [istanbulGunu(0), istanbulGunu(-1)].indexOf(gunIsareti()) !== -1 && gunlukler(kOnce).length === 1, j(kOnce.length));
+  gunIsareti("2020-01-01");
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "" } });
+  var kHata = await kopyalar();
+  ok("gunun ilk yazmasi gecersizse (422) kopya ve gun isareti geri alinir", r.status === 422 && kHata.length === kOnce.length && gunIsareti() === "2020-01-01", j(r.json));
+  await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Günlük örnek 0" } });
+  var kIlk = await kopyalar();
+  await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Günlük örnek 1" } });
+  var kIkinci = await kopyalar();
+  ok("yeni gunun ilk yazmasi kopya alir (ozet Turkce), ikinci yazma almaz", gunlukler(kIlk).length === 2 && kIlk[0].neden === "gunluk" &&
+    /^\d+ müşteri, \d+ içerik, \d+ çekim \/ etkinlik$/.test(kIlk[0].ozet) && kIkinci.length === kIlk.length, j(kIlk.slice(0, 2)));
+  gunIsareti("2020-01-02");
+  await ist({ islem: "toplu", kayitlar: [{ tur: "musteri", veri: { ad: "Günlük örnek 2" } }] });
+  ok("toplu yazma da gunun ilk kopyasini alir", gunlukler(await kopyalar()).length === 3);
+  var digerSayi = kIlk.length - gunlukler(kIlk).length;
+  for (i = 0; i < 14; i++) {
+    gunIsareti("2020-02-" + String(i + 1).padStart(2, "0"));
+    await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Günlük örnek " + (i + 3) } });
+  }
+  var kSon = await kopyalar();
+  ok("gunluk kopyalardan en yeni 14'u kalir; ice aktarma / geri yukleme kopyalari itilmez", gunlukler(kSon).length === 14 &&
+    kSon.length - gunlukler(kSon).length === digerSayi && digerSayi > 0 && !kSon.some(function (a) { return a.id === kIlk[0].id; }), j([kSon.length, digerSayi]));
+  gunIsareti("2020-03-01");
+  await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Günlük kopyadan sonra" } });
+  var gunlukKopya = (await kopyalar())[0];
+  r = await ist({ islem: "anlik_geri", id: gunlukKopya.id, onay: "GERI" });
+  var anlikRed = r.status === 422;
+  r = await ist({ islem: "anlik_geri", id: gunlukKopya.id, onay: "geri yükle" });
+  v = (await ist({ islem: "veri" })).json.veri;
+  ok("gunluk kopyaya donus ('geri yükle' kabul, 'GERI' ret): kopyadan sonraki kayit gider", anlikRed && r.status === 200 && gunlukKopya.neden === "gunluk" &&
+    !v.musteriler.some(function (m) { return m.ad === "Günlük kopyadan sonra"; }) && v.musteriler.some(function (m) { return m.ad === "Günlük örnek 16"; }), j(r.json));
+  var gm = v.musteriler.filter(function (m) { return m.ad === "Günlük örnek 16"; })[0];
+  r = await ist({ islem: "kaydet", tur: "musteri", id: gm.id, surum: gm.surum, veri: Object.assign({}, gm, { not: "dönüş sonrası" }) });
+  ok("gunluk kopyaya donusten sonra kayitlar duzenlenebilir (surum tutarli)", r.status === 200, j(r.json));
 
   /* ---- Eszamanli yazma ---- */
   var hedefM = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Eşzamanlı örnek" } })).json.kayit;
@@ -539,6 +988,7 @@ async function calis() {
 
   /* ---- Oturum suresi ---- */
   await ayarDegistir({ session_idle: 1 });
+  await bekle(2200); // bosta kalma suresi saniye cozunurluguyle asilsin
   r = await ist({ islem: "veri" });
   ok("bosta kalma suresi asilinca oturum 401", r.status === 401);
   await ayarDegistir();
@@ -599,40 +1049,29 @@ async function calis() {
   fs.renameSync(path.join(PRIV, "config.php.yok2"), path.join(PRIV, "config.php"));
 
   /* ---- Eski gelistirme semasi uzerine sessizce kurulmaz ---- */
-  var eskiDb = path.join(PRIV, "eski.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)'); $p->exec(\"INSERT INTO kayitlar VALUES ('x')\");", eskiDb]);
-  await ayarDegistir({ dsn: "sqlite:" + eskiDb });
+  await ayarDegistir({ dsn: dbAc("eski", ["CREATE TABLE kayitlar (id TEXT)", "INSERT INTO kayitlar VALUES ('x')"]) });
   r = await ist({ islem: "oturum" });
   ok("eski sema (sema yok, kayit var): acik 503 kurulum mesaji", r.status === 503 && r.json.hata === "kurulum" && /uyumsuz/.test(r.json.mesaj), j(r.json));
-  var eskiDb2 = path.join(PRIV, "eski2.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar TEXT PRIMARY KEY, deger TEXT)'); $p->exec(\"INSERT INTO ayar VALUES ('sema', '2')\");", eskiDb2]);
-  await ayarDegistir({ dsn: "sqlite:" + eskiDb2 });
+  await ayarDegistir({ dsn: dbAc("eski2", ["CREATE TABLE ayar (anahtar VARCHAR(64) PRIMARY KEY, deger TEXT)", "INSERT INTO ayar VALUES ('sema', '2')"]) });
   r = await ist({ islem: "oturum" });
   ok("baska sema surumu (2): acik 503, uzerine kurulmaz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
   // Eski gelistirme surumu: kayitlar bos ama tablolar eski kolonlarla (girisler kim'siz). Benimsenmez.
-  var eskiDb3 = path.join(PRIV, "eski3.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)'); $p->exec('CREATE TABLE girisler (ip TEXT, zaman INTEGER, basarili INTEGER)');", eskiDb3]);
-  await ayarDegistir({ dsn: "sqlite:" + eskiDb3 });
+  await ayarDegistir({ dsn: dbAc("eski3", ["CREATE TABLE kayitlar (id TEXT)", "CREATE TABLE girisler (ip TEXT, zaman INTEGER, basarili INTEGER)"]) });
   r = await ist({ islem: "oturum" });
   ok("eski gelistirme semasi (bos kayitlar, eski kolonlar): benimsenmez, 503 uyumsuz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
   // Ayni veritabaninda baska bir uygulamanin "ayar" tablosu (dolu, sema yok): uzerine kurulmaz
-  var yabanciDb = path.join(PRIV, "yabanci.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar TEXT PRIMARY KEY, deger TEXT)'); $p->exec(\"INSERT INTO ayar VALUES ('tema', 'koyu')\");", yabanciDb]);
-  await ayarDegistir({ dsn: "sqlite:" + yabanciDb });
+  await ayarDegistir({ dsn: dbAc("yabanci", ["CREATE TABLE ayar (anahtar VARCHAR(64) PRIMARY KEY, deger TEXT)", "INSERT INTO ayar VALUES ('tema', 'koyu')"]) });
   r = await ist({ islem: "oturum" });
   ok("dolu ama semasiz ayar tablosu: uzerine kurulmaz, 503 uyumsuz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
   // Bu surumun yarim kalmis kurulumu ("kuruluyor-3" isareti, bazi tablolar eksik): kaldigi yerden tamamlanir
-  var yarimDb = path.join(PRIV, "yarim.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)'); " +
-    "$p->exec(\"INSERT INTO ayar VALUES ('sema', 'kuruluyor-3')\"); $p->exec('CREATE TABLE oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)');", yarimDb]);
-  await ayarDegistir({ dsn: "sqlite:" + yarimDb, login_max_fail: 50 });
+  var yarimDsn = dbAc("yarim", ["CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)", "INSERT INTO ayar VALUES ('sema', 'kuruluyor-3')",
+    "CREATE TABLE oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)"]);
+  await ayarDegistir({ dsn: yarimDsn, login_max_fail: 50 });
   r = await ist({ islem: "giris", sifre: SIFRE }, { cerez: "", cereziSakla: true });
-  var yarimSema = cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); echo $p->query(\"SELECT deger FROM ayar WHERE anahtar = 'sema'\")->fetchColumn();", yarimDb], { encoding: "utf8" }).stdout;
-  ok("isaretli yarim kurulum tamamlanir: giris calisir, sema 3 olur", r.status === 200 && yarimSema === "3", r.status + " " + j(r.json) + " sema=" + yarimSema);
+  var yarimSema = dbPdo(yarimDsn, [], "SELECT deger FROM ayar WHERE anahtar = 'sema'");
+  ok("isaretli yarim kurulum tamamlanir: giris calisir, sema 3 olur", r.status === 200 && yarimSema === '[["3"]]', r.status + " " + j(r.json) + " sema=" + yarimSema);
   // Yalniz bos ayar tablosu (MySQL'de isaret yazilmadan kesilen kurulum gibi): yeni kurulum yapilir
-  var bosAyarDb = path.join(PRIV, "bosayar.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)');", bosAyarDb]);
-  await ayarDegistir({ dsn: "sqlite:" + bosAyarDb });
+  await ayarDegistir({ dsn: dbAc("bosayar", ["CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)"]) });
   r = await ist({ islem: "oturum" });
   ok("yalniz bos ayar tablosu: kurulum tamamlanir", r.status === 200 && r.json.ok === true, j(r.json));
 
@@ -661,14 +1100,18 @@ async function calis() {
 
   /* ---- Kilit sirasinda yapilan denemeler kilidi uzatmaz ---- */
   await ayarDegistir({ password_hash: yeniOzet, login_max_fail: 2, login_window: 4 });
-  var k1 = [];
+  await bekle(5100); // onceki testlerin hatali girisleri 4 sn'lik pencereden ciksin (saniye cozunurlugu: 5 sn)
+  // Sure ilk hatali denemeden olculur: kilit ondan en az 4 sn surer (sunucu saniye cozunurlugu: 4-5 sn).
+  // Yavas makinede iki hatali giris (her biri 0,4 sn bekleme + bcrypt) uzar; olcum ondan sonra baslarsa yagmurun sonu pencere disina tasar.
+  var k1 = [], k1Bas = Date.now();
   for (i = 0; i < 2; i++) k1.push((await ist({ islem: "giris", sifre: "kisa-pencere-" + i }, { cerez: "", cereziSakla: true })).status);
-  // kilit suresince (pencere icinde) 3 sn boyunca deneme yagdir; hepsi 429 olmali ve kaydedilmemeli
-  var kilitBas = Date.now(), kiliTak = [];
-  while (Date.now() - kilitBas < 3000) { kiliTak.push((await ist({ islem: "giris", sifre: "kilitte-" + kiliTak.length }, { cerez: "", cereziSakla: true })).status); await bekle(250); }
-  await bekle(Math.max(0, 5600 - (Date.now() - kilitBas)));
+  // kilit suresince deneme yagdir (ilk denemeden 3 sn sonrasina kadar); hepsi 429 olmali ve kaydedilmemeli
+  var kiliTak = [];
+  while (Date.now() - k1Bas < 3000) { kiliTak.push((await ist({ islem: "giris", sifre: "kilitte-" + kiliTak.length }, { cerez: "", cereziSakla: true })).status); await bekle(250); }
+  // kilit en gec ilk denemeden 5 sn sonra biter; reddedilen denemeler sayilsaydi son denemeden en az 4 sn (> 6 sn) surerdi
+  await bekle(Math.max(0, 6000 - (Date.now() - k1Bas)));
   r = await ist({ islem: "giris", sifre: "sifirlanan-ornek-sifre-3" }, { cerez: "", cereziSakla: true });
-  ok("kilitteyken reddedilen denemeler kilidi uzatmaz: pencere bitince dogru sifre girer", j(k1) === "[401,401]" && kiliTak.length > 3 && kiliTak.every(function (x) { return x === 429; }) && r.status === 200,
+  ok("kilitteyken reddedilen denemeler kilidi uzatmaz: pencere bitince dogru sifre girer", j(k1) === "[401,401]" && kiliTak.length >= 3 && kiliTak.every(function (x) { return x === 429; }) && r.status === 200,
     j(k1) + " " + j(kiliTak) + " " + r.status);
 
   /* ---- config.php sifirlamasi biriken hatali denemeleri de siler (sahibi kendi denemeleriyle kilitlenmez) ---- */
@@ -687,8 +1130,7 @@ async function calis() {
   var yarisGiris = ist({ islem: "giris", sifre: "yavas-ornek-sifre-5" }, { cerez: "", cereziSakla: true });
   await bekle(600);
   // yeni ozetle gelen bir istegin yapacagi temizlik: oturumlar silinir, parmak izi yeni ozete gecer
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('DELETE FROM oturumlar'); $p->exec(\"UPDATE ayar SET deger = '\" . hash('sha256', 'iz|baska-ozet') . \"' WHERE anahtar = 'sifre_izi'\");",
-    path.join(PRIV, "studio.sqlite").split("\\").join("/")]);
+  dbPdo(ANA_DSN, ["DELETE FROM oturumlar", "UPDATE ayar SET deger = '" + require("crypto").createHash("sha256").update("iz|baska-ozet").digest("hex") + "' WHERE anahtar = 'sifre_izi'"]);
   r = await yarisGiris;
   ok("temizlik sirasinda dogrulanan eski sifreyle oturum acilmaz", r.status === 401 && !r.setCookie, r.status + " " + j(r.json));
 
@@ -700,6 +1142,7 @@ async function calis() {
 calis().catch(function (e) { ok("kosum hatasiz", false, e && e.stack ? e.stack : e); }).then(async function () {
   await durdur();
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e3) {}
+  acilanDblar.forEach(function (ad) { try { dbPdo("mysql:" + MY + ";charset=utf8mb4", ["DROP DATABASE IF EXISTS `" + ad + "`"]); } catch (e4) {} });
   console.log("\n" + gecen + "/" + (gecen + kalan) + " gecti");
   process.exit(kalan ? 1 : 0);
 });

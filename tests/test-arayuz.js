@@ -76,9 +76,9 @@ DOSYALAR.forEach(function (d) {
 ok("korumasiz addEventListener hedefleri markup'ta var",
   korumasiz.length === 0, korumasiz.length ? korumasiz.join(" | ") : "tamam");
 
-ok("Stil bolumu 17 gercek Premiere altyazi sablonu icin acik",
+ok("Stil bolumu 31 gercek Premiere altyazi sablonu icin acik",
   /class="card stil-katmani-card"/.test(html) &&
-  /17 gerçek altyazı şablonundan birini seç/.test(html) &&
+  /hazır görünümlerden birini seç ya da efekti kendin kur; 31 Premiere şablonu en altta\./.test(html) && !/aşağıdaki 17 gerçek altyazı şablonundan/.test(html) &&
   !/class="card stil-katmani-card" hidden/.test(html));
 
 /* ---------- 4) Vazgeçilmez öğeler: silinirse ürün işlevini kaybeder ---------- */
@@ -310,7 +310,8 @@ var ku = fnGovde(capSrc, "function stilKoduUygula(");
 ok("kod uygula: önce temel görünüm (eski kod: en yakın görünüm), sonra stiliYaz(tarif), sonra önizleme", ku.indexOf("gorunumUygula(taban") > 0 &&
   ku.indexOf("gorunumUygula(taban") < ku.indexOf("stiliYaz(ov)") && ku.indexOf("stiliYaz(ov)") < ku.indexOf("efektOnizlemeTazele(true)") &&
   ku.indexOf("onizlemeOynat()") === -1 && /AE\.eskiStilden\(r\.styleId, ov\)/.test(ku));
-ok("kod uygula: izinli stiller yalnız stil motorununkiler (Altyazı Efektleri + eski kodlar)", /SS\.decode\(String\(kod \|\| ""\), function \(id\) \{ return motorStiliMi\(id\); \}\)/.test(ku));
+// Animasyon motoru v2: çözücü SufloStilKodu (style-share.js'i sarar; "ek"teki yazı animasyonu), yoksa SS
+ok("kod uygula: izinli stiller yalnız stil motorununkiler (Altyazı Efektleri + eski kodlar)", /(SS|\(window\.SufloStilKodu \|\| SS\))\.decode\(String\(kod \|\| ""\), function \(id\) \{ return motorStiliMi\(id\); \}\)/.test(ku));
 var kr = fnGovde(capSrc, "function stilKredisi(");
 ok("kredi çipi yalnız textContent ve doğrulanmış adla", /b\.textContent = /.test(kr) && !/innerHTML/.test(kr) && /SS\.validAuthor\(ad\)/.test(kr));
 ok("vurgu rengi oluşturucuda hep seçilebilir (pasif değil)", /kutu\.classList\.remove\("pasif"\)/.test(fnGovde(capSrc, "function vurguKutusuDurumu(")));
@@ -695,7 +696,7 @@ function sahteDugum() {
 var dom = { "cap-canli": sahteDugum(), "cap-canli-liste": sahteDugum() };
 var kap = new Function("el", "tc", "document", "CANLI_GOSTER",
   "var canliIs = null, segments = [{ start: 1, end: 2, text: 'Önceki belge' }], segmentsMode = 'plain', ceviriDili = '', algilananDil = 'tr', shortsYuklenen = '', ornekBelge = false, ornekSekansId = '';\n" +
-  "var belgeSekansId = 'S1', belgeSira = 0, belgeKesimAdi = null;\n" +
+  "var belgeSekansId = 'S1', belgeSira = 0, belgeKesimAdi = null, senkronBelgeNo = 0;\n" +
   "var undoStack = [], redoStack = [];\n" + canliKod +
   "\nreturn { canliBaslat: canliBaslat, canliEkle: canliEkle, canliKirp: canliKirp, canliBitir: canliBitir, durumAl: durumAl, " +
   "segments: function () { return segments; }, undo: function () { return undoStack.length + redoStack.length; }, is: function () { return canliIs; } };")(

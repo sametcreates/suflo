@@ -7,15 +7,21 @@
  * Ölçülmüş kelime zamanlarından (js/whisper-words.js) okunabilir altyazı satırları kurar:
  *   kelimedenSatirlar(words, o)  -> karakter (satır × satır uzunluğu), kelime sayısı, duraklama, cümle
  *                                   sonu ve süre sınırında kırılan cue'lar { start, end, text, words, confidence }
- *   dengeliSar(text, maxChars, maxLines) -> en uzun satırı en kısa olan kırılım ("\n"); 38/4 değil 21/21
+ *   dengeliSar(text, maxChars, maxLines, dil) -> en uzun satırı en kısa olan kırılım ("\n"); 38/4 değil 21/21
  *   kisaBirlestir(cues, o)       -> arası kısa, birlikte sığan komşu parçaları birleştirir (cümle sonunu aşmaz)
  *   karakterleBol(cue, maxChars, o) -> sığmayan cue'yu karakter bütçesiyle böler (zaman kelimelerden)
  *   zamanHijyeni(cues, o)        -> en kısa / en uzun ekran süresi, çakışma yok (caption-quality fixTiming anlamı)
  *   kelimeleriHizala(eski, metin, bas, son, loc) -> düzenlenen metne ölçülmüş kelime zamanlarını taşır (LCS)
  *   kelimeleriOlcekle(words, eskiBas, eskiSon, yeniBas, yeniSon) -> elle değişen satır sınırına doğrusal
  *   satirKiriklariniKoru(eski, yeni) -> kelime sayısı aynıysa satır kırılımını aynı kelimeye geri koyar
- *   ikiyeBolNoktasi(words)       -> iki satırlık en dengeli kırılım (stil motoru da bunu kullanır)
- *   uzunlukAyari(lenVal)         -> "l42" / "c42x2" / "c60" / "w3" / "k1" ayrıştırması
+ *   ikiyeBolNoktasi(words, dil)  -> iki satırlık en dengeli kırılım (stil motoru da bunu kullanır; dil false: eski kural)
+ *   parcalaCezali(words, k, o)   -> k parçaya (satır / kart) dengeli ve Türkçe-duyarlı bölme (kalite motoru)
+ *   uzunlukAyari(lenVal, kadraj) -> "l42" / "c42x2" / "c60" / "w3" / "k1" / "auto" (kadraja göre) ayrıştırması
+ *   otomatikUzunluk(kadraj)      -> "auto"nun somut değeri: yatay c42x2, kare / 4:5 c32x2, 9:16 c24x2, boyut yoksa l42
+ *
+ * Kalite motoru (parti 1): satır ve parça kırılımları js/tr-kirilim.js kirilimCezasi ile seçilir. dil parametresi
+ * isteğe bağlıdır (dengeliSar'da son argüman, kelimedenSatirlar / karakterleBol'da o.dil): verilmezse tr + en kuralları,
+ * false ise hiç ceza yok (stil motorunun eski stilleri bayt bayt aynı). js/tr-kirilim.js yüklenmediyse ceza 0.
  *
  * Karakter + kelime sınırıyla satır kurma ve LCS ile yeniden hizalama Suflo'nun kendi kodu
  * (Animated Captions / TranscriptAI'dan yalnız fikir: satırı karakter ve kelime sınırıyla kurarken
@@ -25,10 +31,13 @@
  * Saf UMD modülü: DOM yok, dosya sistemi yok, ES5 (CEF 74 / Node 12.3).
  */
 (function (root, factory) {
-  var api = factory();
+  // Türkçe-duyarlı kırılım cezası (js/tr-kirilim.js) ONCE yüklenir; yoksa ceza 0 (eski en dengeli kırılım)
+  var TK = (root && root.SufloTrKirilim) || null;
+  if (!TK && typeof require === "function") { try { TK = require("./tr-kirilim.js"); } catch (e) { TK = null; } }
+  var api = factory(TK);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloCaptionLayout = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function () {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (TK) {
   "use strict";
 
   // Cümle sonu: . ! ? … ardından kapanış tırnağı / parantez kalabilir ("geliyorum.”", «Tamam.»)
@@ -63,13 +72,35 @@
   }
 
   /*
+   * "Otomatik (kadraja göre)": sekansın oranından satır bütçesi. Yatay (en / boy ≥ 1,3) 2 × 42, kare ve 4:5
+   * (≥ 0,7) 2 × 32, dikey (9:16) 2 × 24. Boyut bilinmiyorsa eski varsayılan tek satır × 42 (l42).
+   * kadraj: { w, h } ya da { width, height }. Döner: somut menü değeri ("c42x2", "c32x2", "c24x2", "l42").
+   */
+  function otomatikUzunluk(kadraj) {
+    var w = Number(kadraj && (kadraj.w !== undefined ? kadraj.w : kadraj.width));
+    var h = Number(kadraj && (kadraj.h !== undefined ? kadraj.h : kadraj.height));
+    if (!(w > 0 && h > 0 && isFinite(w) && isFinite(h))) return "l42";
+    var oran = w / h;
+    if (oran >= 1.3) return "c42x2";
+    if (oran >= 0.7) return "c32x2";
+    return "c24x2";
+  }
+
+  /*
    * lenVal ayrıştırması (Satır uzunluğu menüsü):
    *   "l32" / "l42"  kelime zamanından tek satır (kelime yoksa "c32" / "c42" ile aynı yol)
    *   "c42x2"        iki satır × 42 karakter (YouTube / TV)
    *   "c32" "c42" "c60"  eski karakter modu · "wN" N kelime · "k1" / "kc" kelime kelime
+   *   "auto"         kadraja göre (otomatikUzunluk); sonuçta otomatik: true ve deger: somut değer
    */
-  function uzunlukAyari(lenVal) {
+  function uzunlukAyari(lenVal, kadraj) {
     var v = String(lenVal || "c42"), m;
+    if (v === "auto") {
+      var somut = otomatikUzunluk(kadraj), r = uzunlukAyari(somut);
+      r.otomatik = true;
+      r.deger = somut;
+      return r;
+    }
     if (/^k/.test(v)) return { tur: "k", deger: v, maxChars: 0, maxLines: 1 };
     if ((m = /^w(\d+)$/.exec(v))) return { tur: "w", n: parseInt(m[1], 10) || 3, maxChars: 0, maxLines: 1 };
     if ((m = /^l(\d+)$/.exec(v))) return { tur: "l", maxChars: parseInt(m[1], 10) || 42, maxLines: 1 };
@@ -101,56 +132,177 @@
     return true;
   }
 
+  /* ---------------- kırılım seçimi (kalite motoru) ---------------- */
+
+  var AGIR = TK && TK.AGIR ? TK.AGIR : 10;
+  // Denge payı: en uzun parça en iyi bölmenin en uzununa en çok bu kadar karakter eklenebilir
+  function denge(enIyi) { return enIyi + Math.max(3, Math.ceil(enIyi * 0.15)); }
+  // Kırılım cezaları: ceza[i] = words[i-1] ile words[i] arasında kırmanın cezası (dil false: hepsi 0)
+  function kirilimCezalari(words, dil) {
+    var c = [0];
+    for (var i = 1; i < words.length; i++) c.push(dil === false || !TK ? 0 : TK.kirilimCezasi(words[i - 1], words[i], dil));
+    return c;
+  }
   /*
-   * İki satırlık en dengeli kırılım: sağ ve sol satırın karakter farkı en küçük olan ilk kelime
-   * sınırı (fark en küçükken en uzun satır da en kısadır). Stil motorunun \N bölmesi (balancedText,
-   * dengeliUzunluk) AYNI işlevi çağırır: katman ile altyazı izi aynı yerden kırılır.
-   * words: kelime metinleri. Döner: ikinci satırın ilk kelimesinin indeksi (1..n-1), n < 2 ise -1.
+   * sol kelimesinden sonra cümle bitiyor mu? Noktalama tek başına yetmez: unvan ("Dr. Ayşe") ve sıra sayısı
+   * ("2. sırada") kırılım kuralında ağırdır (AGIR), noktaları cümle sonu değildir. dil false ya da
+   * tr-kirilim yoksa eski kural (her nokta / ünlem / soru cümle sonu).
    */
-  function ikiyeBolNoktasi(words) {
-    var n = words ? words.length : 0;
-    if (n < 2) return -1;
-    var on = [0];
-    for (var i = 0; i < n; i++) on.push(on[i] + String(words[i]).length);
-    var best = 1, bestScore = Infinity;
-    for (var k = 1; k < n; k++) {
-      var sol = on[k] + (k - 1), sag = on[n] - on[k] + (n - k - 1);
-      var skor = Math.abs(sol - sag);
-      if (skor < bestScore) { best = k; bestScore = skor; }
-    }
-    return best;
+  function cumleSonuMu(sol, sag, dil) {
+    if (!CUMLE_SONU.test(sol)) return false;
+    if (sag == null || sag === "" || dil === false || !TK) return true;
+    return TK.kirilimCezasi(sol, sag, dil) < AGIR;
+  }
+  // [ağır sayısı, toplam ceza, en uzun] sözlük sırasıyla küçük mü
+  function dahaIyi(a, b) {
+    for (var i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
+    return false;
   }
 
   /*
-   * Kelimeleri k parçaya böl: en uzun parça en kısa olsun (eşitlikte ilk kırılım). k = 2'de
-   * ikiyeBolNoktasi ile aynı sonuç. Döner: her parçanın ilk kelime indeksi [0, i1, ...].
+   * n kelimeyi tam k parçaya bölen dinamik programlama. uz(a, b): a..b-1 parçasının karakter uzunluğu;
+   * uygun(a, b): sert sınırlar (karakter, kelime, süre); C: en uzun parçanın üst sınırı (Infinity olabilir).
+   * cezasiz: yalnız en uzun parça (eski en dengeli kırılım). Eşitlikte ilk kırılım (eski kural).
+   * Döner: { bas: [0, i1, …], skor: [ağır, ceza, en uzun] } ya da null (sığan bölme yok).
    */
-  function dengeliParcalar(words, k) {
+  function bolDP(n, k, uz, uygun, cez, ekCeza, C, cezasiz, alt) {
+    var f = [[[0, 0, 0]]], geri = [[]];
+    for (var z = 1; z <= n; z++) f[0].push(null);
+    /*
+     * lo[b]: b'de biten parçanın en küçük başı: uz(a, b) <= C olan en küçük a (uz a'da azalan, b'de artan: tek
+     * geçişte iki işaretçi) ile alt(b)'nin (kelime / karakter sınırı, uygunBas) büyüğü. Döngü O(k · n · parça boyu).
+     */
+    var lo = [];
+    for (var b0 = 0, a0 = 0; b0 <= n; b0++) {
+      while (a0 < b0 && uz(a0, b0) > C) a0++;
+      lo.push(alt ? Math.max(a0, alt(b0)) : a0);
+    }
+    for (var p = 1; p <= k; p++) {
+      f.push([]); geri.push([]);
+      for (var b = 0; b <= n; b++) {
+        var en = null, arg = -1;
+        // geriye doğru: a küçüldükçe parça uzar. cezasiz geçişte parça en iyinin en uzununu aşınca daha küçük a
+        // kazanamaz (dur). Eşitlikte en küçük a (ilk kırılım; eski ileri döngünün seçimi) alınır.
+        for (var a = b - 1; a >= Math.max(p - 1, lo[b]); a--) {
+          var u = uz(a, b);
+          if (cezasiz && en && u > en[2]) break;
+          var once = f[p - 1][a];
+          if (!once) continue;
+          if (u > C || !uygun(a, b)) continue;
+          var aday;
+          if (cezasiz) aday = [0, 0, Math.max(once[2], u)];
+          else {
+            var ek = ekCeza ? ekCeza(a, b) : 0, kc = a > 0 ? cez[a] : 0;
+            aday = [once[0] + (kc >= AGIR ? 1 : 0) + (ek >= AGIR ? 1 : 0), once[1] + kc + ek, Math.max(once[2], u)];
+          }
+          if (!en || !dahaIyi(en, aday)) { en = aday; arg = a; }
+        }
+        f[p].push(en);
+        geri[p].push(arg);
+      }
+    }
+    if (!f[k][n]) return null;
+    var bas = [n];
+    for (var q = k; q >= 1; q--) bas.unshift(geri[q][bas[0]]);
+    bas.pop();
+    return { bas: bas, skor: f[k][n] };
+  }
+
+  /*
+   * Seçim kuralı (satır, altyazı parçası ve Altyazı Efektleri kartı için ortak):
+   *   1) eski en dengeli bölmenin en uzun parçası M* (sert sınırlar içinde)
+   *   2) en uzun parçası denge(M*) = M* + max(3, ⌈%15⌉) içinde kalan bölmelerden önce ağır kırılım sayısı,
+   *      sonra toplam ceza, sonra en uzun parça en küçük (eşitlikte ilk kırılım)
+   *   3) seçilen bölmede ağır kırılım varsa (soru eki satır başında, sayı biriminden ayrı…) sert sınırların
+   *      tamamına bakılır; daha az ağır kırılımlı bölme varsa o alınır
+   * Döner: parça başları ya da null (secSkorlu: { bas, agir } — seçilen bölmedeki ağır kırılım sayısı).
+   */
+  function secSkorlu(n, k, uz, uygun, cez, ekCeza, alt) {
+    var temel = bolDP(n, k, uz, uygun, cez, ekCeza, Infinity, true, alt);
+    if (!temel) return null;
+    var r = bolDP(n, k, uz, uygun, cez, ekCeza, denge(temel.skor[2]), false, alt);
+    if (!r) return { bas: temel.bas, agir: 0 };
+    if (r.skor[0] > 0) {
+      var genis = bolDP(n, k, uz, uygun, cez, ekCeza, Infinity, false, alt);
+      if (genis && genis.skor[0] < r.skor[0]) r = genis;
+    }
+    return { bas: r.bas, agir: r.skor[0] };
+  }
+  function sec(n, k, uz, uygun, cez, ekCeza, alt) {
+    var r = secSkorlu(n, k, uz, uygun, cez, ekCeza, alt);
+    return r ? r.bas : null;
+  }
+
+  function onUzunluk(words) {
+    var on = [0];
+    for (var i = 0; i < words.length; i++) on.push(on[i] + String(words[i]).length);
+    return function (a, b) { return on[b] - on[a] + (b - a - 1); };
+  }
+
+  /*
+   * Kelimeleri tam k parçaya böl (satır ya da kart), kalite motorunun seçim kuralıyla (sec).
+   * o: { dil (verilmezse tr + en, false: ceza yok), sinir (parça başına en çok karakter, sert), enCokKelime
+   *      (parça başına en çok kelime, sert; 0 kapalı), parcaCezasi(a, b, n) (parçaya ek ceza; AGIR ve üstü ağır) }
+   * Döner: parça başları [0, i1, …] ya da sert sınırlara uyan bölme yoksa null.
+   */
+  function parcalaCezali(words, k, o) {
+    var r = parcalaSkorlu(words, k, o);
+    return r ? r.bas : null;
+  }
+  // parcalaCezali'nin { bas, agir } döndüren hâli (agir: seçilen bölmedeki ağır kırılım sayısı)
+  function parcalaSkorlu(words, k, o) {
+    o = o || {};
+    var liste = dizi(words) ? words : [];
+    var n = liste.length;
+    k = Math.max(1, Math.min(Math.floor(Number(k)) || 1, Math.max(1, n)));
+    if (n === 0) return { bas: [0], agir: 0 };
+    var uz = onUzunluk(liste);
+    var sinir = Number(o.sinir) > 0 ? Number(o.sinir) : Infinity;
+    var enCok = Math.floor(Number(o.enCokKelime)) > 0 ? Math.floor(Number(o.enCokKelime)) : 0;
+    function uygun(a, b) { return uz(a, b) <= sinir && (!enCok || b - a <= enCok); }
+    var ek = typeof o.parcaCezasi === "function" ? function (a, b) { return Number(o.parcaCezasi(a, b, n)) || 0; } : null;
+    // b'de biten parçanın en küçük yasal başı: karakter sınırı (iki işaretçi; uz a'da azalan, b'de artan) ve kelime sınırı
+    var altD = [];
+    for (var b = 0, a0 = 0; b <= n; b++) {
+      while (a0 < b && uz(a0, b) > sinir) a0++;
+      altD.push(enCok ? Math.max(a0, b - enCok) : a0);
+    }
+    return secSkorlu(n, k, uz, uygun, kirilimCezalari(liste, o.dil), ek, function (b) { return altD[b]; });
+  }
+
+  /*
+   * İki satırlık kırılım: ikinci satırın ilk kelimesinin indeksi (1..n-1), n < 2 ise -1.
+   * dil === false: ESKİ kural, sağ ve sol satırın karakter farkı en küçük olan ilk kelime sınırı. Stil motorunun
+   * eski stilleri (balancedText, dengeliUzunluk, breakIndex) bunu çağırır: çıktıları bayt bayt aynı kalır.
+   * Diğer dillerde kalite motorunun seçimi (parcalaCezali): dengeli kırılımlar arasından Türkçe-duyarlı en iyisi.
+   * sinir (isteğe bağlı): satır başına en çok karakter (ağır kırılımdan kaçarken aşılmaz).
+   */
+  function ikiyeBolNoktasi(words, dil, sinir) {
+    var n = words ? words.length : 0;
+    if (n < 2) return -1;
+    if (dil === false || !TK) {
+      var uz0 = onUzunluk(words), best = 1, bestScore = Infinity;
+      for (var k = 1; k < n; k++) {
+        var skor = Math.abs(uz0(0, k) - uz0(k, n));
+        if (skor < bestScore) { best = k; bestScore = skor; }
+      }
+      return best;
+    }
+    var bas = parcalaCezali(words, 2, { dil: dil, sinir: sinir });
+    if (!bas || bas.length < 2) bas = parcalaCezali(words, 2, { dil: dil });
+    return bas && bas.length > 1 ? bas[1] : 1;
+  }
+
+  /*
+   * Kelimeleri k parçaya böl (kalite motoru; sinir verilirse sert sınır, sığmazsa sınırsız seçime düşer).
+   * Döner: her parçanın ilk kelime indeksi [0, i1, ...].
+   */
+  function dengeliParcalar(words, k, dil, sinir) {
     var n = words.length;
     k = Math.max(1, Math.min(k, n));
     if (k === 1) return [0];
-    if (k === 2) return [0, ikiyeBolNoktasi(words)];
-    var on = [0];
-    for (var i = 0; i < n; i++) on.push(on[i] + String(words[i]).length);
-    function uz(a, b) { return on[b] - on[a] + (b - a - 1); }
-    var f = [], geri = [];
-    for (var j = 0; j <= k; j++) { f.push([]); geri.push([]); }
-    for (var b = 1; b <= n; b++) f[1][b] = uz(0, b);
-    for (var p = 2; p <= k; p++) {
-      for (var b2 = p; b2 <= n; b2++) {
-        var en = Infinity, arg = p - 1;
-        for (var a = p - 1; a < b2; a++) {
-          var v = Math.max(f[p - 1][a], uz(a, b2));
-          if (v < en) { en = v; arg = a; }
-        }
-        f[p][b2] = en;
-        geri[p][b2] = arg;
-      }
-    }
-    var bas = [], son = n;
-    for (var q = k; q >= 2; q--) { son = geri[q][son]; bas.unshift(son); }
-    bas.unshift(0);
-    return bas;
+    var bas = sinir ? parcalaCezali(words, k, { dil: dil, sinir: sinir }) : null;
+    return bas || parcalaCezali(words, k, { dil: dil });
   }
 
   function parcaMetinleri(words, baslar) {
@@ -162,24 +314,44 @@
   /*
    * Dengeli sarma: metin tek satıra sığıyorsa aynen (tek satır) döner; sığmıyorsa 2..maxLines satır
    * sırayla denenir ve en uzun satırı en kısa olan kırılım alınır (en az satırla). 38/4 yerine 21/21.
+   * Kalite motoru: denge payı içindeki kırılımlardan Türkçe-duyarlı en iyisi ("yapabilir\nmisin" ve
+   * "bir\nşey" yerine), maxChars ve maxLines sert sınır. dil (isteğe bağlı): altyazının dili.
    * Hiçbiri sığmıyorsa (tek kelime satırdan uzun) açgözlü sarmaya düşer: hiçbir kelime atılmaz.
    * Döner: satırlar "\n" ile ayrılmış metin.
    */
   // Raunen: wrapText
-  function dengeliSar(text, maxChars, maxLines) {
+  function dengeliSar(text, maxChars, maxLines, dil) {
     var duz = duzMetin(text);
     maxChars = tamsayi(maxChars, 42, 1, 1000);
     maxLines = tamsayi(maxLines, 1, 1, 10);
     var words = belirtecler(duz);
     if (!words.length || duz.length <= maxChars || maxLines <= 1) return duz;
+    /*
+     * en az satırla; o satır sayısında maxChars'ı aşmayan bölmeler arasından kalite motorunun seçimi. En az satırlı
+     * bölme ağır kırılım içeriyorsa ("yapabilir\nmisin") maxLines'a dek bir satır daha denenir; ağırsız bölme
+     * bulunamazsa en az ağır kırılımlı (eşitlikte en az satırlı) bölme alınır.
+     */
+    var enIyi = null;
     for (var L = 2; L <= maxLines && L <= words.length; L++) {
-      var satirlar = parcaMetinleri(words, dengeliParcalar(words, L));
-      var sigdi = true;
-      for (var i = 0; i < satirlar.length; i++) if (satirlar[i].length > maxChars) { sigdi = false; break; }
-      if (sigdi) return satirlar.join("\n");
+      var r = parcalaSkorlu(words, L, { dil: dil, sinir: maxChars });
+      if (!r) continue;
+      if (!r.agir) return parcaMetinleri(words, r.bas).join("\n");
+      if (!enIyi || r.agir < enIyi.agir) enIyi = r;
     }
-    // sığmıyor: kelime düşürmeden açgözlü sarma
-    return acgozluSatirlar(words, maxChars).join("\n");
+    if (enIyi) return parcaMetinleri(words, enIyi.bas).join("\n");
+    /*
+     * sığmıyor: kelime düşürmeden açgözlü sarmanın satır sayısıyla (en az satır); kalite motoru o satır sayısında
+     * maxChars'ı aşmayan dengeli, Türkçe-duyarlı bölmeyi seçer (zaten maxLines aşıldığından, o sayıdaki bölme ağır
+     * kırılım içeriyorsa bir satır fazlası da denenir). Satırdan uzun tek kelime varsa (sığan bölme yok) açgözlü sarma aynen.
+     */
+    var acgozlu = acgozluSatirlar(words, maxChars);
+    if (dil === false) return acgozlu.join("\n");
+    var dengeli = parcalaSkorlu(words, acgozlu.length, { dil: dil, sinir: maxChars });
+    if (dengeli && dengeli.agir && acgozlu.length < words.length) {
+      var fazla = parcalaSkorlu(words, acgozlu.length + 1, { dil: dil, sinir: maxChars });
+      if (fazla && fazla.agir < dengeli.agir) dengeli = fazla;
+    }
+    return dengeli ? parcaMetinleri(words, dengeli.bas).join("\n") : acgozlu.join("\n");
   }
 
   /* ---------------- kelimeden satır ---------------- */
@@ -221,7 +393,8 @@
    *      doldurmanın bıraktığı "mi?" gibi tek kelimelik artık satır kalmaz.
    * Tek kelime her zaman bir satırdır (sınırı aşsa da atılmaz). minSure ekran süresidir: zamanHijyeni
    * uygular. Satır metni tek satırdır (kırılımı dengeliSar koyar).
-   * o: { maxChars: 42, maxLines: 1|2, maxWords: 0, maxSure: 6, minSure: 0.8, araKir: 0.6 }
+   * o: { maxChars: 42, maxLines: 1|2, maxWords: 0, maxSure: 6, minSure: 0.8, araKir: 0.6, dil }
+   * Kalite motoru: aynı satır sayısıyla kırılım, denge payı içinde Türkçe-duyarlı en iyisi (o.dil).
    * Döner: [{ start, end, text, words, confidence }]
    */
   function kelimedenSatirlar(words, o) {
@@ -235,26 +408,29 @@
     var araKir = sayi(o.araKir, 0.6);
     if (!(araKir >= 0)) araKir = 0.6;
     // 1) öbekler
-    var obekler = [], cur = [];
+    var obekler = [], cur = [], ws = [];
     (dizi(words) ? words : []).forEach(function (w0) {
       if (!w0) return;
       var w = kelime(w0);
       if (!w.text || !isFinite(w.start)) return;
+      ws.push(w);
+    });
+    ws.forEach(function (w, i) {
       var onceki = cur[cur.length - 1];
       if (onceki && w.start - onceki.end > araKir) { obekler.push(cur); cur = []; }
       cur.push(w);
-      if (CUMLE_SONU.test(w.text)) { obekler.push(cur); cur = []; }
+      if (cumleSonuMu(w.text, ws[i + 1] ? ws[i + 1].text : null, o.dil)) { obekler.push(cur); cur = []; }
     });
     if (cur.length) obekler.push(cur);
     // 2) her öbek en az satıra, dengeli
     var out = [];
     obekler.forEach(function (ob) {
-      obekBol(ob, maxChars, maxLines, maxWords, maxSure).forEach(function (parca) { out.push(cueKur(parca)); });
+      obekBol(ob, maxChars, maxLines, maxWords, maxSure, o.dil).forEach(function (parca) { out.push(cueKur(parca)); });
     });
     return out;
   }
 
-  function obekBol(ob, maxChars, maxLines, maxWords, maxSure) {
+  function obekBol(ob, maxChars, maxLines, maxWords, maxSure, dil) {
     var n = ob.length;
     var metin = ob.map(function (w) { return w.text; });
     // uygunBas[b]: ob[a..b) satırı sınırlara uyan en küçük a (a büyüdükçe satır kısalır, hep uyar)
@@ -279,28 +455,12 @@
       bas = son;
     }
     if (k <= 1) return [ob];
-    // dengeli: k satırla, en uzun satır en kısa (eşitlikte ilk kırılım)
-    var on = [0];
-    for (var i = 0; i < n; i++) on.push(on[i] + metin[i].length);
-    function uz(x, y) { return on[y] - on[x] + (y - x - 1); }
-    var f = [[0]], geri = [[]];
-    for (var z = 1; z <= n; z++) f[0].push(Infinity);
-    for (var p = 1; p <= k; p++) {
-      f.push([]); geri.push([]);
-      for (var y = 0; y <= n; y++) {
-        var en = Infinity, arg = -1;
-        for (var x = Math.max(p - 1, uygunBas[y] || 0); x < y; x++) {
-          if (f[p - 1][x] === Infinity) continue;
-          var v = Math.max(f[p - 1][x], uz(x, y));
-          if (v < en) { en = v; arg = x; }
-        }
-        f[p].push(en);
-        geri[p].push(arg);
-      }
-    }
-    if (f[k][n] === Infinity) return [ob];      // olmamalı: açgözlü kırılım uygundur
-    var sinir = [n];
-    for (var q = k; q >= 1; q--) sinir.unshift(geri[q][sinir[0]]);
+    // dengeli: k satırla, kalite motorunun seçimi (en uzun satır denge payında, Türkçe-duyarlı en iyi kırılım)
+    var uz = onUzunluk(metin);
+    function altBas(y) { return uygunBas[y] || 0; }
+    var sinir = sec(n, k, uz, function (x, y) { return x >= altBas(y); }, kirilimCezalari(metin, dil), null, altBas);
+    if (!sinir) return [ob];      // olmamalı: açgözlü kırılım uygundur
+    sinir.push(n);
     var parcalar = [];
     for (var r = 0; r < k; r++) parcalar.push(ob.slice(sinir[r], sinir[r + 1]));
     return parcalar;
@@ -320,6 +480,8 @@
    * kelime grupları hep yan yana olduğundan ayarı geri alırdı.
    * o: { aralik: 0.2, maxChars: 42, maxLines: 1, maxSure: 6, maxWords: 0 }
    */
+  function sonBelirtec(t) { var b = belirtecler(t); return b.length ? b[b.length - 1] : ""; }
+
   // Raunen: shapeSegments (merge pass)
   function kisaBirlestir(cues, o) {
     o = o || {};
@@ -339,7 +501,7 @@
       if (p && aralik > 0) {
         var bosluk = Number(c.start) - Number(p.end);
         var birlesik = duzMetin(p.text) + " " + duzMetin(c.text);
-        if (bosluk >= 0 && bosluk <= aralik && !CUMLE_SONU.test(duzMetin(p.text)) &&
+        if (bosluk >= 0 && bosluk <= aralik && !cumleSonuMu(sonBelirtec(p.text), belirtecler(c.text)[0], o.dil) &&
             Number(c.end) - Number(p.start) <= maxSure && sigarMi(belirtecler(birlesik), maxChars, maxLines) &&
             (!maxWords || belirtecler(birlesik).filter(icerikli).length <= maxWords)) {
           var np = belirtecler(p.text).length, nc = belirtecler(c.text).length;
@@ -390,10 +552,17 @@
     if (cur.length) aSay++;
     var k = Math.max(aSay, enAz);
     if (k <= 1) return [cue];
-    // dengeli parçalar; her biri bütçeye sığmıyorsa (2 satırda) açgözlü parçalara dön
-    var baslar = dengeliParcalar(tokens, k);
+    /*
+     * dengeli parçalar (kalite motoru: denge payında Türkçe-duyarlı en iyi kırılım; tek satırda maxChars sert sınır);
+     * bütçeye sığmayan parça kalırsa eski en dengeli bölme (ceza yok), o da sığmazsa (2 satırda) açgözlü parçalar
+     */
+    function sigar(bs) {
+      return parcaMetinleri(tokens, bs).every(function (m) { return sigarMi(belirtecler(m), maxChars, maxLines); });
+    }
+    var baslar = dengeliParcalar(tokens, k, o.dil, maxLines === 1 ? maxChars : 0);
+    if (!sigar(baslar)) baslar = dengeliParcalar(tokens, k, false);
     var metinler = parcaMetinleri(tokens, baslar);
-    var hepsiSigar = metinler.every(function (m) { return sigarMi(belirtecler(m), maxChars, maxLines); });
+    var hepsiSigar = sigar(baslar);
     if (!hepsiSigar) {
       baslar = [0]; cur = [];
       for (var g = 0; g < tokens.length; g++) {
@@ -661,8 +830,11 @@
 
   return {
     uzunlukAyari: uzunlukAyari,
+    otomatikUzunluk: otomatikUzunluk,
     dengeliSar: dengeliSar,
     ikiyeBolNoktasi: ikiyeBolNoktasi,
+    parcalaCezali: parcalaCezali,
+    AGIR: AGIR,
     sigarMi: sigarMi,
     kelimedenSatirlar: kelimedenSatirlar,
     kisaBirlestir: kisaBirlestir,

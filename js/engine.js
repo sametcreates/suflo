@@ -69,17 +69,33 @@ window.KEngine = (function () {
     sizeMB: 2
   };
 
+  /*
+   * Sabitlenmiş v1.9.1 Windows motor arşivlerinin SHA-256'sı (Pro denetimi). Arşiv açılmadan önce
+   * bununla karşılaştırılır: uyuşmayan (bozuk / değiştirilmiş) arşiv silinir, kurulum durur. Özetler
+   * GitHub'daki v1.9.1 sürüm dosyaları indirilip ölçüldü (2026-11-05; 20.769.031 ve 677.887.125 bayt).
+   * null = doğrulanmadı: arşiv eskisi gibi boyut denetimiyle açılır (günlüğe "doğrulanmadı" düşer).
+   * Sürüm yükseltilirken URL ile birlikte özet de değişmeli (test-model-dogrulama sürümü ve biçimi denetler).
+   */
+  var MOTOR_SHA256 = {
+    cpu: "3c319eab3e87f85883e1ff3d14426c0a1986c661c5eb5985e8af431ed9c4f71f",
+    cuda: "106a2030eff8998e4ef320fe72e263a78449e9040386ee27c41ea80b001b601b"
+  };
+
+  var MOTOR_DOGRULANAMADI = "Motor arşivi doğrulanamadı (bozuk ya da değiştirilmiş) — silindi, tekrar dene.";
+
   var BUILDS = {
     cpu: {
       id: "cpu",
       urls: ["https://github.com/ggerganov/whisper.cpp/releases/download/v1.9.1/whisper-blas-bin-x64.zip"],
       sizeMB: 20,
+      sha256: MOTOR_SHA256.cpu,
       label: "CPU (BLAS)"
     },
     cuda: {
       id: "cuda",
       urls: ["https://github.com/ggerganov/whisper.cpp/releases/download/v1.9.1/whisper-cublas-12.4.0-bin-x64.zip"],
       sizeMB: 646,
+      sha256: MOTOR_SHA256.cuda,
       label: "NVIDIA GPU (cuBLAS)"
     }
   };
@@ -155,6 +171,22 @@ window.KEngine = (function () {
     sonuc.durum = "uyusmadi";
     K.log("[model] SHA-256 UYUSMADI: " + item.file + " " + ozet + " != " + beklenen);
     try { K.fs.unlinkSync(yol); } catch (e2) {}
+    return false;
+  }
+
+  /*
+   * Sabit özetli arşiv (motor; ileride sürümü sabitlenen ffmpeg kaynağı da aynı alanla: item.sha256).
+   * true: doğrulandı ya da özet yok (null: "doğrulanmadı", eski davranış); false: uyuşmadı, dosya silinir.
+   */
+  async function arsivDogrula(item, yol, say) {
+    var beklenen = item && /^[0-9a-f]{64}$/.test(String(item.sha256 || "")) ? String(item.sha256) : "";
+    var ad = (item && (item.id || item.ad || item.url)) || "arsiv";
+    if (!beklenen) { K.log("[arsiv] SHA-256 sabitlenmemis, dogrulanmadi: " + ad); return true; }
+    if (say) say("Arşiv doğrulanıyor…");
+    var ozet = await dosyaOzeti(yol);
+    if (ozet === beklenen) { K.log("[arsiv] SHA-256 dogrulandi: " + ad); return true; }
+    K.log("[arsiv] SHA-256 UYUSMADI: " + ad + " " + ozet + " != " + beklenen);
+    try { K.fs.unlinkSync(yol); } catch (e) {}
     return false;
   }
 
@@ -605,6 +637,7 @@ window.KEngine = (function () {
         say("Motor iniyor… %" + Math.round(f * 100) + " (" + fmtMB(build.sizeMB) + ")");
       }, "motor:" + build.id, iptal);
       if (!d1.ok) throw indirmeHatasi("Motor", d1, build);
+      if (!(await arsivDogrula(build, zipPath, say))) throw new Error(MOTOR_DOGRULANAMADI);
 
       say("Motor açılıyor…");
       // CPU'ya geçiş (Hızlandırma kapatıldı) ya da onarım: arşiv yalnız üstüne yazar, eski CUDA DLL'lerini silmez
@@ -625,6 +658,7 @@ window.KEngine = (function () {
           say("CPU motoru iniyor… %" + Math.round(f * 100));
         }, "motor:cpu", iptal);
         if (!d2.ok) throw indirmeHatasi("CPU motoru", d2, cpu);
+        if (!(await arsivDogrula(cpu, zp2, say))) throw new Error(MOTOR_DOGRULANAMADI);
         var ok2 = await K.unzip(zp2, dir);
         try { K.fs.unlinkSync(zp2); } catch (e) {}
         if (!ok2) throw new Error("CPU motor arşivi açılamadı.");
@@ -678,7 +712,8 @@ window.KEngine = (function () {
         // İptal: indirme kesilir, .part korunur (yeniden kurunca kaldığı yerden); CUDA DLL'leri
         // silinmiş durum ağ hatasındakiyle aynı. Kullanıcıya "Hazır" değil iptal uyarısı gider.
         if (d5.iptal) throw indirmeHatasi("CPU motoru", d5, BUILDS.cpu);
-        var ok3 = d5.ok && await K.unzip(zp3, dir);
+        // Doğrulanmayan (uyuşmayan) arşiv açılmaz: aşağıdaki "CPU'ya dönülemedi" dalına düşer
+        var ok3 = d5.ok && (await arsivDogrula(BUILDS.cpu, zp3)) && await K.unzip(zp3, dir);
         try { K.fs.unlinkSync(zp3); } catch (e) {}
         if (ok3) {
           var s2 = K.settings();
@@ -1208,6 +1243,9 @@ window.KEngine = (function () {
         }, 0, undefined, { key: "ffmpeg:" + i, expectedMB: kaynak.sizeMB, iptal: iptal || null });
         if (d.iptal) throw iptalHatasi(INDIRME_IPTAL);   // sonraki aynaya geçme; .part korunur
         if (!d.ok) { sonHata = d.error || "indirilemedi"; continue; }
+        // Sabit özet (kaynak.sha256) varsa açmadan önce doğrulanır. Bugünkü kaynaklar sürekli güncellenen
+        // "latest" derlemeler: özet sabitlenemez, "doğrulanmadı" olarak eskisi gibi açılır
+        if (!(await arsivDogrula(kaynak, zip, say))) { sonHata = "arşiv doğrulanamadı (bozuk ya da değiştirilmiş)"; continue; }
 
         say("ffmpeg açılıyor…");
         var cikti = await ffmpegCikar(zip, dir, kaynak);
@@ -1325,6 +1363,8 @@ window.KEngine = (function () {
     modelYenidenDogrula: modelYenidenDogrula,
     _hfBeklenenOzet: hfBeklenenOzet,
     _hfDepo: hfDepo,
-    _modelDogrula: modelDogrula
+    _modelDogrula: modelDogrula,
+    _arsivDogrula: arsivDogrula,
+    _BUILDS: BUILDS
   };
 })();

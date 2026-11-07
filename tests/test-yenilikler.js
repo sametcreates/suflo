@@ -26,23 +26,28 @@ html.replace(/data-tab="([^"]+)"/g, function (_, t) { sekmeler[t] = 1; });
   if (id) ok("madde '" + m.baslik + "': hedef öğe index.html'de", html.indexOf('id="' + id + '"') !== -1, id);
 });
 var hedefler = (Y ? Y.maddeler : []).map(function (m) { return (m.eylem ? "eylem:" + m.eylem : m.sekme + ":" + (m.hedef || m.acilir || "")); }).join(" ");
-["egri:egri-editor", "egri:egri-yaylan", "cut:cut-scope", "hiz:hiz-grid", "eylem:aracAra"].forEach(function (h) {
-  ok("v3.4 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
+["captions:cap-adimlar", "captions:cap-efekt-galeri", "captions:cap-senkron-sar", "captions:cap-stil-grid", "settings:set-dolgu-sil"].forEach(function (h) {
+  ok("v3.5 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
-// Yapay zekâ köprüsü (MCP) varsayılan kapalı ve Pro: 3.4 Yenilikler penceresinde öne çıkarılmaz (sürüm notu ve sitede duyurulur)
-ok("yapay zekâ köprüsü 3.4 Yenilikler penceresinde yok", !/MCP|köprü/i.test(JSON.stringify(Y ? Y.maddeler : [])));
+// Senkron doğrulama Gelişmiş ayarlar katının içinde: madde katı açar
+var mSk = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Sesle senkron doğrulama"; })[0];
+ok("madde 'Sesle senkron doğrulama' Gelişmiş ayarlar katını açar", !!mSk && mSk.acilir === "cap-gelismis" && html.indexOf('id="cap-gelismis"') !== -1, mSk && mSk.acilir);
+// Yapay zekâ köprüsü (MCP) ve After Effects (deneysel) Yenilikler penceresinde öne çıkarılmaz (sürüm notu ve sitede duyurulur)
+ok("yapay zekâ köprüsü ve After Effects 3.5 Yenilikler penceresinde yok", !/MCP|köprü|After Effects/i.test(JSON.stringify(Y ? Y.maddeler : [])));
 
-// Pro kapılı araçlar pencerede (Pro) işaretli: işaretsiz madde ücretsiz gibi okunur, Uygula'da upsell çıkar
-["Varışta yaylan", "Canlı eşikli kesim", "Özel hız eğrisi"].forEach(function (b) {
+// Pro kapılı içerik pencerede (Pro) işaretli: AutoCaptions yalnız Pro (deneme hakkı yok)
+["AutoCaptions koleksiyonu"].forEach(function (b) {
   var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];
   ok("madde '" + b + "' (Pro) işaretli", !!m && /\(Pro\)\.?$/.test(m.metin), m && m.metin);
 });
-// Eğri: düzenlemek ücretsiz, anahtar karelere uygulamak Pro (3 deneme) — madde bunu söyler
-var mEg = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Eğri"; })[0];
-ok("madde 'Eğri' uygulamanın Pro olduğunu söyler", !!mEg && /düzenlemek ücretsiz, uygulamak Pro/.test(mEg.metin), mEg && mEg.metin);
-// Araç ara ücretsiz: (Pro) işareti yok
-var mAA = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Araç ara"; })[0];
-ok("madde 'Araç ara' ücretsiz (Pro işareti yok)", !!mAA && !/Pro/.test(mAA.metin), mAA && mAA.metin);
+// Yazı animasyonları: önizlemek ücretsiz, eklemek Pro — madde bunu söyler
+var mYa = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Yazı animasyonları"; })[0];
+ok("madde 'Yazı animasyonları' eklemenin Pro olduğunu söyler", !!mYa && /önizlemek ücretsiz, eklemek Pro/.test(mYa.metin), mYa && mYa.metin);
+// Ücretsiz özellikler: (Pro) işareti yok
+["Üç adımda altyazı", "Sesle senkron doğrulama", "Metin temizliği"].forEach(function (b) {
+  var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];
+  ok("madde '" + b + "' ücretsiz (Pro işareti yok)", !!m && !/Pro/.test(m.metin), m && m.metin);
+});
 
 // İngilizce karşılıklar
 var EN = require(path.join(KOK, "i18n", "en.js"));

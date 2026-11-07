@@ -110,7 +110,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   var ls = sahteLs();
   var d1 = baglam(DT, { ls: ls });
   var P = d1.Pro;
-  ok("deneme: dosya yokken her araca 3 hak", P.denemeKalan("cut") === 3 && P.status().deneme.ozellikler.length === 13 && P.status().deneme.toplamKalan === 39, JSON.stringify(P.status().deneme && P.status().deneme.toplamKalan));
+  ok("deneme: dosya yokken her araca 3 hak", P.denemeKalan("cut") === 3 && P.status().deneme.ozellikler.length === 14 && P.status().deneme.toplamKalan === 42, JSON.stringify(P.status().deneme && P.status().deneme.toplamKalan));
   ok("deneme: kurulmadan deneme+silent kapi false", P.gate("cut", { deneme: true, silent: true }) === false && P.gate("cut", { silent: true }) === false);
   ok("deneme: kurulmadan harcama yok (-1), dosya yazilmaz", P.denemeHarca("cut") === -1 && !fs.existsSync(DF));
   ok("deneme: denemeBaslat('mogrt') ve diger kutuphaneler false", ["mogrt", "sfx", "motionbg", "presets", "propack", "captionStyles", "batch", "assexport"].every(function (f) { return P.denemeBaslat(f) === false; }));
@@ -133,7 +133,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   ok("deneme: dosya gecerli _sig ile yazildi", yazilan.v === 1 && yazilan.kullanilan.cut === 1 && yazilan._sig === beklenenSig, JSON.stringify(yazilan));
   ok("deneme: dosya 0600 ve .tmp kalmadi", (process.platform === "win32" || (fs.statSync(DF).mode & 511) === 384) && !fs.existsSync(DF + ".tmp"));
   ok("deneme: localStorage aynasi ayni imzali durumu tutar", ls.d["suflo.deneme"] === fs.readFileSync(DF, "utf8"));
-  ok("deneme: status().deneme cut 2/3", P.status().deneme.ozellikler[0].kalan === 2 && P.status().deneme.toplamKalan === 38);
+  ok("deneme: status().deneme cut 2/3", P.status().deneme.ozellikler[0].kalan === 2 && P.status().deneme.toplamKalan === 41);
 
   var d2 = baglam(DT, { ls: sahteLs() });
   ok("deneme: yeni oturum dosyadan 2 okur (hak suresiz kalir)", d2.Pro.denemeKalan("cut") === 2 && d2.Pro.denemeKalan("zoom") === 3);
@@ -173,7 +173,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   kilit.kalan = 1;
   var zoomKalan = e1.Pro.denemeHarca("zoom");
   ok("okuma hatası (EBUSY): harcama bellekteki duruma yapılır, öteki haklar silinmez", zoomKalan === 2 && e1.Pro.denemeKalan("cut") === 2 &&
-    e1.Pro.denemeKalan("overlay") === 3 && e1.Pro.status().deneme.toplamKalan === 37, zoomKalan + " / " + JSON.stringify(e1.Pro.status().deneme));
+    e1.Pro.denemeKalan("overlay") === 3 && e1.Pro.status().deneme.toplamKalan === 40, zoomKalan + " / " + JSON.stringify(e1.Pro.status().deneme));
   var e2 = baglam(EF, { ls: els1 });
   ok("okuma hatası: yeni oturumda cut 2, zoom 2, overlay 3 (tükenmiş durum diske yazılmadı)",
     e2.Pro.denemeKalan("cut") === 2 && e2.Pro.denemeKalan("zoom") === 2 && e2.Pro.denemeKalan("overlay") === 3, [e2.Pro.denemeKalan("cut"), e2.Pro.denemeKalan("zoom"), e2.Pro.denemeKalan("overlay")].join(","));
@@ -233,6 +233,17 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   reply(owned());
   var accepted = await activate("OWNED-LICENSE");
   ok("Dogru store ve product anahtari Pro'yu acar", accepted.ok === true && ctx.Pro.isPro());
+  // Gizlilik (Pro denetimi): etkinlestirme adinda bilgisayar adi (os.hostname "test-pc") yok; yalniz
+  // pro-machine.json'daki kalici rastgele UUID. Ayni makinede ikinci etkinlestirme ayni adi kullanir.
+  var aktReq = requests.filter(function (r) { return /licenses\/activate/.test(r.path); });
+  var adlar = aktReq.map(function (r) { return require("querystring").parse(r.body).instance_name; });
+  var makine = JSON.parse(fs.readFileSync(path.join(TMP, "Suflo", "pro-machine.json"), "utf8")).id;
+  ok("Etkinlestirme adi bilgisayar adini (hostname) gondermez; kalici makine UUID'si", aktReq.length === 2 &&
+    adlar.every(function (a) { return a === "Suflo / " + makine; }) && /^[0-9a-f-]{36}$/.test(makine) &&
+    !aktReq.some(function (r) { return /test-pc/.test(r.body); }), JSON.stringify(adlar));
+  // Var olan etkinlestirmeler bozulmaz: dogrulama ve birakma ad degil instance_id gonderir
+  ok("Var olan etkinlestirme instance_id ile surer (ad gonderilmez)", !requests.some(function (r) {
+    return /licenses\/(validate|deactivate)/.test(r.path) && /instance_name/.test(r.body); }), JSON.stringify(requests.map(function (r) { return r.path; })));
   var creds = ctx.Pro.contentCredentials();
   ok("Icerik bulutu yalniz lisans ve instance kopyasini alir", creds && creds.licenseKey === "OWNED-LICENSE" && creds.instanceId === "instance-owned");
   creds.licenseKey = "mutated";

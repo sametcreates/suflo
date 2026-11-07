@@ -341,7 +341,7 @@ function belgeOrtami(o) {
   ].join("\n");
   return new Function("K", "KEngine", "WAR", "WW", "el", "KApp",
     "var segments = [], segmentsMode = 'plain', ceviriDili = '', algilananDil = '', shortsYuklenen = '', ornekBelge = false, ornekSekansId = '', anlik = 0;\n" +
-    "var belgeSekansId = '', belgeSira = 0, belgeKesimAdi = null;\n" +
+    "var belgeSekansId = '', belgeSira = 0, belgeKesimAdi = null, senkronBelgeNo = 0;\n" +
     "function shortsDugmesi() {} function snapshot() { anlik++; } function render() {} function saveDraftSoon() {} function belgeDegisti() {}\n" +
     "function arayuzDili() { return 'tr'; }\n" + kod +
     "\nfunction dil() { " + dilSatiri[1] + " }\nfunction paketDili() { return " + paketSatiri[1] + "; }\n" +
@@ -422,7 +422,7 @@ isler.push(function () {
   ok("go(): örnek klip çevrilmez ve DTW almaz", /var cevirEn = !ornek && cevrimdisiCeviriSecili\(\);/.test(g) && /var dtwIste = !ornek && dtwSecili\(\);/.test(g));
   ok("go(): hak yalnız 'basarili = true' sonrasında ve catch'ten önce", g.indexOf('Pro.denemeHarca("offlineTranslate"') > g.indexOf("basarili = true;") &&
     g.indexOf('Pro.denemeHarca("offlineTranslate"') < g.search(/\n    \} catch \(/));
-  ok("go(): çeviride transkript önbelleğe yazılmaz", /var onbMeta = \(!ornek && !cevirEn && scope === "clip" && clip\)/.test(g));
+  ok("go(): çeviride transkript önbelleğe yazılmaz", /\n\s*onbMeta = \(!ornek && !cevirEn && scope === "clip" && clip\)/.test(g));
   ok("go(): tek klip ve toplu klip seçenekleri motora verir", /rotaSecenek\.cevir = cevirEn;/.test(g) && /rotaSecenek\.dtw = dtwIste;/.test(g) &&
     /var bSecenek = \{ cevir: cevirEn, dtw: dtwIste \};/.test(g) && /transcribeSuflo\(ba, bc\.dur, karaoke, tempFiles, bSecenek\)/.test(g));
   ok("go(): çevrilen satırlar cikisDili 'en' işaretini alır, algılanan dil en", /segments\.forEach\(function \(sg\) \{ sg\.cikisDili = "en"; \}\);\s*algilananDil = "en";/.test(g));

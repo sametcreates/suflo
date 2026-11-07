@@ -1,3 +1,35 @@
+## Suflo 3.5.0 — Altyazı yenilemesi, sesle senkron doğrulama ve After Effects (deneysel)
+
+### Yeni
+- **Üç adımda altyazı:** Altyazı sekmesi artık **1 Oluştur · 2 Stil seç · 3 Uygula**. Üstteki adım çubuğu her adımın durumunu gösterir (bekliyor / hazır ✓ / şu an), tıklayınca o adıma gider. Tek bir **Timeline'a uygula** düğmesi var; kelime sınırı, DTW, yazım biçimi gibi seçenekler katlı **Gelişmiş ayarlar**'da, çeviri, çok dilli paket, B-roll gibi araçlar **Diğer araçlar**'da.
+- **25 özgün yazı animasyonu:** Altyazı Efektleri'nin başında yeni **Animasyon** seçimi, beş kategoride: Kelime kelime, Harf harf, Kart girişi, Konuşulan kelime (Karaoke dolgu, Biriken vurgu, Vurgu kutusu, Vurgu çizgisi, Parlama, İki ton…) ve Sürekli. Önizlemede canlı görünür; eski stil kodları ve .suflo-stil dosyaları aynen açılır.
+- **30 hazır görünüm ve galeri:** Altyazı Efektleri'nde 30 özgün görünüm altı kategoride (Viral · Shorts, Minimal, Podcast, Eğitim, Sinematik, Marka); galeriden önizleyerek seç, sonra istediğin gibi değiştir.
+- **AutoCaptions koleksiyonu (yalnız Pro, deneme hakkı yok):** ClashiVFX'in AutoCaptions stilleri yazarın izniyle Suflo'ya geldi: Altyazı Efektleri'nde **19 görünüm** ve **12 yazı animasyonu**, Premiere şablonlarında **14 AutoCaptions altyazı MOGRT'i**. Pro vitrini artık **31 altyazı şablonu** gösteriyor (17 Suflo + 14 AutoCaptions). Galeride PRO rozetiyle işaretli; önizleme ücretsiz.
+- **5 yeni başlık MOGRT'i (Pro):** Highlighted Text, Money Text Pro, Cinematic Duo, Comment Your Word ve Apple Selection (ClashiVFX, izinli). Animasyon kütüphanesi 267 MOGRT'e çıktı.
+- **Ses dalgasıyla senkron doğrulama (ücretsiz):** Altyazı oluşturulunca kelimeler ve kartlar sesin kendisine bakılarak gerçek konuşmanın başına ve sonuna oturtulur (**Gelişmiş ayarlar › Sesle senkron doğrulama**, varsayılan açık). Tek satırlık rapor kaç kelimenin oturtulduğunu ve emin olunamayanları söyler; Caption Editor'da ses dalgası şeridinde sınırları sürükleyip **Dinle** ile kontrol edebilirsin, **Geri al** tek adımda eski zamanlara döner. Düzeltilmiş zamanlar her çıktıya gider: altyazı izi, stilli katman, MOGRT, After Effects, SRT / VTT / TXT, Shorts Paketi ve kesimden sonra uyarlama. Hızı değiştirilmiş, ters çevrilmiş ya da iç içe sekanstaki kliplerde zamanlara dokunulmaz, rapor nedenini söyler.
+- **After Effects desteği (deneysel):** Panel After Effects 2020 (17.0) ve üstünde de açılır; yalnız altyazı araçları görünür. Seçili katmanın sesinden altyazı çıkar, **yerel metin katmanları** olarak ekle (düz: ücretsiz). **Altyazı Efektleriyle ekle** (Pro, deneme hakkı yok) yazı tipi, renk, kontur, gölge, konum ve yazı animasyonlarını After Effects'in kendi **metin animatörleriyle** yazar; arka plan kutusu yazıya bağlı bir şekil katmanıdır. Bazı animasyonlar yaklaşık karşılıkla kurulur, panel hangileri olduğunu adıyla söyler. **Suflo altyazılarını kaldır** yalnız Suflo'nun eklediği katmanları siler.
+
+### İyileştirildi
+- **Türkçe-duyarlı satır ve kart kırılımı:** Soru eki fiilinden kopmaz, "bir, bu, ve, ama…" satır sonunda asılı kalmaz, "gibi, kadar, için, değil, de / da" satır başına düşmez; sayı biriminden ("10 bin", "1.250 TL"), unvan addan ("Dr. Ayşe") ayrılmaz. Kadraja sığmayan uzun kelime kendi kartına geçer.
+- **Kadraja göre satır uzunluğu:** Satır uzunluğu menüsünde yeni **Otomatik (kadraja göre)**: yatayda 2 × 42, kare ve 4:5'te 2 × 32, 9:16'da 2 × 24 karakter.
+- **Anahtar kelime vurgusu ve otomatik emoji daha isabetli:** birimler, yazıyla sayılar, olumsuzluk ve Türkçe ekler doğru tanınır.
+- **Metin temizliği (isteğe bağlı, varsayılan kapalı):** **Dolgu seslerini altyazıdan çıkar** ııı, eee, hmm gibi tek başına dolguları altyazıdan atar; **Küfürleri maskele** yalnız çıktıda ilk harfi bırakarak gizler ("s****"), transkriptin değişmez.
+- **Katman render'ı:** Stilli altyazı katmanı çizilirken yüzde ve kalan süre görünür; **İptal** render'ı hemen durdurur, yarım dosyaları siler, timeline'a dokunmaz ve deneme hakkı düşürmez. Uzun katmanlar 3 ve daha çok çekirdekli bilgisayarlarda paralel parçalarla daha hızlı çizilir; hata mesajları ne olduğunu anlaşılır dille söyler.
+- **Pro düzeltmeleri:**
+  - B-roll önerileri artık kendi Pro kapısında (deneme hakkı yok); Sahne algılama kendi 3 deneme hakkıyla çalışır, tarama hak düşürmez.
+  - Güncelleme: SHA-256 özeti olmayan sürüm dosyası indirilmez ve kurulmaz.
+  - whisper.cpp motor arşivi açılmadan önce sabit SHA-256 özetiyle doğrulanır.
+  - Lisans etkinleştirirken bilgisayarının adı gönderilmez.
+  - Kaldırma, kurucunun açtığı `PlayerDebugMode` ayarını yalnız Suflo değiştirdiyse eski hâline döndürür; kurulum ZIP'inde artık `Suflo-Kaldir.bat` / `Suflo-Kaldir.command` var.
+- Fiyatlar ve ücretsiz / Pro sınırı değişmedi; eski stil kodları, .suflo-stil dosyaları, Marka Kiti ve Şablonum aynen açılır.
+
+### Bilmen gerekenler
+- **After Effects desteği deneysel ve gerçek After Effects'te henüz denenmedi.** Yalnız sahte After Effects nesneleriyle test edildi; ilk sürümde hata çıkabilir. Suflo'nun yazı tipleri After Effects'te kurulu değilse o katmanlar Arial'a geçer, panel eksik fontları adlarıyla söyler.
+- **Senkron doğrulama sentetik sesle test edildi.** Gerçek kayıtlarda (özellikle müzik altında ya da gürültülü seste) emin olamadığı kelimelere dokunmaz ve raporda "emin değil" diye gösterir; sonucu Dinle ile kontrol etmeni öneririz.
+- **AutoCaptions altyazı MOGRT'lerinin "Texto" metin alanı düzeltmesi gerçek Premiere'de henüz denenmedi.** Bir şablonda yazı değişmezse Essential Graphics'ten elle düzenleyebilirsin.
+- **Yeni Pro içerikleri (14 AutoCaptions MOGRT'i ve 5 başlık MOGRT'i) içerik bulutu güncellendikten sonra panele iner.** O zamana kadar vitrinde önizlemeleri görünür.
+- **Bazı MOGRT'ler Suflo ile gelmeyen yazı tipleri kullanır** (ör. Tempting, Apple Garamond Italic, Tactic Sans Bold). Bilgisayarında yoksa Premiere benzer bir yazı tipiyle değiştirir; Essential Graphics'ten başka yazı tipi seçebilirsin.
+
 ## Suflo 3.4.2 — Yapay Zekâ sol menüde, menü daraltılabilir
 
 ### İyileştirildi

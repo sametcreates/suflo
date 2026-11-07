@@ -1,4 +1,4 @@
 Options -Indexes
-<FilesMatch "(^(config|config\.example|sifre-ozeti)\.php$|\.(sqlite|sqlite-wal|sqlite-shm|json|md)$)">
+<FilesMatch "(^(config|config\.example|sifre-ozeti|studio-ortak)\.php$|\.(sqlite|sqlite-wal|sqlite-shm|json|md)$)">
   Require all denied
 </FilesMatch>

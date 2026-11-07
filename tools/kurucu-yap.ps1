@@ -43,6 +43,12 @@ Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.bat") -Destination $stage -
 # .command LF ve BOM'suz yazilir: CRLF ile macOS "bad interpreter: /bin/bash^M" der (.gitattributes'a ek guvence)
 $cmdMetin = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "kurucu\Suflo-Kur.command")) -replace "`r`n", "`n"
 [System.IO.File]::WriteAllText((Join-Path $stage "Suflo-Kur.command"), $cmdMetin, (New-Object System.Text.UTF8Encoding($false)))
+# Kaldiricilar da pakette: kurucularin yazdigi SufloOncekiPlayerDebugMode isaretini okuyup PlayerDebugMode'u
+# yalniz Suflo degistirdiyse geri alan arac ZIP'ten kuran kullanicida da olsun (tools/uninstall.* repo icin).
+# .command'a calistirma iznini zip-izin.js verir (her .command / .sh).
+Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kaldir.bat") -Destination $stage -Force
+$kaldirMetin = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "kurucu\Suflo-Kaldir.command")) -replace "`r`n", "`n"
+[System.IO.File]::WriteAllText((Join-Path $stage "Suflo-Kaldir.command"), $kaldirMetin, (New-Object System.Text.UTF8Encoding($false)))
 
 # Kısa yol tarifi: ZIP'i açan kişi ne yapacağını dosya adından anlamalı
 $oku = @"
@@ -79,6 +85,14 @@ Sonra dosyaya tekrar cift tikla.
 
 Panel ilk acilista "Ilk altyazin 2 dakikada" rehberini gosterir:
 gerekli motoru kendisi indirir, senin ayrica bir sey kurman gerekmez.
+
+KALDIRMA
+
+  Windows : "Suflo-Kaldir.bat" dosyasina cift tikla
+  Mac     : "Suflo-Kaldir.command" dosyasina cift tikla
+
+  Paneli siler; kurulumun actigi PlayerDebugMode ayarini yalniz
+  Suflo degistirdiyse eski haline dondurur (diger eklentilere dokunmaz).
 
 Yardim: https://suflo.app
 Surum : $surum

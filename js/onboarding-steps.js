@@ -226,7 +226,7 @@
    * Yapay zekâ özelliklerinden hangileri Pro? (Pro kapısı anahtardan ÖNCE çalışır;
    * ücretsiz kullanıcıya "anahtarla çalışır" denmesin.) Ad → Pro.gate özellik anahtarı.
    */
-  var PRO_AI = { "Çeviri": "translate", "Çok dilli SRT paketi": "translate", "Viral anlar": "highlights", "B-roll önerileri": "highlights", "AI tekrar gruplama": "textcut" };
+  var PRO_AI = { "Çeviri": "translate", "Çok dilli SRT paketi": "translate", "Viral anlar": "highlights", "B-roll önerileri": "broll", "AI tekrar gruplama": "textcut" };
   function aiProOzelligi(ozellik) {
     return Object.prototype.hasOwnProperty.call(PRO_AI, ozellik) ? PRO_AI[ozellik] : "";
   }

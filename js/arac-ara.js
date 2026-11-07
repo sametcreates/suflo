@@ -109,14 +109,15 @@
     { id: "altyazi-uyarla", ad: "Altyazıyı yeni kurguya uyarla", tab: "cut", hedef: ["cut-altyazi-uyarla", "tc-altyazi-uyarla"],
       gerekli: "Önce kesimleri uygula.", anahtar: "kesimden sonra altyazi esle kaydir remap captions after cut" },
     { id: "konusmadan-kes", ad: "Konuşmadan kes", tab: "cut", hedef: ["tc-analyze"], pro: "textcut", anahtar: "dolgu eee tekrar filler text cut" },
-    { id: "sahne-bul", ad: "Sahneleri bul", tab: "cut", hedef: ["sc-analyze"], pro: "cut", anahtar: "sahne algilama scene detect marker" },
+    { id: "sahne-bul", ad: "Sahneleri bul", tab: "cut", hedef: ["sc-analyze"], pro: "sahne", anahtar: "sahne algilama scene detect marker" },
     { id: "ses-iyilestir", ad: "Sesi iyileştir", tab: "cut", hedef: ["ses-go"], pro: "audioclean", anahtar: "gurultu lufs ses audio noise enhance" },
     { id: "zoom-uygula", ad: "Zoom uygula", tab: "zoom", hedef: ["zoom-run"], pro: "zoom", anahtar: "punch in yakinlastirma" },
     { id: "ritim-bul", ad: "Ritmi bul", tab: "beat", hedef: ["beat-analyze"], pro: "beat", anahtar: "beat muzik marker ritim bpm" },
     { id: "rampa-uygula", ad: "Rampayı uygula", tab: "hiz", hedef: ["hiz-uygula"], pro: "speedramp", anahtar: "hiz rampasi agir cekim speed ramp slow motion" },
     { id: "rampa-kaldir", ad: "Rampayı kaldır", tab: "hiz", hedef: ["hiz-kaldir"], anahtar: "hiz rampasi geri al remove speed ramp" },
-    // 3.4: Özel eğri düzenleyicisi yalnız rampa listesinde Özel eğri seçiliyken görünür; değilse liste vurgulanır
-    { id: "hiz-ozel", ad: "Özel hız eğrisi", tab: "hiz", hedef: ["hiz-ozel-editor", "hiz-grid"], pro: "speedramp",
+    // 3.4: Özel eğri düzenleyicisi yalnız rampa listesinde Özel eğri seçiliyken görünür; değilse liste vurgulanır.
+    // Çizmek ve önizlemek ücretsiz (Pro kapısı yalnız "Rampayı uygula"da): rozet yok
+    { id: "hiz-ozel", ad: "Özel hız eğrisi", tab: "hiz", hedef: ["hiz-ozel-editor", "hiz-grid"],
       anahtar: "ozel rampa egri duzenleyici sfc1 kod custom speed curve editor" },
     // 3.4 Eğri sekmesi: uygulamak ve varışta yaylanma Pro ('curves'); kod / dosya paylaşımı ve geri almak ücretsiz
     { id: "egri-uygula", ad: "Eğri uygula", tab: "egri", hedef: ["egri-uygula"], pro: "curves", anahtar: "egri yumusatma easing bezier keyframe anahtar kare curve" },

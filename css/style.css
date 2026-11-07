@@ -2045,6 +2045,10 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
 .caption-editor-search svg { flex: none; width: 13px; height: 13px; }
 .caption-editor-search input { min-width: 0; height: 28px; padding: 0 0 0 7px; border: 0; background: transparent; box-shadow: none; }
 .caption-editor-search input:focus { border: 0; box-shadow: none; }
+/* Otomatik emoji + yoğunluk / yer menüleri tek öbek: dar panelde birlikte kayar */
+.cap-oto-emoji { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.cap-oto-emoji .mini-select { max-width: 120px; }
+#cap-emoji-atla { margin-top: 6px; }
 .caption-tool-primary { color: #fff !important; border-color: rgba(121,137,255,.58) !important; background: linear-gradient(135deg,#5269ef,#7e68ef) !important; }
 .caption-tool-toggle.on { color: #c9ceff; border-color: rgba(126,142,255,.55); background: rgba(91,107,226,.16); }
 .caption-learn { flex: 1 1 100%; color: #a8f0cf !important; border-color: rgba(63,207,142,.28) !important; background: rgba(63,207,142,.07) !important; }
@@ -3759,11 +3763,46 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   background: #11131b; font-size: 12px; line-height: 1.15; text-align: center; letter-spacing: .01em;
   text-shadow: 1px 0 0 var(--efekt-kontur, #000), -1px 0 0 var(--efekt-kontur, #000), 0 1px 0 var(--efekt-kontur, #000), 0 -1px 0 var(--efekt-kontur, #000);
 }
+/* Stil kütüphanesi (parti 3, js/stil-galeri.js): kategori sekmeleri, süzülen çipler, ipucu. Dar panelde (300 px) taşmaz:
+   sekmeler ve çipler satıra kırılır, ipucu galerinin genişliğinde */
+.efekt-galeri { position: relative; min-width: 0; }
+.efekt-kategoriler { display: flex; flex-wrap: wrap; margin: 0 -2px 3px; min-width: 0; }
+.efekt-kategori {
+  flex: 0 1 auto; min-width: 0; max-width: calc(100% - 4px); margin: 0 2px 4px; padding: 3px 9px; border: 1px solid transparent; border-radius: 999px;
+  background: transparent; color: var(--faint); font: inherit; font-size: 10px; font-weight: 650; letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+  transition: color .16s var(--ease), border-color .16s var(--ease), background .16s var(--ease);
+}
+.efekt-kategori:hover { color: var(--text); }
+.efekt-kategori.secili { color: var(--text); border-color: var(--line2); background: var(--bg3); }
+.efekt-kategori:focus-visible { outline: none; box-shadow: var(--glow-sm); border-color: var(--accent); }
+.efekt-gorunumler { min-width: 0; }
+.efekt-cip { max-width: calc(100% - 6px); min-width: 0; }
+.efekt-cip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.efekt-cip[hidden] { display: none; }
+.efekt-cip-ornek { flex: none; white-space: nowrap; }
+/* Kutulu görünüm: örneğin zemini kutunun rengi; kontursuz örnek yalın; Marka Kiti açıkken Marka çipinde kit halkası */
+.efekt-cip-ornek-kutu { background: var(--efekt-kutu, #11131b); }
+.efekt-cip-ornek-yalin { text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
+.efekt-cip-ornek-kit { box-shadow: 0 0 0 1px var(--accent); }
+/* AutoCaptions (Suflo Pro içeriği): Pro'suzken çipte küçük PRO rozeti */
+.efekt-cip-pro { flex: none; margin-left: 5px; padding: 0 4px; border-radius: 4px; background: rgba(139, 124, 246, .18); color: var(--accent); font-style: normal; font-weight: 700; font-size: 8.5px; letter-spacing: .04em; }
+.efekt-cip-anim { margin-left: 3px; font-style: normal; font-weight: 600; font-size: 9px; font-family: var(--mono, monospace); color: var(--faint); text-shadow: none; }
+.efekt-galeri-ipucu {
+  position: absolute; left: 0; right: 0; z-index: 5; padding: 6px 9px; border: 1px solid var(--line2); border-radius: 9px;
+  background: var(--bg2, #15171f); color: var(--dim); font-size: 10.5px; line-height: 1.35; box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  pointer-events: none; word-wrap: break-word;
+}
+.efekt-galeri-ipucu[hidden] { display: none; }
+.efekt-galeri-ipucu b { display: block; color: var(--text); font-size: 11px; font-weight: 650; margin-bottom: 2px; }
 /* Büyük canlı önizleme */
 .efekt .onizleme-sahne { max-height: 240px; }
 .efekt .onizleme-sahne.dikey { max-height: 380px; }
 /* Ayarlar */
 .efekt-ayarlar .field { margin-bottom: 8px; }
+/* Animasyon motoru v2: yazı animasyonu seçiliyken giriş / vurgu animasyonu kapalı (soluk), ipucu altta */
+.efekt-anim .hint { margin: 4px 0 0; }
+.efekt-ayarlar select:disabled { opacity: .5; cursor: not-allowed; }
 .efekt-renkler { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .efekt-renkler > .switch { display: inline-flex; margin: 0 10px 6px 0; }
 .efekt-ayarlar input[type="number"] { width: 100%; padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--text); border: 1px solid var(--line); border-radius: 9px; }
@@ -3771,6 +3810,9 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-renkler .renk-satir { margin-bottom: 6px; flex: 1 1 100%; }
 .efekt-renkler .renk-kutu { min-width: 0; }
 .efekt-renkler .renk-kutu span { text-align: center; line-height: 1.2; }
+/* Parti 5: animasyonun ek renkleri (vurgu kutusu, ikinci vurgu) yalnız o animasyonda; hidden display kuralını yener */
+.efekt-renkler .efekt-anim-renkler[hidden], .efekt-anim-renkler .renk-kutu[hidden] { display: none; }
+.efekt-anim-renkler .renk-kutu { flex: 0 1 50%; }
 /* Dar panelde (320 px) yazı tipi adı kesilmesin: kalın / italik düğmeleri birlikte alt satıra iner (flex gap'siz, CEF 74) */
 .efekt-font { flex-wrap: wrap; }
 .efekt-font select { flex: 1 1 150px; min-width: 150px; }
@@ -4626,3 +4668,119 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .yan-menu.dar .ky-oge { justify-content: center !important; min-height: 42px; padding: 6px 0 !important; }
 .yan-menu.dar .ky-daralt { align-self: center; }
 .yan-menu.dar .ky-daralt svg { transform: rotate(180deg); }
+
+/* After Effects (deneysel; js/ae-panel.js body.host-ae): Premiere'e özgü öğeler gizli, AE öğeleri yalnız AE'de.
+   !important: captions.js gibi modüller kendi öğelerinin hidden'ını açıp kapatabilir; AE'de yine görünmezler. */
+body:not(.host-ae) [data-yalniz-ae] { display: none !important; }
+body.host-ae [data-yalniz-premiere], body.host-ae [data-ae-gizli] { display: none !important; }
+.ae-not { margin: 10px 13px 0; padding: 9px 12px; border: 1px solid rgba(114, 124, 255, .35); border-radius: var(--r); background: rgba(114, 124, 255, .08); color: var(--dim); font-size: 11.5px; line-height: 1.5; }
+.ae-not b { display: block; color: var(--text); font-size: 12px; margin-bottom: 2px; }
+.ae-altyazi #ae-kaldir { margin: 0 0 10px; }
+
+/* ---------- Altyazı: üç adımlı akış (parti 4, js/altyazi-akis.js) ----------
+   300 px genişlikte yatay kaydırma yok (adım çubuğu üç eşit sütun, uzun metin satır kırar). Renkler var olan
+   belirteçlerden: şu an = --accent, hazır = --good, bekliyor = --faint / --line. Hareket azaltmada geçiş ve kaydırma yok. */
+.cap-adimlar {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+  margin: 0 0 12px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2);
+}
+.cap-adimlar-oge {
+  display: flex; align-items: center; gap: 5px; min-width: 0; padding: 6px 6px; border: 1px solid transparent; border-radius: 7px;
+  background: none; color: var(--dim); font: inherit; font-size: 11.5px; text-align: left; cursor: pointer;
+  transition: color .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
+}
+.cap-adimlar-oge b { font-weight: 620; min-width: 0; flex: 1 1 auto; line-height: 1.2; overflow-wrap: break-word; }
+.cap-adimlar-oge:hover { color: var(--text); background: rgba(255, 255, 255, .03); }
+.cap-adimlar-oge:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--glow-sm); }
+.cap-adim-no {
+  flex: none; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  border: 1px solid var(--line2); color: var(--faint); font-size: 10px; font-weight: 750; line-height: 1;
+}
+.cap-adim-durum { flex: none; font-size: 9px; font-weight: 650; letter-spacing: .02em; color: var(--faint); white-space: nowrap; }
+.cap-adimlar-oge[data-durum="aktif"] { color: var(--text); border-color: var(--accent); background: rgba(114, 124, 255, .1); }
+.cap-adimlar-oge[data-durum="aktif"] .cap-adim-no { border-color: var(--accent); background: var(--accent); color: #fff; }
+.cap-adimlar-oge[data-durum="aktif"] .cap-adim-durum { color: var(--accent-lite, var(--accent)); }
+.cap-adimlar-oge[data-durum="tamam"] .cap-adim-no { border-color: var(--good); color: var(--good); }
+.cap-adimlar-oge[data-durum="tamam"] .cap-adim-durum { color: var(--good); }
+/* Dar panelde (yan yana yerleşik Premiere paneli ~360–440 px dahil) durum yazısı alt satıra iner: etiket sözcük
+   ortasından bölünmez ("Oluş|tur"), yatay kaydırma olmaz. Kapsayıcı sorgusu yok: eski CEP Chromium'u desteklemeyebilir. */
+@media (max-width: 479px) {
+  .cap-adimlar-oge { flex-wrap: wrap; row-gap: 1px; }
+  .cap-adimlar-oge .cap-adim-durum { flex-basis: 100%; padding-left: 22px; }
+}
+
+.cap-adim { margin: 0 0 14px; min-width: 0; scroll-margin-top: 8px; }
+.cap-adim + .cap-adim { padding-top: 12px; border-top: 1px solid var(--line); }
+.cap-adim-bas {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 10px; color: var(--text);
+  font-size: 13px; font-weight: 680; letter-spacing: -.01em;
+}
+.cap-adim-bas:focus { outline: none; }
+.cap-adim-bas:focus-visible { outline: 1px dashed var(--accent); outline-offset: 3px; }
+.cap-adim[data-durum="aktif"] > .cap-adim-bas .cap-adim-no { border-color: var(--accent); background: var(--accent); color: #fff; }
+.cap-adim[data-durum="tamam"] > .cap-adim-bas .cap-adim-no { border-color: var(--good); color: var(--good); }
+.cap-adim-ara { margin: 0 0 6px; color: var(--faint); font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+
+/* Katlanır bölümler: Gelişmiş ayarlar, Diğer araçlar, Özelleştir, Premiere şablonları */
+.cap-gelismis, .cap-diger-araclar, .cap-ozellestir, .cap-mogrt-sar { min-width: 0; }
+.cap-gelismis summary .ia-not, .cap-diger-araclar summary .ia-not, .cap-ozellestir summary .ia-not, .cap-mogrt-sar summary .ia-not {
+  color: var(--faint); font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.cap-ozellestir > summary, .cap-mogrt-sar > summary { font-size: 12px; color: var(--text); font-weight: 600; }
+.cap-mogrt-sar[hidden], .cap-gelismis[hidden], .cap-diger-araclar[hidden] { display: none !important; }
+
+/* 3. adım: tür seçimi, tek düğme, ikincil "Dosya olarak indir" satırı */
+.cap-uygula-govde[hidden], .cap-uygula-ek[hidden], .cap-uygula-asil[hidden] { display: none !important; }
+.cap-uygula-bos[hidden] { display: none; }
+.cap-uygula-bos { margin: 0 0 8px; }
+.cap-uygula-tur { margin-bottom: 8px; }
+.cap-uygula-tur button { min-width: 0; font-size: 11.5px; line-height: 1.25; white-space: normal; }
+.cap-uygula-tur button:disabled { opacity: .45; cursor: not-allowed; }
+.cap-uygula-tur button:focus-visible { outline: none; box-shadow: var(--glow-sm); }
+.cap-uygula-tek { width: 100%; white-space: normal; }
+.cap-uygula-tek em:empty { display: none; }
+.cap-uygula-indir {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; padding: 7px 9px;
+  border: 1px solid var(--line); border-radius: var(--r, 10px); min-width: 0;
+}
+.cap-uygula-indir-bas { flex: 1 1 auto; color: var(--dim); font-size: 11px; min-width: 0; }
+.cap-uygula-indir .mini-select { max-width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cap-adimlar-oge, .cap-adim-no { transition: none; }
+  .cap-adim { scroll-margin-top: 0; }
+}
+
+/* Senkron doğrulama (js/senkron-ui.js): 1. adımdaki tek satırlık rapor, Caption Editor'daki ses dalgası şeridi ve
+   kartlardaki "emin değil" işareti. CEF 74: flex gap ve :focus-visible yok — aralıklar margin ile, odak :focus ile.
+   320–480 px panelde taşmaz: düğmeler alt satıra sarar, tuval kabın genişliğini alır. */
+.senkron-rapor[hidden], .dalga[hidden], .dalga-bos[hidden], .dalga-alan[hidden], #cap-senkron-geri[hidden] { display: none !important; }
+.senkron-rapor { display: flex; flex-wrap: wrap; align-items: baseline; margin: 6px 0 2px; padding: 6px 9px; border: 1px solid var(--line);
+  border-radius: var(--r-s); background: var(--bg2); color: var(--dim); font-size: 11px; line-height: 1.45; min-width: 0; }
+.senkron-rapor[data-ton="iyi"] { border-color: rgba(111, 220, 160, .35); color: var(--good); }
+.senkron-rapor[data-ton="uyari"] { border-color: rgba(234, 200, 119, .35); color: var(--warn); }
+.senkron-rapor-metin { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; margin-right: 8px; }
+.senkron-rapor .link-btn { flex: 0 0 auto; }
+
+.dalga { margin: 2px 0 10px; padding: 7px 8px 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg2); min-width: 0;
+  --dalga-renk: #3aa7ff; --dalga-sessiz: #3b4657; --dalga-kart: rgba(114, 124, 255, .2); --dalga-komsu: rgba(255, 255, 255, .045);
+  --dalga-sinir: rgba(242, 245, 250, .5); --dalga-yazi: #f2f5fa; }
+.dalga-ust { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 4px; min-width: 0; }
+.dalga-baslik { flex: 1 1 auto; margin: 0 8px 4px 0; color: var(--dim); font-size: 11px; white-space: nowrap; }
+.dalga-btns { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 4px; min-width: 0; }
+.dalga-btns .btn.tiny { margin: 0 0 0 5px; }
+.dalga-btns .btn.tiny:first-child { margin-left: 0; }
+.dalga-btns .btn.tiny:disabled { opacity: .45; cursor: not-allowed; }
+.dalga-alan { position: relative; width: 100%; height: 64px; overflow: hidden; border-radius: var(--r-s); background: var(--bg); touch-action: none; }
+.dalga-tuval { display: block; width: 100%; height: 64px; }
+.dalga-tutamaklar { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.dalga-tutamak { position: absolute; top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: ew-resize; outline: none; }
+.dalga-tutamak::after { content: ""; position: absolute; top: 14px; bottom: 0; left: 5px; width: 3px; border-radius: 2px; background: rgba(242, 245, 250, .35); }
+.dalga-tutamak.kart::after { top: 0; background: var(--accent); }
+.dalga-tutamak:hover::after, .dalga-tutamak.surukleniyor::after { background: var(--accent-lite); }
+.dalga-tutamak:focus::after { left: 4px; width: 5px; background: var(--warn); box-shadow: 0 0 0 2px rgba(234, 200, 119, .35); }
+.dalga-bos { margin: 2px 0 4px; color: var(--dim); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.dalga-ipucu { margin: 4px 0 0; color: var(--dim); font-size: 10.5px; line-height: 1.4; overflow-wrap: anywhere; }
+.seg-senkron-uyari { padding: 0 5px; border: 1px solid rgba(234, 200, 119, .4); border-radius: 4px; background: rgba(234, 200, 119, .08);
+  color: var(--warn); font-size: 10px; line-height: 1.5; cursor: pointer; }
+.seg-senkron-uyari:hover, .seg-senkron-uyari:focus { outline: none; border-color: var(--warn); box-shadow: 0 0 0 2px rgba(234, 200, 119, .25); }

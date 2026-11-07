@@ -111,6 +111,17 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.3 Altyazi Efektleri: olusturucu modeli ve tek temel stil (efekt) motoru
             '(^|/)js/altyazi-efekt\.js$',
             '(^|/)js/style-engine\.js$',
+            # Kalite motoru (parti 1): Turkce-duyarli satir / kart kirilimi; eksikse caption-layout cezasiz eski kirilima sessizce duser
+            '(^|/)js/tr-kirilim\.js$',
+            # Animasyon motoru v2: yazi animasyonlari katalogu ve geriye uyumlu stil kodu (SFL1. + ek); eksikse sessizce klasige duser
+            '(^|/)js/yazi-animasyonlari\.js$',
+            '(^|/)js/stil-kodu\.js$',
+            # Stil kutuphanesi (parti 3): hazir gorunum galerisi (kategori sekmeleri, cip ornekleri, klavye, ipucu)
+            '(^|/)js/stil-galeri\.js$',
+            # Parti 4: uc adimli altyazi akisi (Olustur / Stil sec / Uygula; tek uygula dugmesi)
+            '(^|/)js/altyazi-akis\.js$',
+            # Parti 6: Kufurleri maskele (eksikse anahtar acik oldugu halde cikti sessizce maskesiz kalir)
+            '(^|/)js/kufur-maske\.js$',
             # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
             '(^|/)js/youtube-indir\.js$',
             '(^|/)js/youtube-indir-ui\.js$',
@@ -132,6 +143,11 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.4 adim 8: kesimden sonra altyazi (saf esleme modulu + kesim kartlarindaki eylem satiri)
             '(^|/)js/kesim-esle\.js$',
             '(^|/)js/kesim-altyazi\.js$',
+            # Senkron dogrulama: ses zarfi / konusma baslangiclari ve kelime-kart hizalama motoru (saf moduller)
+            '(^|/)js/ses-zarf\.js$',
+            '(^|/)js/senkron\.js$',
+            # Senkron dogrulama arayuzu: rapor satiri, ses dalgasi seridi, sinir tasima (Caption Editor)
+            '(^|/)js/senkron-ui\.js$',
             # 3.4 Yumusatma motoru (Rebound MIT uyarlamasi) ve anahtar kare kayitlari: Egri, Gecis, Zoom, Hareket bunlara dayanir
             '(^|/)js/ease-curve\.js$',
             '(^|/)js/key-records\.js$',
@@ -142,6 +158,10 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/egri\.js$',
             # 3.4 kayit tabanli guvenli kaldirma (Gecis, Zoom, Hareket onayari); host tarafi KS_removeSufloKeys
             '(^|/)js/kayit-kaldir\.js$',
+            # After Effects (deneysel): saf plan (bridge.js'ten once yuklenir), panel ve AE ExtendScript tarafi
+            '(^|/)js/ae-plan\.js$',
+            '(^|/)js/ae-panel\.js$',
+            '(^|/)jsx/host-ae\.jsx$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

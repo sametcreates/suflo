@@ -160,8 +160,9 @@ chk("l42: satırlar ölçülmüş kelimelerden; cümle sonunda kırılır (\"Gü
 chk("l42: kısa \"Güzel.\" en kısa süreye (0,8 sn) sonraki satıra çarpmadan uzar", l42.segments[2].end > l42.segments[2].start + 0.4 &&
   l42.segments[2].end <= l42.segments[3].start - 0.08 + 1e-9, l42.segments[2].start + "–" + l42.segments[2].end);
 var l32 = T.segmentleriKur(esli, "l32");
-chk("l32: 32 karakter aşılmaz, aynı satır sayısıyla dengeli (\"mi?\" tek başına kalmaz)",
-  metinler2(l32) === "Bu ışık hiç de kötü|değil, değil mi?|Şimdi kamerayı biraz|sola çevirelim.|Güzel.|Peki, sonra tekrar deneyelim!" &&
+// Kalite motoru (parti 1): "değil" satır başına düşmez; "kötü değil" birlikte kalır (eskiden "…kötü|değil, değil mi?")
+chk("l32: 32 karakter aşılmaz, aynı satır sayısıyla dengeli (\"mi?\" tek başına kalmaz, \"değil\" satır başında değil)",
+  metinler2(l32) === "Bu ışık hiç de|kötü değil, değil mi?|Şimdi kamerayı biraz|sola çevirelim.|Güzel.|Peki, sonra tekrar deneyelim!" &&
   l32.segments.every(function (x) { return x.text.length <= 32; }), metinler2(l32));
 chk("l32/l42: satırlar sıralı, çakışmasız", [l32, l42].every(function (r) { return r.segments.every(function (x, i) { return i === 0 || x.start >= r.segments[i - 1].end - 1e-9; }); }));
 var x2 = T.segmentleriKur(esli, "c42x2");

@@ -1,0 +1,31 @@
+{
+  "maxlen": "c42x2",
+  "kase": "upper",
+  "punct": false,
+  "stil": {
+    "aile": "efekt",
+    "yogunluk": "balanced",
+    "font": "Bebas Neue",
+    "boyut": 118,
+    "renk": "#abcdef",
+    "konturRenk": "#0b1020",
+    "vurguRenk": "#2af5ff",
+    "kontur": 3,
+    "konum": 8,
+    "kutu": false,
+    "animasyon": "efekt",
+    "guvenli": false,
+    "giris": "asagi",
+    "aktif": "glitch",
+    "vurgu": true,
+    "kalin": true,
+    "italik": true,
+    "satir": 1,
+    "kelime": 3,
+    "golge": null,
+    "kutuRenk": "#000000",
+    "kutuOpak": 50,
+    "konumX": null,
+    "konumY": null
+  }
+}

@@ -18,7 +18,10 @@
  *   - yerlesim(w, h, oran, o): şablonun 1920×1080 kompozisyonunu sekansa yerleştiren Motion › Scale (kartı kapsayan en
  *     küçük ölçek: AE şablonu kompozisyon çözünürlüğünde çizilir, %100 üstü yumuşatır) ve Caption_Position.
  *   - izAraligi(parcalar): grubun izdeki ayak izi (importMGT şablonu 1 saatlik overwrite eder, sonra kırpılır).
- *   - bildirimEkleri(o): yerel çıktının önizlemeden farkları (Arial, italik, vurgu, Marka Kiti logosu, konuşmacı renkleri).
+ *   - bildirimEkleri(o): yerel çıktının önizlemeden farkları (Arial, italik, vurgu, Marka Kiti logosu, konuşmacı renkleri,
+ *     yazı animasyonu: animasyonNotu).
+ *   - animasyonNotu(ayar): yazı animasyonu (animasyon motoru v2) sözleşmede yok; şablon en yakın klasik giriş / vurgu
+ *     çiftini (altyazi-efekt.js klasikAyar → sablonIndeksleri) çizer, kullanıcıya bu söylenir.
  *   - fontSecimi / fontKuruluMu / fontKlasorleri / adobeFontKlasorleri / fontPostScriptAdlari / fontKurulumPlani:
  *     Premiere yalnız sisteme kurulu (ya da Adobe Fonts'ta etkin) fontu çizer. Bilinen aile (PostScript eşlemesi olan)
  *     kurulu değilse, aile bilinmiyorsa ya da font bu oturumda kurulduysa (Premiere yeniden başlayınca görür) Arial'a
@@ -124,7 +127,8 @@
     var ov = ae ? ae.overrides(ayar) : (ayar || {});
     var kad = kadrajOku(o);
     if (kad && kad.guvenli) ov.guvenli = true;
-    var kartlar = se.efektSatirlari({ cues: cues || [], cueKind: o && o.cueKind ? o.cueKind : "lines" }, ov,
+    // o.dil: altyazının dili (kalite motoru: kart / satır kırılımı önizlemeyle aynı dilde; verilmezse tr + en)
+    var kartlar = se.efektSatirlari({ cues: cues || [], cueKind: o && o.cueKind ? o.cueKind : "lines", dil: o && typeof o.dil === "string" ? o.dil : undefined }, ov,
       kad ? { width: kad.w, height: kad.h, genislik: kad.genislik } : undefined);
     var out = [];
     kartlar.forEach(function (k) {
@@ -148,14 +152,32 @@
         onceki = kb;
       });
       var satir = { start: bas, end: son, text: metin, kelimeler: zam, vurgu: vur };
-      if (kad && k.fs > 0 && k.fs0 > 0) { satir.fs = k.fs; satir.fs0 = k.fs0; }
+      if (kad && k.fs > 0 && k.fs0 > 0) {
+        satir.fs = k.fs; satir.fs0 = k.fs0;
+        /*
+         * Kalite motoru: tek başına kadraja sığmayan uzun kelimenin kartı önizlemede yatayda sıkışır (k.sx, \fscx);
+         * şablonun yatay ölçeği yok: aynı genişlik için punto o oranda küçülür (en az 1).
+         */
+        if (k.sx > 0 && k.sx < 100) satir.fs = Math.max(1, Math.floor(k.fs * k.sx / 100));
+      }
       out.push(satir);
     });
     out.sort(function (a, b) { return a.start - b.start; });
     for (var i = 0; i + 1 < out.length; i++) {
       if (out[i].end > out[i + 1].start) {
-        out[i].end = Math.max(out[i].start + 0.01, out[i + 1].start);
-        out[i].kelimeler.forEach(function (z) { z[0] = Math.min(z[0], out[i].end); z[1] = Math.min(z[1], out[i].end); });
+        var sinir = Math.max(out[i].start + 0.01, out[i + 1].start);
+        out[i].end = sinir;
+        out[i].kelimeler.forEach(function (z) { z[0] = Math.min(z[0], sinir); z[1] = Math.min(z[1], sinir); });
+        /*
+         * İki kart 10 ms'den yakın başlıyorsa (sırasız / çakışan kelime zamanı) önceki kartın en kısa süresi sonrakine
+         * taşardı: sonraki kart o sınırdan başlar (Premiere'de klipler üst üste binmez)
+         */
+        var sonraki = out[i + 1];
+        if (sonraki.start < sinir) {
+          sonraki.start = sinir;
+          sonraki.end = Math.max(sonraki.end, sinir + 0.01);
+          sonraki.kelimeler.forEach(function (z) { z[0] = Math.max(z[0], sinir); z[1] = Math.max(z[1], z[0]); });
+        }
       }
     }
     return out;
@@ -202,7 +224,7 @@
 
   /*
    * build(cues, ayar, o) → { parcalar: [{ start, end, json, bayt, satir, punto }], satirSayisi, vurguKaybi, asiri }
-   * o: { cueKind ("lines" | "words" | "cumulative"), fps, font, punto, sure (sn), bayt, kadraj: { w, h, guvenli } }
+   * o: { cueKind ("lines" | "words" | "cumulative"), fps, font, punto, sure (sn), bayt, kadraj: { w, h, guvenli }, dil (altyazının dili; kart kırılımı) }
    * Parça başı ve sonu kare sınırına oturur (Premiere klibi kareye yuvarlar; komşu parçalar aynı izde çakışmasın),
    * satır zamanları parçanın (kareye oturmuş) başına göredir. Tek satır sınırı aşarsa yine kendi parçasıdır (asiri).
    * o.kadraj (sekansın boyu; yerlesim'inkiyle aynı) verilirse satır sığdırma (PUNTO_ORANI): parçanın puntosu (d[3],
@@ -475,9 +497,16 @@
    * logo (Marka Kiti logosu açık), konusmaci (Podcast Modu konuşmacı renkleri açık), konumYok (Caption_Position /
    * Motion › Scale yazılamadı) }. Logo ve konuşmacı renkleri yalnız video katmanında çizilir: yolu da söylenir.
    */
+  // Yazı animasyonu seçiliyse kullanıcıya not (yoksa ""): yerel çıktı en yakın klasik çifti çizer
+  function animasyonNotu(ayar) {
+    var ae = AE(), a = ae && ae.animasyonu ? ae.animasyonu(ayar) : null;
+    return a ? "Bu animasyon Premiere yerel çıktıda en yakın karşılığıyla (" + a.girisAd + " + " + a.aktifAd + ") gelir" : "";
+  }
+
   function bildirimEkleri(o) {
     o = o || {};
     var ek = [], f = o.font || {};
+    if (typeof o.anim === "string" && o.anim) ek.push(o.anim);
     if (f.yedek) ek.push(f.neden === "yeniden-baslat" ? "yazı tipi Arial (Premiere'i yeniden başlat)" : "yazı tipi Arial");
     if (f.italikYok) ek.push("italik yerel çıktıda yok");
     if (o.vurguKaybi) ek.push("anahtar kelime vurgusu yerel çıktıda yok");
@@ -603,6 +632,7 @@
     yerlesim: yerlesim,
     izAraligi: izAraligi,
     bildirimEkleri: bildirimEkleri,
+    animasyonNotu: animasyonNotu,
     fontKuruluMu: fontKuruluMu,
     fontSecimi: fontSecimi,
     fontPostScriptAdlari: fontPostScriptAdlari,

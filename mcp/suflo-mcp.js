@@ -24,7 +24,7 @@ var path = require("path");
 var http = require("http");
 var O = require("../js/otomasyon.js");
 
-var SURUM = "3.4.2";
+var SURUM = "3.5.0";
 // En yeni önce. Yayından önce güncel MCP belirtimine göre doğrulanır (marketing/v4-kurucu-yapilacaklar.md)
 var PROTOKOLLER = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 var CAGRI_SURESI = 20 * 60000;   // kopyada kesim gibi uzun eylemler

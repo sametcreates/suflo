@@ -51,7 +51,16 @@ if not errorlevel 1 (
 rem 2) Imzasiz eklentilere izin. Suflo imzali ama kendi sertifikasiyla imzali;
 rem    Adobe yalnizca kendi onayladigi sertifikalari "guvenli" sayiyor.
 echo   [1/3] Premiere ayari yapiliyor... / Configuring Premiere...
+rem    Kaldirma yalniz Suflo'nun degistirdigini geri alsin: PlayerDebugMode zaten 1 degilse
+rem    onceki deger (yoksa "yok") isaret degerine yazilir; isaret varsa (onceki Suflo kurulumu) ellenmez.
 for %%V in (9 10 11 12 13 14) do (
+  reg query "HKCU\Software\Adobe\CSXS.%%V" /v SufloOncekiPlayerDebugMode >nul 2>&1
+  if errorlevel 1 (
+    set "ONCEKI=yok"
+    for /f "tokens=3" %%A in ('reg query "HKCU\Software\Adobe\CSXS.%%V" /v PlayerDebugMode 2^>nul ^| find /I "PlayerDebugMode"') do set "ONCEKI=%%A"
+    if /I "!ONCEKI!"=="0x1" set "ONCEKI=1"
+    if not "!ONCEKI!"=="1" reg add "HKCU\Software\Adobe\CSXS.%%V" /v SufloOncekiPlayerDebugMode /t REG_SZ /d "!ONCEKI!" /f >nul 2>&1
+  )
   reg add "HKCU\Software\Adobe\CSXS.%%V" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>&1
 )
 

@@ -6,6 +6,9 @@
  *
  * Kullanim:
  *   node tools/build-caption-showcase.js [Captioneer klasoru]
+ *
+ * Bu arac vitrini BASTAN kurar (17 Captioneer stili). AutoCaptions kartlari icin ardindan
+ * node tools/build-autocaptions-showcase.js calistir (katalogu 31 stile tamamlar).
  */
 "use strict";
 

@@ -667,7 +667,9 @@ async function kopruTesti() {
   var SRC = fs.readFileSync(path.join(KOK, "js", "bridge.js"), "utf8");
   function yukle(platform, ek) {
     ek = ek || {};
-    var cagri = { spawn: [], execFile: [], kill: [], grup: [] };
+    var cagri = { spawn: [], execFile: [], kill: [], grup: [] }, cocuklar = [];
+    // öldürülen süreç (kill, grup, taskkill) gerçekteki gibi kapanır: K.run iptal sonucunu "close"tan sonra verir
+    function oldu(pid) { cocuklar.forEach(function (c) { if (c.pid === Math.abs(Number(pid)) && !c.kapali) { c.kapali = true; setImmediate(function () { c.emit("close", null); }); } }); }
     var sahteCp = {
       spawn: function (cmd, args, o) {
         cagri.spawn.push({ cmd: cmd, o: o });
@@ -675,16 +677,21 @@ async function kopruTesti() {
         c.pid = 4242;
         c.stdout = new EventEmitter(); c.stdout.setEncoding = function () {};
         c.stderr = new EventEmitter(); c.stderr.setEncoding = function () {};
-        c.kill = function (s) { cagri.kill.push(s); return true; };
+        c.kill = function (s) { cagri.kill.push(s); oldu(c.pid); return true; };
+        cocuklar.push(c);
         return c;
       },
-      execFile: function (cmd, args, o, cb) { cagri.execFile.push({ cmd: cmd, args: args }); if (cb) setImmediate(function () { cb(null); }); return new EventEmitter(); },
+      execFile: function (cmd, args, o, cb) {
+        cagri.execFile.push({ cmd: cmd, args: args });
+        if (cb) setImmediate(function () { if (cmd === "taskkill") oldu(args[1]); cb(null); });
+        return new EventEmitter();
+      },
       execSync: function () { return ""; }
     };
     var sb = {
       window: {}, console: console,
       require: function (ad) { return ad === "child_process" ? sahteCp : (ek.moduller && ek.moduller[ad]) || require(ad); },
-      process: { platform: platform, env: ek.env || { PATH: "/usr/bin" }, versions: process.versions, arch: process.arch, kill: function (pid, sig) { cagri.grup.push([pid, sig]); } },
+      process: { platform: platform, env: ek.env || { PATH: "/usr/bin" }, versions: process.versions, arch: process.arch, kill: function (pid, sig) { cagri.grup.push([pid, sig]); oldu(pid); } },
       URL: URL, Promise: Promise, Buffer: Buffer, JSON: JSON, Math: Math, Date: Date, setTimeout: setTimeout, clearTimeout: clearTimeout, setImmediate: setImmediate,
       String: String, Number: Number, Object: Object, Array: Array, Error: Error, RegExp: RegExp, isFinite: isFinite,
       navigator: { platform: platform === "darwin" ? "MacIntel" : "Win32", userAgent: "" },

@@ -42,7 +42,14 @@ fi
 # 1) İmzasız eklentilere izin. Suflo imzalı ama kendi sertifikasıyla;
 #    Adobe yalnızca kendi onayladığı sertifikaları "güvenli" sayıyor.
 echo "  [1/4] Premiere ayarı yapılıyor... / Configuring Premiere..."
+#    Kaldırma yalnız Suflo'nun değiştirdiğini geri alsın: PlayerDebugMode zaten 1 değilse önceki
+#    değer (yoksa "yok") işaret anahtarına yazılır; işaret varsa (önceki Suflo kurulumu) ellenmez.
+ISARET=SufloOncekiPlayerDebugMode
 for V in 9 10 11 12 13 14; do
+  if ! defaults read "com.adobe.CSXS.$V" "$ISARET" >/dev/null 2>&1; then
+    ONCEKI="$(defaults read "com.adobe.CSXS.$V" PlayerDebugMode 2>/dev/null || echo yok)"
+    [ "$ONCEKI" = "1" ] || defaults write "com.adobe.CSXS.$V" "$ISARET" -string "$ONCEKI" 2>/dev/null
+  fi
   defaults write "com.adobe.CSXS.$V" PlayerDebugMode 1 2>/dev/null
 done
 

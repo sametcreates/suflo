@@ -14,9 +14,18 @@ if (-not $destFull.StartsWith($cepRoot + [IO.Path]::DirectorySeparatorChar, [Str
 Write-Host "Suflo kuruluyor..." -ForegroundColor Cyan
 
 # 1) Imzasiz eklentilere izin (kullanici kapsamli, geri alinabilir)
+# Kaldirma yalniz Suflo'nun degistirdigini geri alsin: PlayerDebugMode zaten "1" degilse onceki
+# deger (yoksa "yok") isaret degerine yazilir. Isaret varsa (onceki Suflo kurulumu) ellenmez.
+$isaret = "SufloOncekiPlayerDebugMode"
 foreach ($v in 9..14) {
     $key = "HKCU:\Software\Adobe\CSXS.$v"
     if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
+    $ozellik = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+    if ($null -eq $ozellik.$isaret) {
+        $onceki = $ozellik.PlayerDebugMode
+        if ($null -eq $onceki) { $onceki = "yok" }
+        if ("$onceki" -ne "1") { New-ItemProperty -Path $key -Name $isaret -Value "$onceki" -PropertyType String -Force | Out-Null }
+    }
     New-ItemProperty -Path $key -Name "PlayerDebugMode" -Value "1" -PropertyType String -Force | Out-Null
 }
 Write-Host "  PlayerDebugMode acildi (CSXS 9-14)" -ForegroundColor DarkGray

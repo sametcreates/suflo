@@ -19,6 +19,14 @@ window.KShortsPaket = (function () {
   var AE = window.SufloAltyaziEfekt || null;
   var CT = window.SufloCaptionText, OR = window.SufloOverlayRender, MK = window.SufloMarkaKiti;
   var calisiyorMu = false, iptalIstendi = false, sonKlasor = "";
+  /*
+   * Katman render'larının (altyazı, kanca, çerçeve) iptal jetonu: İptal süren ffmpeg'i hemen öldürür. O adım
+   * "bekliyor" kalır (hata sayılmaz), yarım dosya silinir; "Devam et" o adımdan sürer. Premiere adımları
+   * (sekans oluşturma) bölünemez: onlar eskisi gibi sıradaki adımdan önce durur.
+   */
+  var katmanJetonu = null;
+  function yeniKatmanJetonu() { katmanJetonu = K.iptalJetonu ? K.iptalJetonu() : null; return katmanJetonu; }
+  function katmanIptali() { return katmanJetonu || undefined; }
   // Paketin başladığı Viral anlar aramasının nesli: yalnız o arama hâlâ ekrandaysa kaynak sekansa
   // bağlanır ("Devam et" ya da yeni arama sonrası null / farklı: bağlanmaz)
   var bagNesli = null;
@@ -135,13 +143,27 @@ window.KShortsPaket = (function () {
     var kayit = K.settings().shortsPaketSecim || {};
     var mogrt = !!(window.KCaptions && KCaptions.mogrtSecili && KCaptions.mogrtSecili());
     sel.innerHTML = "";
-    var secenekler = [{ id: "panel", ad: "Altyazı sekmesindeki efekt" }].concat(AE ? AE.GORUNUMLER.map(function (g) { return { id: g.id, ad: g.ad }; }) : []);
-    secenekler.forEach(function (x) {
+    function secenek(kap, id, ad) {
       var o = document.createElement("option");
-      o.value = x.id;
-      o.textContent = x.ad;
-      sel.appendChild(o);
-    });
+      o.value = id;
+      o.textContent = ad;
+      kap.appendChild(o);
+    }
+    secenek(sel, "panel", "Altyazı sekmesindeki efekt");
+    /*
+     * Stil kütüphanesi (parti 3): hazır görünümler kategori başına <optgroup> içinde (değerler görünüm kimliği, sayı
+     * 1 + GORUNUMLER aynı). Kategorisiz eski model (gruplar yok) düz liste.
+     */
+    var gruplar = AE && typeof AE.gruplar === "function" ? AE.gruplar() : null;
+    if (gruplar) {
+      gruplar.forEach(function (gr) {
+        var og = document.createElement("optgroup");
+        og.label = gr.ad;
+        if (og.setAttribute) og.setAttribute("label", gr.ad);
+        gr.gorunumler.forEach(function (x) { secenek(og, x.id, x.ad); });
+        sel.appendChild(og);
+      });
+    } else if (AE) AE.GORUNUMLER.forEach(function (g) { secenek(sel, g.id, g.ad); });
     var secilen = kayit.gorunum === "panel" || (AE && AE.gorunum(kayit.gorunum)) ? kayit.gorunum :
       (AE && AE.eskiGorunum(kayit.stilId)) || "panel";
     sel.value = secilen;
@@ -377,11 +399,15 @@ window.KShortsPaket = (function () {
         if (!cc.cues.length) return { atla: "altyazi-bos" };
         var W = ciftBoyut(ctx.width, 1080), H = ciftBoyut(ctx.height, 1920), fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : 30;
         var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt, job.secim.gorunum === "panel");
-        var der = SE.compile({ styleId: job.secim.stilId, cueKind: cc.cueKind, cues: cc.cues, offset: 0, width: W, height: H, overrides: sa.overrides });
+        // dil: kalite motorunun kart / satır kırılım dili (Short'un dili; Altyazı Efektleri'nde Türkçe-duyarlı)
+        // zamanlar Short sekansının karesine tam oturur (libass santisaniyesi kareyi geçmesin; js/overlay-render.js)
+        var kareCue = OR.kareZamanlari ? OR.kareZamanlari(cc.cues, fps, 0) : cc.cues;
+        var der = SE.compile({ styleId: job.secim.stilId, cueKind: cc.cueKind, cues: kareCue, offset: 0, width: W, height: H, overrides: sa.overrides,
+          dil: typeof job.lang === "string" ? job.lang : undefined });
         var sure = CT.katmanSuresi(cc.cues[cc.cues.length - 1].end, Number(ctx.end) || 0, fps, false);
         var yol = cikti("altyazi", k);
         await OR.render(K, { ass: der.ass, fontFiles: der.fontFiles, g: W, y: H, fps: fps, sure: sure, cikti: yol,
-          onek: "overlay-paket-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 1800000 });
+          onek: "overlay-paket-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 1800000, iptal: katmanIptali() });
         var yer = await K.call("KS_placeOverlay", { path: yol, at: 0, name: P.KATMAN.altyazi, expectSeqId: ctx.id }, 120000);
         if (!yer || !yer.ok) { sil(yol); return { ok: false, hata: (yer && yer.error) || "?" }; }
         return { ok: true };
@@ -389,7 +415,9 @@ window.KShortsPaket = (function () {
 
       kanca: async function (k, ctx) {
         if (!window.KKanca) return { ok: false, hata: "Kanca modülü yüklenemedi." };
-        var r = await KKanca.ekle({ text: k.kanca, at: 0, stil: job.kancaStil, dur: job.kancaSure, expectSeqId: ctx.id, ad: P.KATMAN.kanca, sessiz: true });
+        var r = await KKanca.ekle({ text: k.kanca, at: 0, stil: job.kancaStil, dur: job.kancaSure, expectSeqId: ctx.id, ad: P.KATMAN.kanca, sessiz: true,
+          iptal: katmanIptali() });
+        if (r && r.iptal) return { ok: false, iptal: true, hata: "İptal edildi" };
         return r && r.ok ? { ok: true } : { ok: false, hata: (r && r.hata) || "Kanca başlığı eklenemedi." };
       },
 
@@ -409,7 +437,7 @@ window.KShortsPaket = (function () {
         var yol = cikti("cerceve", k);
         var katman = await OR.render(K, { ass: ass, fontFiles: cp.cta ? cp.cta.fontFiles : [], g: W, y: H, fps: fps,
           sure: CT.katmanSuresi(dur, Number(ctx.end) || 0, fps, true), cikti: yol, assAd: "cerceve.ass", onek: "overlay-paket-",
-          fontDizini: K.path.join(uzantiDizini(), "fonts"), logo: cp.logo, timeout: 1800000 });
+          fontDizini: K.path.join(uzantiDizini(), "fonts"), logo: cp.logo, timeout: 1800000, iptal: katmanIptali() });
         if (katman && katman.logoAtlandi) k.notlar.logo = "logo-yok";
         var yer = await K.call("KS_placeOverlay", { path: yol, at: 0, name: P.KATMAN.cerceve, expectSeqId: ctx.id }, 120000);
         if (!yer || !yer.ok) { sil(yol); return { ok: false, hata: (yer && yer.error) || "?" }; }
@@ -536,6 +564,7 @@ window.KShortsPaket = (function () {
     }
     calisiyorMu = true;   // ilk await'ten ÖNCE: çift tıklama iki paket başlatmasın
     iptalIstendi = false;
+    yeniKatmanJetonu();
     bagNesli = null;
     guncelle();
     var basladi = false;
@@ -607,6 +636,7 @@ window.KShortsPaket = (function () {
     if (!job) { guncelle(); return; }
     P.resumeJob(job);
     iptalIstendi = false;
+    yeniKatmanJetonu();
     // ekrandaki arama bu işin olmayabilir: kaynak sekansa bağlanmaz; altyazı kaydı işin kendi transkriptinden
     bagNesli = null;
     await calistir(job);
@@ -615,6 +645,7 @@ window.KShortsPaket = (function () {
   function iptal() {
     if (!calisiyorMu) return;
     iptalIstendi = true;
+    if (katmanJetonu) katmanJetonu.iptal();   // süren katman render'ı hemen durur
     durum(T("Sıradaki adımdan önce durduruluyor…"), "warn");
   }
 

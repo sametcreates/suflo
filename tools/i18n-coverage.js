@@ -75,7 +75,8 @@ var YOKSAY = ["Iıı, eee, hmm, şey, yani... ıı, ee.", "Ee, ıı, hmm, yəni,
   "Français", // dil seçicide dilin kendi adı
   "Pro altyazi vitrini", "Pro animasyon vitrini", // iç katalog adı (hata günlüğü)
   "{}. {} ({}–{}, {} sn){}", // panoya kopyalanan liste
-  " (kalan kisim da tekrarla bitiyor)"]; // yalnız günlük (K.log birleştirmesi)
+  " (kalan kisim da tekrarla bitiyor)", // yalnız günlük (K.log birleştirmesi)
+  "tr+en", "müdür"]; // js/tr-kirilim.js: kırılım dil kipi ve soru eki istisnası (dil verisi, arayüzde görünmez)
 var REGEX_ONCESI = /^(return|typeof|case|in|of|do|else|void|throw|new|delete|instanceof|yield|await)$/;
 function tokenize(src) {
   var toks = [], i = 0, n = src.length, onceki = "", sonKelime = "";
@@ -236,6 +237,7 @@ function extractJs(src, file) {
     if (/^[a-z ]+$/.test(duz)) continue; // arama anahtar kelimeleri (ASCII, küçük harf)
     if (/^[a-z0-9{}_ -]+$/.test(duz) && /-/.test(duz)) continue; // CSS sınıf listesi
     if (/^(https?:|Dialogue:|Style:|;|color=)/.test(duz)) continue; // URL, ASS başlıkları, ffmpeg filtreleri
+    if (/^\.\.?\/[\w.\/-]+\.js$/.test(duz)) continue; // require yolu (UMD: "./altyazi-efekt.js")
     if (YOKSAY.indexOf(duz) !== -1) continue;
     if ((duz.match(/[{};]/g) || []).length > 8 && /[a-z-]+:[^ ]/.test(duz) && !/<[a-z]/.test(duz)) continue; // üretilen CSS
     var sonraki = toks[k + 1], onceki = toks[k - 1];
@@ -248,6 +250,8 @@ function extractJs(src, file) {
     if (onceki && onceki.t === "p" && onceki.v === "(" && toks[k - 3] && toks[k - 3].v === "console") continue;
     var sablonMetni = (t.t === "tpl" ? [] : zincir(toks, k)).map(function (p) { return p.lit === null ? "" : p.lit; }).join("");
     if (/^(https?:|Dialogue:|Style:|color=)/.test(sablonMetni)) continue;
+    // After Effects ifadesi (js/ae-plan.js: kutu / perde; + zincirinin tamamı kod, arayüzde görünmez)
+    if (/\b(thisComp|sourceRectAtTime|parent\.transform|createPath)\b/.test(sablonMetni)) continue;
     var sablon = t.t === "tpl" ? (function () {
       var r = [];
       t.parts.forEach(function (p, i) { if (i) r.push({ lit: null }); r.push({ lit: p }); });
@@ -267,7 +271,8 @@ function extractHost(src, file) {
   var toks = tokenize(src), out = [];
   for (var k = 0; k + 1 < toks.length; k++) {
     var t = toks[k];
-    if (t.t !== "id" || (t.v !== "KS_err" && t.v !== "KS_errKod")) continue;
+    // KSAE_err: After Effects tarafı (jsx/host-ae.jsx, deneysel); KS_err gibi panelde gösterilir
+    if (t.t !== "id" || (t.v !== "KS_err" && t.v !== "KS_errKod" && t.v !== "KSAE_err")) continue;
     if (!(toks[k + 1].t === "p" && toks[k + 1].v === "(")) continue;
     if (toks[k - 1] && toks[k - 1].t === "id" && toks[k - 1].v === "function") continue;   // tanımın kendisi
     // argümanların sonu
@@ -358,7 +363,8 @@ function rapor() {
     var ok = tam.some(function (s) { return cevrildi(I, s); }) || cevrildi(I, x.text);
     if (!ok) jEksik.push(x);
   });
-  var hostTum = extractHost(fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8"), "jsx/host.jsx");
+  var hostTum = extractHost(fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8"), "jsx/host.jsx")
+    .concat(extractHost(fs.readFileSync(path.join(KOK, "jsx", "host-ae.jsx"), "utf8"), "jsx/host-ae.jsx"));
   var xTekil = {}, xEksik = [], xToplam = 0;
   hostTum.forEach(function (x) {
     if (xTekil[x.text]) return;
@@ -391,7 +397,7 @@ if (require.main === module) {
   yaz("js/*.js kullanıcı metinleri", r.js, function (x) {
     return x.file + ":" + x.line + " " + x.template.map(function (p) { return p.lit === null ? "{…}" : p.lit; }).join("").replace(/\n/g, "\\n").slice(0, 110);
   });
-  yaz("jsx/host.jsx hata metinleri (KS_err)", r.host, function (x) {
+  yaz("jsx/host.jsx + host-ae.jsx hata metinleri (KS_err, KSAE_err)", r.host, function (x) {
     return x.file + ":" + x.line + " " + x.text.replace(/\n/g, "\\n").slice(0, 110);
   });
   var gecti = r.html.yuzde >= ESIK && r.host.yuzde >= ESIK;

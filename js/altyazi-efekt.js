@@ -4,7 +4,8 @@
  * Altyazı sekmesindeki "Altyazı Efektleri" bölümü tek bir temel stil üretir: stil motorundaki
  * "efekt" (js/style-engine.js). Bu modül arayüzden bağımsız kısmı taşır:
  *   - GIRISLER / AKTIFLER: giriş ve vurgu animasyonlarının kimlik ve adları
- *   - GORUNUMLER: "Hazır görünümler" (kontrolleri dolduran 5 başlangıç; rozet yok)
+ *   - GORUNUMLER: "Hazır görünümler" (kontrolleri dolduran 6 başlangıç + parti 3'ün stil kütüphanesi; rozet yok)
+ *   - KATEGORILER / gruplar(): kütüphanenin kategorileri (Viral · Shorts, Minimal, Podcast, Eğitim, Sinematik, Marka)
  *   - normalize(ayar): oluşturucu ayarını doğrular, eksik / geçersiz alan varsayılana döner
  *   - overrides(ayar): stil motoruna ve SFL1 koduna giden ince ayar (styleId "efekt")
  *   - eskiGorunum / eskiStilden: eski Suflo stil kimlikleri (Creator Punch, Bold Box…) en yakın
@@ -28,10 +29,13 @@
     if (!m && typeof require === "function") { try { m = require(yol); } catch (e) { m = null; } }
     return m;
   }
-  var api = factory(yukle("SufloStyleShare", "./style-share.js"), function () { return yukle("SufloStyleEngine", "./style-engine.js"); });
+  // Yazı animasyonları kataloğu (animasyon motoru v2): index.html'de önce yüklenir, Node'da require
+  var YA = (root && root.SufloYaziAnimasyon) || null;
+  if (!YA && typeof require === "function") { try { YA = require("./yazi-animasyonlari.js"); } catch (e) { YA = null; } }
+  var api = factory(yukle("SufloStyleShare", "./style-share.js"), function () { return yukle("SufloStyleEngine", "./style-engine.js"); }, YA);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloAltyaziEfekt = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, motorBul) {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, motorBul, YA) {
   "use strict";
 
   // Stil motoru (hazır konumların kadraja göre noktası için); index.html'de önce yüklenir, Node'da require
@@ -76,37 +80,238 @@
 
   /*
    * Hazır görünümler. "temiz" stil motorundaki efekt varsayılanıyla birebir aynı (test denetler).
+   * anim (animasyon motoru v2): yazı animasyonu, js/yazi-animasyonlari.js kimliği; "" klasik (giriş + vurgu ayrı).
+   * İlk altı görünüm klasik (anim ""): onları seçmek seçili animasyonu bırakır; kütüphanenin bazı görünümleri
+   * (aşağıda) kendi yazı animasyonuyla gelir, seçilince o animasyon seçilir.
+   * Meta: kategori (KATEGORILER kimliği), aciklama (tek kısa Türkçe satır), marka (yalnız Marka görünümlerinde true).
    * kase / punct: yazım biçimi ve noktalama (Altyazı ayarları), görünüm seçilince onlar da dolar (3.2'nin
    * noktalamasız stillerinin yerini alan Vurucu / Canlı / Glitch noktalamasız).
    * Her görünüm her alanı VARSAYILAN sırasıyla taşır (normalize'dan aynen geçer). Adım 17: Vurucu sert,
    * Zarif yumuşak gölgeli; "Kutulu" yarı saydam arka plan kutusu (konturusuz, okunur).
    */
   var GORUNUMLER = [
-    { id: "temiz", ad: "Temiz", ayar: {
+    { id: "temiz", ad: "Temiz", kategori: "minimal", aciklama: "Beyaz yazı, ince siyah kontur, sarı vurgu: her videoya uyan sade başlangıç.", ayar: {
       giris: "fade", aktif: "yok", vurgu: true, vurguRenk: "#ffd23f", renk: "#ffffff", font: "Montserrat",
       kalin: true, italik: false, boyut: 76, kontur: 5, konturRenk: "#000000", konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
-    { id: "vurucu", ad: "Vurucu", ayar: {
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
+    { id: "vurucu", ad: "Vurucu", kategori: "viral", aciklama: "Büyük harf, kalın kontur ve sert gölge; konuşulan kelime zıplar.", ayar: {
       giris: "pop", aktif: "zipla", vurgu: true, vurguRenk: "#ffe600", renk: "#ffffff", font: "Anton",
       kalin: true, italik: false, boyut: 112, kontur: 8, konturRenk: "#000000", konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false,
-      golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
-    { id: "canli", ad: "Canlı", ayar: {
+      golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
+    { id: "canli", ad: "Canlı", kategori: "viral", aciklama: "Kalın harfler, pembe vurgu, zıplayarak gelen kelimeler.", ayar: {
       giris: "zipla", aktif: "zipla", vurgu: true, vurguRenk: "#ff5fa2", renk: "#ffffff", font: "Archivo Black",
       kalin: true, italik: false, boyut: 92, kontur: 6, konturRenk: "#16121f", konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
-    { id: "zarif", ad: "Zarif", ayar: {
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
+    { id: "zarif", ad: "Zarif", kategori: "sinematik", aciklama: "Serif yazı, altın vurgu ve yumuşak gölge; aşağıdan süzülür.", ayar: {
       giris: "yukari", aktif: "yok", vurgu: true, vurguRenk: "#e3c27a", renk: "#f7f3ea", font: "Lora",
       kalin: false, italik: false, boyut: 70, kontur: 2, konturRenk: "#0b0b0d", konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true,
-      golge: { renk: "#000000", opak: 60, mesafe: 3, yumusak: 10 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } },
-    { id: "kutulu", ad: "Kutulu", ayar: {
+      golge: { renk: "#000000", opak: 60, mesafe: 3, yumusak: 10 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
+    { id: "kutulu", ad: "Kutulu", kategori: "podcast", aciklama: "Yarı saydam koyu kutuda kontursuz yazı; uzun konuşmada rahat okunur.", ayar: {
       giris: "fade", aktif: "yok", vurgu: true, vurguRenk: "#ffd23f", renk: "#ffffff", font: "Montserrat",
       kalin: true, italik: false, boyut: 64, kontur: 0, konturRenk: "#000000", konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true,
-      golge: null, kutu: true, kutuRenk: "#000000", kutuOpak: 65, konumX: null, konumY: null } },
-    { id: "glitch", ad: "Glitch", ayar: {
+      golge: null, kutu: true, kutuRenk: "#000000", kutuOpak: 65, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } },
+    { id: "glitch", ad: "Glitch", kategori: "viral", aciklama: "Tek satır dar harfler, camgöbeği vurgu ve glitch titreşimi.", ayar: {
       giris: "asagi", aktif: "glitch", vurgu: true, vurguRenk: "#2af5ff", renk: "#ffffff", font: "Bebas Neue",
       kalin: true, italik: false, boyut: 118, kontur: 3, konturRenk: "#0b1020", konum: 5, satir: 1, kelime: 3, kase: "upper", punct: false,
-      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } }
+      golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "", vurguKutuRenk: null, vurguRenk2: null } }
   ];
+
+  /*
+   * Stil kütüphanesi (parti 3): kategoriler ve 24 özgün hazır görünüm. Hepsi Suflo'nun kendi adı, rengi ve fikridir;
+   * hiçbir üçüncü taraf ön ayarı, şablonu ya da üreticisi taklit edilmedi. Hepsi düz "efekt" ayarıdır: önizlemek ve
+   * düzenlemek ücretsiz, timeline'a eklemek her görünümde olduğu gibi Pro.gate("overlay", { deneme: true }).
+   * Meta alanlar (kategori, aciklama, marka) görünüm kaydında durur, ayar'a girmez (normalize / stil kodu / tercih bilmez).
+   * Tipografi kuralları (tests/test-altyazi-efekt.js denetler): yalnız büyük harfli görüntü fontları (Anton, Bebas Neue,
+   * Bungee, Bangers) kase "upper" ile; yazı ile kontur / kutu (ikisi de yoksa gölge) arasında WCAG kontrastı ≥ 4,5;
+   * vurgu rengi yazı renginden stil motorunun renk uzaklığıyla belirgin; punto 56-130 (1080 tabanı); viral 1-2 satır,
+   * ≤ 4 kelime; podcast ve eğitim 2 satır, 5-7 kelime; her font Türkçe harflerin tamamını içerir.
+   * Yazı animasyonlu görünümlerde giris / aktif katalogdaki en yakın klasik çifttir (Premiere yerel çıktı, After
+   * Effects, eski paneller ve stil kodunun klasik karşılığı onu çizer).
+   * Marka görünümleri (marka: true) nötr varsayılanlarla gelir; Marka Kiti açıkken her görünüm gibi kitin yazı tipi,
+   * renkleri ve konumuyla uygulanır (captions.js gorunumUygula → mergeBrandKit), çipleri kitin örneğini gösterir.
+   */
+  var KATEGORILER = [
+    { id: "viral", ad: "Viral · Shorts" },
+    { id: "minimal", ad: "Minimal" },
+    { id: "podcast", ad: "Podcast" },
+    { id: "egitim", ad: "Eğitim" },
+    { id: "sinematik", ad: "Sinematik" },
+    { id: "marka", ad: "Marka" },
+    // AutoCaptions koleksiyonu (aşağıda; yazarın izniyle)
+    { id: "autocaptions", ad: "AutoCaptions" }
+  ];
+  // Kütüphane kaydı → tam ayar (VARSAYILAN alan sırasıyla; verilmeyen alan: gölge yok, kutu kapalı, serbest konum yok, klasik)
+  var AYAR_SIRASI = ["giris", "aktif", "vurgu", "vurguRenk", "renk", "font", "kalin", "italik", "boyut", "kontur", "konturRenk", "konum",
+    "satir", "kelime", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY", "anim", "vurguKutuRenk", "vurguRenk2"];
+  var KUTUPHANE_TABAN = { vurgu: true, italik: false, golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null, anim: "",
+    vurguKutuRenk: null, vurguRenk2: null };
+  function kutuphaneKaydi(id, ad, kategori, aciklama, a, ek) {
+    var ayar = {};
+    AYAR_SIRASI.forEach(function (k) { ayar[k] = Object.prototype.hasOwnProperty.call(a, k) ? a[k] : KUTUPHANE_TABAN[k]; });
+    var g = { id: id, ad: ad, kategori: kategori, aciklama: aciklama, ayar: ayar };
+    if (ek && ek.marka === true) g.marka = true;
+    return g;
+  }
+  function golgeAyari(renk, opak, mesafe, yumusak) { return { renk: renk, opak: opak, mesafe: mesafe, yumusak: yumusak }; }
+  var KUTUPHANE = [
+    /* Viral · Shorts */
+    kutuphaneKaydi("patlama", "Patlama", "viral", "Çizgi roman harfleri ve turuncu vurgu; her kelime söylendiği an patlar.", {
+      giris: "pop", aktif: "yok", vurguRenk: "#ff7a1a", renk: "#ffffff", font: "Bangers", kalin: true, boyut: 108, kontur: 7, konturRenk: "#1a0b2e",
+      konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false, golge: golgeAyari("#1a0b2e", 80, 6, 0), anim: "kelime-pop" }),
+    kutuphaneKaydi("neon-gece", "Neon Gece", "viral", "Mor ışıltılı gölge, neon yeşili vurgu; konuşulan kelime nabız gibi atar.", {
+      giris: "yok", aktif: "zipla", vurguRenk: "#39ff88", renk: "#f2fbff", font: "Exo 2", kalin: true, boyut: 96, kontur: 4, konturRenk: "#140a33",
+      konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false, golge: golgeAyari("#7a2cff", 70, 0, 12), anim: "olcek-darbe" }),
+    kutuphaneKaydi("seker", "Şeker", "viral", "Yuvarlak kalın harfler, mürdüm kontur ve limon vurgu; kelimeler sekerek gelir.", {
+      giris: "asagi", aktif: "yok", vurguRenk: "#ffe14a", renk: "#ffffff", font: "Nunito", kalin: true, boyut: 98, kontur: 6, konturRenk: "#7a1146",
+      konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, anim: "zipla-gel" }),
+    kutuphaneKaydi("turbo", "Turbo", "viral", "Tek satır, eğik dar harfler ve kırmızı vurgu; hızlı kurgulara.", {
+      giris: "yukari", aktif: "titre", vurguRenk: "#ff2e4d", renk: "#ffffff", font: "Bebas Neue", kalin: true, italik: true, boyut: 124, kontur: 5,
+      konturRenk: "#000000", konum: 5, satir: 1, kelime: 2, kase: "upper", punct: false, golge: golgeAyari("#000000", 90, 8, 0) }),
+    kutuphaneKaydi("sokak", "Sokak", "viral", "Geniş blok harfler ve camgöbeği vurgu; kelimeler dalga gibi akar.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#00d1ff", renk: "#fff7e0", font: "Bungee", kalin: true, boyut: 84, kontur: 6, konturRenk: "#111111",
+      konum: 2, satir: 2, kelime: 2, kase: "upper", punct: false, golge: golgeAyari("#000000", 70, 4, 2), anim: "dalga" }),
+    /* Minimal */
+    kutuphaneKaydi("sade-beyaz", "Sade Beyaz", "minimal", "Yalnız beyaz yazı ve hafif gölge; vurgu yok, dikkat görüntüde kalır.", {
+      giris: "fade", aktif: "yok", vurgu: false, vurguRenk: "#ffcf5c", renk: "#ffffff", font: "Inter", kalin: true, boyut: 68, kontur: 3,
+      konturRenk: "#000000", konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true, golge: golgeAyari("#000000", 55, 2, 6) }),
+    kutuphaneKaydi("ince-cizgi", "İnce Çizgi", "minimal", "İnce harfler, nane yeşili vurgu; harfler sırayla belirir.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#7fe0c4", renk: "#ffffff", font: "Montserrat", kalin: false, boyut: 64, kontur: 2, konturRenk: "#111111",
+      konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true, golge: golgeAyari("#000000", 60, 2, 8), anim: "harf-belir" }),
+    kutuphaneKaydi("kagit", "Kâğıt", "minimal", "Krem kutuda koyu mürekkep yazı ve kiremit vurgu; açık sahnelerde de okunur.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#c2410c", renk: "#1d1b16", font: "Poppins", kalin: true, boyut: 62, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true, kutu: true, kutuRenk: "#f5efe1", kutuOpak: 92 }),
+    kutuphaneKaydi("nefes", "Nefes", "minimal", "Kontursuz yumuşak yazı, geniş hale gölge; kelimeler yukarı süzülür.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#8fd0ff", renk: "#fbfbf8", font: "Nunito", kalin: false, boyut: 66, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true, golge: golgeAyari("#000000", 75, 0, 14), anim: "yukari-suzul" }),
+    /* Podcast */
+    kutuphaneKaydi("studyo", "Stüdyo", "podcast", "Lacivert kutu, kehribar vurgu; uzun sohbetlerde gözü yormaz.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#ffb547", renk: "#ffffff", font: "Inter", kalin: true, boyut: 60, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true, kutu: true, kutuRenk: "#1b1f2a", kutuOpak: 78 }),
+    kutuphaneKaydi("sohbet", "Sohbet", "podcast", "Yuvarlak harfler ve nane vurgu; konuşulan kelime renge yumuşakça geçer.", {
+      giris: "yok", aktif: "yok", vurguRenk: "#6ee7b7", renk: "#ffffff", font: "Nunito", kalin: true, boyut: 66, kontur: 4, konturRenk: "#23202b",
+      konum: 2, satir: 2, kelime: 7, kase: "normal", punct: true, golge: golgeAyari("#000000", 50, 2, 6), anim: "renk-gecis" }),
+    kutuphaneKaydi("gece-yayini", "Gece Yayını", "podcast", "Gece mavisi kutu ve lavanta vurgu; satırlar aşağıdan kayar.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#b69cff", renk: "#eef2ff", font: "Poppins", kalin: true, boyut: 62, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true, kutu: true, kutuRenk: "#0d0b1f", kutuOpak: 70 }),
+    kutuphaneKaydi("mikrofon", "Mikrofon", "podcast", "Koyu lacivert kontur, mercan vurgu; konuşulan kelime hafifçe zıplar.", {
+      giris: "pop", aktif: "zipla", vurguRenk: "#ff6b5e", renk: "#ffffff", font: "Montserrat", kalin: true, boyut: 70, kontur: 6, konturRenk: "#0f172a",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true }),
+    /* Eğitim */
+    kutuphaneKaydi("ders-notu", "Ders Notu", "egitim", "Lacivert kutuda net yazı, sarı vurgu; anahtar terimler öne çıkar.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#ffd166", renk: "#ffffff", font: "Poppins", kalin: true, boyut: 60, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true, kutu: true, kutuRenk: "#1e3a5f", kutuOpak: 85 }),
+    kutuphaneKaydi("tebesir", "Tebeşir", "egitim", "Yeşil tahta kutusu, tebeşir beyazı ve pembe vurgu; kelimeler harf harf yazılır.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#ff9ec4", renk: "#f4f1e8", font: "Nunito", kalin: true, boyut: 62, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true, kutu: true, kutuRenk: "#1f3d2b", kutuOpak: 88, anim: "daktilo" }),
+    // Parti 5: konuşulan kelime fosforlu kalemle işaretlenmiş gibi (vurgu kutusu; kutudaki yazı kontrast renginde siyah)
+    kutuphaneKaydi("vurgu-kalemi", "Vurgu Kalemi", "egitim", "Beyaz yazı, fosforlu limon vurgu: önemli kelime işaretlenmiş gibi.", {
+      giris: "yok", aktif: "yok", vurguRenk: "#d4ff3a", renk: "#ffffff", font: "Inter", kalin: true, boyut: 68, kontur: 5, konturRenk: "#111111",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true, anim: "vurgu-kutusu" }),
+    kutuphaneKaydi("formul", "Formül", "egitim", "Teknik harfler, koyu kutu ve turkuaz vurgu; kart netleşerek belirir.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#5eead4", renk: "#e8f1ff", font: "Chakra Petch", kalin: true, boyut: 58, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 7, kase: "normal", punct: true, kutu: true, kutuRenk: "#101828", kutuOpak: 80, anim: "netles" }),
+    /* Sinematik */
+    kutuphaneKaydi("jenerik", "Jenerik", "sinematik", "Büyük harf serif, geniş aralıktan kapanan harfler; film açılışı gibi.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#d9b46a", renk: "#f5f1e6", font: "Libre Caslon Display", kalin: false, boyut: 74, kontur: 1,
+      konturRenk: "#000000", konum: 2, satir: 2, kelime: 6, kase: "upper", punct: true, golge: golgeAyari("#000000", 65, 2, 12), anim: "aralik-acil" }),
+    kutuphaneKaydi("altin-saat", "Altın Saat", "sinematik", "Eğik serif, sıcak krem yazı ve kehribar vurgu; gün batımı tonu.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#ffb347", renk: "#fff4e0", font: "Lora", kalin: false, italik: true, boyut: 72, kontur: 2,
+      konturRenk: "#2a1606", konum: 2, satir: 2, kelime: 6, kase: "normal", punct: true, golge: golgeAyari("#3a1d00", 60, 3, 10) }),
+    kutuphaneKaydi("belgesel-bandi", "Belgesel Bandı", "sinematik", "Alt solda yarı saydam bant; kart yandan kayarak gelir.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#f0c419", renk: "#ffffff", font: "Inter", kalin: true, boyut: 58, kontur: 0, konturRenk: "#000000",
+      konum: 1, satir: 2, kelime: 6, kase: "normal", punct: true, kutu: true, kutuRenk: "#000000", kutuOpak: 55, anim: "yandan-kay" }),
+    kutuphaneKaydi("sessiz-film", "Sessiz Film", "sinematik", "Siyah ara yazı kartında büyük harf serif; renk yok, yalnız gri vurgu.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#9e9e9e", renk: "#f2f2f2", font: "Libre Caslon Display", kalin: false, boyut: 66, kontur: 0,
+      konturRenk: "#000000", konum: 5, satir: 2, kelime: 5, kase: "upper", punct: true, kutu: true, kutuRenk: "#0a0a0a", kutuOpak: 90 }),
+    /* Marka: Marka Kiti açıkken yazı tipi, renkler ve konum kitten */
+    kutuphaneKaydi("marka-sade", "Marka · Sade", "marka", "Kitinin yazı tipi ve renkleriyle sade altyazı; kit kapalıyken nötr.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#8b7cf6", renk: "#ffffff", font: "Montserrat", kalin: true, boyut: 72, kontur: 4, konturRenk: "#111111",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true }, { marka: true }),
+    kutuphaneKaydi("marka-vurgulu", "Marka · Vurgulu", "marka", "Kitinin vurgu rengiyle iri, zıplayan kelimeler; kit kapalıyken sarı.", {
+      giris: "pop", aktif: "zipla", vurguRenk: "#ffcc00", renk: "#ffffff", font: "Poppins", kalin: true, boyut: 96, kontur: 6, konturRenk: "#000000",
+      konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false, golge: golgeAyari("#000000", 80, 5, 0) }, { marka: true }),
+    kutuphaneKaydi("marka-kutulu", "Marka · Kutulu", "marka", "Koyu kutuda kitinin yazı tipi; kit kapalıyken mavi vurgu.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#4cc9f0", renk: "#ffffff", font: "Inter", kalin: true, boyut: 62, kontur: 0, konturRenk: "#000000",
+      konum: 2, satir: 2, kelime: 5, kase: "normal", punct: true, kutu: true, kutuRenk: "#111111", kutuOpak: 75 }, { marka: true })
+  ];
+
+  /*
+   * AutoCaptions koleksiyonu (kategori "autocaptions", koleksiyon: "autocaptions"). ClashiVFX AutoCaptions eklentisinin
+   * yazı stilleri, yazarın izniyle Suflo'nun "efekt" motorunda yeniden kuruldu: renkler eklentinin önizleme görsellerinden,
+   * gölge / ışıltı / degrade değerleri stil ön ayarlarından (Styles (After Effects)/*.style.json) okundu. Eklentinin kodu,
+   * .ffx / .mogrt / .prfpset dosyaları ve lisans bileşeni alınmadı. Motorun karşılığı olmayanlar yaklaşık:
+   *   ışıltı (Glow)   → renkli, mesafesiz, yumuşak gölge (hale)
+   *   degrade (Ramp)  → iki tonlu vurgu (iki-ton) ya da açık-koyu yazı + yumuşak gölge
+   *   el yazısı fontlar (Azul, Rosa, Lima Viva, Editorial) → paketteki eğik serif (Lora / Libre Caslon Display)
+   *   Paper Wiggle'ın sürekli titreşimi → konuşulan kelimede Sallanma
+   * Önizlemek ve düzenlemek ücretsiz; timeline'a eklemek her görünümde olduğu gibi Pro.gate("overlay", { deneme: true }).
+   * Eklentideki "Simple", "Blanco con sombra", "Glitch", "Outline / Stroke", "Type Writer" ve "Different" Suflo'da
+   * zaten var (Temiz, Sade Beyaz, Glitch, Vurucu, Tebeşir / Daktilo animasyonu); tekrar eklenmedi.
+   */
+  function ac(id, ad, aciklama, a) { var g = kutuphaneKaydi(id, ad, "autocaptions", aciklama, a); g.koleksiyon = "autocaptions"; return g; }
+  function hale(renk, opak, yumusak) { return golgeAyari(renk, opak, 0, yumusak); }
+  var AUTOCAPTIONS = [
+    ac("ac-azul", "Azul", "Eğik serif mavi yazı ve mavi ışıltı; yumuşak kayışla gelir.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#ffffff", renk: "#4d8dff", font: "Lora", kalin: true, italik: true, boyut: 84, kontur: 3,
+      konturRenk: "#050b24", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#1f5bff", 85, 16), anim: "yumusak-kay" }),
+    ac("ac-celeste", "Celeste", "Açık camgöbeği kalın yazı, camgöbeği hale; sıcak sarı vurgu.", {
+      giris: "pop", aktif: "zipla", vurguRenk: "#ffd23f", renk: "#7af7ff", font: "Montserrat", kalin: true, boyut: 88, kontur: 4,
+      konturRenk: "#002a33", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#00c8ff", 80, 14) }),
+    ac("ac-rojo", "Rojo", "Kırmızı kalın yazı ve kırmızı ışıltı; konuşulan kelime beyaz parlar.", {
+      giris: "pop", aktif: "zipla", vurguRenk: "#ffffff", renk: "#ff5252", font: "Montserrat", kalin: true, boyut: 88, kontur: 4,
+      konturRenk: "#2a0000", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#ff1a1a", 80, 14) }),
+    ac("ac-rosa", "Rosa", "Eğik serif pembe yazı, pembe hale; kart bulanıktan kayarak netleşir.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#ffffff", renk: "#ff66f2", font: "Lora", kalin: true, italik: true, boyut: 84, kontur: 3,
+      konturRenk: "#2a0026", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#e01bd6", 80, 16), anim: "bulanik-kay" }),
+    ac("ac-verde", "Verde", "Yeşil kalın yazı ve yeşil ışıltı; konuşulan kelime beyaz parlar.", {
+      giris: "pop", aktif: "zipla", vurguRenk: "#ffffff", renk: "#4cf04c", font: "Montserrat", kalin: true, boyut: 88, kontur: 4,
+      konturRenk: "#002400", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#12c912", 80, 14) }),
+    ac("ac-naranja", "Naranja", "Turuncu kalın yazı ve turuncu ışıltı; kart sıcak bir parıltıyla kayar.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#ffffff", renk: "#ff8a3d", font: "Montserrat", kalin: true, boyut: 88, kontur: 4,
+      konturRenk: "#2b0f00", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#ff4d00", 80, 14), anim: "isilti-kay" }),
+    ac("ac-arcoiris", "Arcoíris", "Gökkuşağı tonları: turuncu yazı, sarı ve mavi vurgular sırayla.", {
+      giris: "yok", aktif: "yok", vurguRenk: "#ffe94a", renk: "#ff6a2b", font: "Archivo Black", kalin: true, boyut: 90, kontur: 5,
+      konturRenk: "#1a0800", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#ff3b00", 70, 12), anim: "iki-ton" }),
+    ac("ac-sombra-degradada", "Sombra Degradada", "Beyazdan griye inen yazı hissi, yumuşak koyu gölge; sade ve ağır.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#9a9a9a", renk: "#f4f4f4", font: "Montserrat", kalin: true, boyut: 96, kontur: 0,
+      konturRenk: "#000000", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: golgeAyari("#000000", 80, 6, 12), anim: "yumusak-kay" }),
+    ac("ac-violeta", "Violeta Enfocada", "Mor kalın yazı ve geniş mor ışıltı; konuşulan kelime beyaz.", {
+      giris: "pop", aktif: "yok", vurguRenk: "#ffffff", renk: "#c45cff", font: "Archivo Black", kalin: true, boyut: 86, kontur: 4,
+      konturRenk: "#14001f", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#9c0cfc", 90, 20) }),
+    ac("ac-lima", "Lima Viva", "Eğik serif lime yeşili yazı, yeşil hale; kart bir kez kırpışarak kayar.", {
+      giris: "yukari", aktif: "yok", vurguRenk: "#ffffff", renk: "#5cf26e", font: "Lora", kalin: false, italik: true, boyut: 86, kontur: 3,
+      konturRenk: "#002408", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#1fd13a", 80, 14), anim: "titrek-kay" }),
+    ac("ac-editorial", "Editorial", "Dergi kapağı gibi eğik serif, pembe-mor ışıltı; kart büyükten oturur.", {
+      giris: "pop", aktif: "yok", vurguRenk: "#ffffff", renk: "#f27aff", font: "Libre Caslon Display", kalin: false, italik: true, boyut: 90, kontur: 3,
+      konturRenk: "#24002a", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#c21bd6", 80, 16), anim: "yakinlas" }),
+    ac("ac-aura", "Aura", "Buz mavisi yazı ve geniş camgöbeği hale; sarı vurgu.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#ffd23f", renk: "#b0fcff", font: "Montserrat", kalin: true, boyut: 86, kontur: 3,
+      konturRenk: "#00262b", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#39e6ff", 85, 22) }),
+    ac("ac-shine", "Shine", "Altın sarısı yazı ve turuncu parıltı; konuşulan kelime beyaz.", {
+      giris: "pop", aktif: "zipla", vurguRenk: "#ffffff", renk: "#ffb020", font: "Montserrat", kalin: true, boyut: 88, kontur: 4,
+      konturRenk: "#2b1600", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#ff7a00", 85, 16) }),
+    ac("ac-funk", "Funk", "Mavi blok harfler ve koyu mavi sert gölge; kart esneyerek gelir.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#ffffff", renk: "#33b4ff", font: "Archivo Black", kalin: true, boyut: 76, kontur: 4,
+      konturRenk: "#041a4d", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: golgeAyari("#0a3cbf", 100, 8, 0), anim: "esnet" }),
+    ac("ac-gradient", "Gradient", "Gümüş tonlu yazı, ince koyu kontur ve yumuşak gölge; sarı vurgu.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#ffd23f", renk: "#e3e3e3", font: "Montserrat", kalin: true, boyut: 90, kontur: 2,
+      konturRenk: "#151515", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: golgeAyari("#000000", 60, 5, 14) }),
+    ac("ac-dort-renk", "4 Color Gradient", "Pastel camgöbeği yazı; pembe ve yeşil vurgular sırayla, beyaz hale.", {
+      giris: "yok", aktif: "yok", vurguRenk: "#ff7af5", renk: "#8af5ff", font: "Montserrat", kalin: true, boyut: 88, kontur: 4,
+      konturRenk: "#0b1a2b", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: hale("#ffffff", 55, 18), anim: "iki-ton" }),
+    ac("ac-light-sweep", "Light Sweep", "Açık mavi yazı, mavi kontur; konuşulan kelimede ışık nabzı.", {
+      giris: "yok", aktif: "yok", vurguRenk: "#ffd23f", renk: "#c4e8ff", font: "Montserrat", kalin: true, boyut: 86, kontur: 4,
+      konturRenk: "#1d36d6", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, anim: "parlama" }),
+    ac("ac-paper-wiggle", "Paper Wiggle", "Yuvarlak beyaz harfler, kâğıt gibi koyu kontur; konuşulan kelime sallanır.", {
+      giris: "yok", aktif: "titre", vurguRenk: "#ffd23f", renk: "#ffffff", font: "Nunito", kalin: true, boyut: 86, kontur: 5,
+      konturRenk: "#1c1c1c", konum: 5, satir: 2, kelime: 3, kase: "normal", punct: false, golge: golgeAyari("#000000", 60, 4, 4), anim: "sallanma" }),
+    ac("ac-text-box", "Text Box", "Dolu mavi kutuda büyük harf beyaz yazı; sarı vurgu, sağdan kayar.", {
+      giris: "fade", aktif: "yok", vurguRenk: "#ffe14a", renk: "#ffffff", font: "Montserrat", kalin: true, boyut: 80, kontur: 0,
+      konturRenk: "#000000", konum: 5, satir: 2, kelime: 3, kase: "upper", punct: false, kutu: true, kutuRenk: "#0b3cff", kutuOpak: 100, anim: "sagdan-kay" })
+  ];
+  KUTUPHANE = KUTUPHANE.concat(AUTOCAPTIONS);
+  // İlk altı görünüm aynı sırada başta kalır (temiz 0. dizin: stil motorunun efekt varsayılanı)
+  GORUNUMLER = GORUNUMLER.concat(KUTUPHANE);
 
   /*
    * Eski stil kimliği → en yakın görünüm. 3.2'nin kutulu stilleri (Clean Pill, SaaS Glass ve Belgesel: metnin
@@ -148,6 +353,12 @@
     var out = kopya(t);
     if (own(a, "giris") && idler(GIRISLER).indexOf(a.giris) !== -1) out.giris = a.giris;
     if (own(a, "aktif") && idler(AKTIFLER).indexOf(a.aktif) !== -1) out.aktif = a.aktif;
+    // Yazı animasyonu: katalog kimliği ya da "" (klasik); bilinmeyen kimlik tabanda kalır
+    if (own(a, "anim") && (a.anim === "" || animKaydi(a.anim))) out.anim = a.anim;
+    // Parti 5: vurgu kutusu rengi ve ikinci vurgu rengi: null (türetilir) ya da #rrggbb; bozuk değer tabanda kalır
+    ["vurguKutuRenk", "vurguRenk2"].forEach(function (k) {
+      if (own(a, k) && (a[k] === null || (typeof a[k] === "string" && RENK.test(a[k])))) out[k] = a[k] === null ? null : a[k].toLowerCase();
+    });
     ["vurgu", "kalin", "italik"].forEach(function (k) { if (own(a, k) && typeof a[k] === "boolean") out[k] = a[k]; });
     ["vurguRenk", "renk", "konturRenk"].forEach(function (k) { if (own(a, k) && typeof a[k] === "string" && RENK.test(a[k])) out[k] = a[k].toLowerCase(); });
     if (own(a, "font") && FONTLAR.indexOf(a.font) !== -1) out.font = a.font;
@@ -181,6 +392,8 @@
   }
 
   function kirp(n, ar) { return Math.max(ar[0], Math.min(ar[1], Math.round(n))); }
+  // Katalogdaki yazı animasyonu kaydı ya da null ("" / bilinmeyen / katalog yüklenmedi)
+  function animKaydi(id) { return YA && YA.bul && typeof id === "string" && id ? YA.bul(id) : null; }
   function golgeNormalize(g) {
     var out = kopya(GOLGE_VARSAYILAN);
     if (typeof g.renk === "string" && RENK.test(g.renk)) out.renk = g.renk.toLowerCase();
@@ -191,11 +404,50 @@
   // Stil motoruna / SFL1 koduna giden ince ayar (kase / punct metin kuralıdır, buraya girmez; guvenli çağıranın)
   function overrides(ayar) {
     var n = normalize(ayar);
-    return {
+    var o = {
       font: n.font, renk: n.renk, konturRenk: n.konturRenk, vurguRenk: n.vurguRenk, boyut: n.boyut, kontur: n.kontur, konum: n.konum,
       giris: n.giris, aktif: n.aktif, vurgu: n.vurgu, kalin: n.kalin, italik: n.italik, satir: n.satir, kelime: n.kelime,
       golge: n.golge ? kopya(n.golge) : null, kutu: n.kutu, kutuRenk: n.kutuRenk, kutuOpak: n.kutuOpak, konumX: n.konumX, konumY: n.konumY
     };
+    // Yazı animasyonu yalnız seçiliyse (klasikte alan hiç yok: stil motoru / SFL1 / Shorts paketi çıktısı aynı)
+    if (n.anim) o.anim = n.anim;
+    // Parti 5 renkleri yalnız elle seçildiyse (null = türetilir; alan yok, eski çıktı / kod aynı)
+    if (n.vurguKutuRenk) o.vurguKutuRenk = n.vurguKutuRenk;
+    if (n.vurguRenk2) o.vurguRenk2 = n.vurguRenk2;
+    return o;
+  }
+
+  /*
+   * Parti 5: animasyonun kullandığı ek renk alanları (panel renk seçicilerini yalnız bunlar için gösterir) ve geçerli
+   * renkleri: vurguKutuRenk boşsa vurgu rengi, vurguRenk2 boşsa vurgu renginin karşıtı (yazi-animasyonlari ikinciVurgu).
+   */
+  function renkAlanlari(ayar) {
+    var n = normalize(ayar);
+    return n.anim && YA && YA.renkAlanlari ? YA.renkAlanlari(n.anim) : [];
+  }
+  function gecerliRenkler(ayar) {
+    var n = normalize(ayar);
+    return { vurguKutuRenk: n.vurguKutuRenk || n.vurguRenk,
+      vurguRenk2: n.vurguRenk2 || (YA && YA.ikinciVurgu ? YA.ikinciVurgu(n.vurguRenk) : n.vurguRenk) };
+  }
+
+  /*
+   * Yazı animasyonunun en yakın klasik karşılığı (animasyon motoru v2). Premiere yerel çıktının sözleşmesi (textAnim 0-5,
+   * hlAnim 0-3), After Effects planı ve eski paneller yazı animasyonunu bilmez: ayar giriş / vurgu animasyonu katalogdaki
+   * klasik çiftle, anim "" olarak döner. anim yoksa normalize(ayar) aynen.
+   */
+  function klasikAyar(ayar) {
+    var n = normalize(ayar), k = animKaydi(n.anim);
+    if (k) { n.giris = k.klasik.giris; n.aktif = k.klasik.aktif; }
+    n.anim = "";
+    return n;
+  }
+  // Seçili yazı animasyonu: { id, ad, klasik: { giris, aktif }, girisAd, aktifAd } ya da null (klasik)
+  function animasyonu(ayar) {
+    var k = animKaydi(normalize(ayar).anim);
+    if (!k) return null;
+    function ad(liste, id) { for (var i = 0; i < liste.length; i++) if (liste[i].id === id) return liste[i].ad; return id; }
+    return { id: k.id, ad: k.ad, klasik: kopya(k.klasik), girisAd: ad(GIRISLER, k.klasik.giris), aktifAd: ad(AKTIFLER, k.klasik.aktif) };
   }
 
   function eskiGorunum(styleId) {
@@ -227,6 +479,9 @@
     delete n.kase;
     delete n.punct;
     if (!n.kutu) { delete n.kutuRenk; delete n.kutuOpak; }
+    // Parti 5 renkleri yalnız onları kullanan animasyonda görünür
+    var ra = renkAlanlari(n);
+    ["vurguKutuRenk", "vurguRenk2"].forEach(function (k) { if (ra.indexOf(k) === -1) delete n[k]; });
     return JSON.stringify(n).toLowerCase();
   }
   function gorunumuBul(ayar) {
@@ -393,8 +648,9 @@
     return n.kalin && e.b ? e.b : e.n;
   }
 
+  // Yazı animasyonu seçiliyse en yakın klasik çift (klasikAyar): sözleşme yalnız textAnim 0-5 / hlAnim 0-3 bilir
   function sablonIndeksleri(ayar) {
-    var n = normalize(ayar);
+    var n = klasikAyar(ayar);
     return { textAnim: Math.max(0, idler(GIRISLER).indexOf(n.giris)), hlAnim: Math.max(0, idler(AKTIFLER).indexOf(n.aktif)) };
   }
 
@@ -413,11 +669,23 @@
     return [rgb(n.vurgu ? n.vurguRenk : n.renk), rgb(n.renk), sablonFontu(n), Math.round(n.boyut * olcek), kontur, golge, kutu, ind.textAnim, ind.hlAnim];
   }
 
+  /*
+   * Kategoriye göre gruplar (Shorts paketi optgroup'ları, galeri sekmeleri): [{ id, ad, gorunumler: [{ id, ad }] }]
+   * KATEGORILER sırasıyla, her grupta GORUNUMLER sırası; boş grup yok. Kategorisi bilinmeyen görünüm (olmamalı) dışarıda.
+   */
+  function gruplar() {
+    return KATEGORILER.map(function (k) {
+      return { id: k.id, ad: k.ad, gorunumler: GORUNUMLER.filter(function (g) { return g.kategori === k.id; }).map(function (g) { return { id: g.id, ad: g.ad }; }) };
+    }).filter(function (k) { return k.gorunumler.length > 0; });
+  }
+
   return {
     STIL: STIL,
     GIRISLER: kopya(GIRISLER),
     AKTIFLER: kopya(AKTIFLER),
     GORUNUMLER: kopya(GORUNUMLER),
+    KATEGORILER: kopya(KATEGORILER),
+    gruplar: gruplar,
     VARSAYILAN: kopya(VARSAYILAN),
     gorunum: gorunum,
     normalize: normalize,
@@ -425,6 +693,10 @@
     eskiGorunum: eskiGorunum,
     eskiStilden: eskiStilden,
     gorunumuBul: gorunumuBul,
+    klasikAyar: klasikAyar,
+    animasyonu: animasyonu,
+    renkAlanlari: renkAlanlari,
+    gecerliRenkler: gecerliRenkler,
     KONUM_NOKTALARI: kopya(KONUM_NOKTALARI),
     YAPISMA: YAPISMA,
     konumNoktasi: konumNoktasi,

@@ -114,7 +114,7 @@ ok("örnek klip varsa ffmpeg arkaya bırakılır", SO.kurulumSecenekleri({ model
 /* ---- Pro'ya bağlı yapay zekâ özellikleri ve metinler ---- */
 ok("Pro'ya bağlı AI özellikleri: Çeviri/SRT paketi translate, Viral/B-roll highlights; diğerleri ücretsiz",
   SO.aiProOzelligi("Çeviri") === "translate" && SO.aiProOzelligi("Çok dilli SRT paketi") === "translate" && SO.aiProOzelligi("Viral anlar") === "highlights" &&
-  SO.aiProOzelligi("B-roll önerileri") === "highlights" && SO.aiProOzelligi("AI metin kontrolü") === "" && SO.aiProOzelligi("Kanca önerileri") === "" && SO.aiProOzelligi("") === "");
+  SO.aiProOzelligi("B-roll önerileri") === "broll" && SO.aiProOzelligi("AI metin kontrolü") === "" && SO.aiProOzelligi("Kanca önerileri") === "" && SO.aiProOzelligi("") === "");
 ok("ücretsiz kullanıcıya çeviri/viral 'anahtarla çalışır' denmez, Pro olduğu söylenir",
   [SO.aiMetni(false, false), SO.aiMetni(false, true)].every(function (m) { return /^(AI metin kontrolü|Yapay zekâ açık: AI metin)/.test(m) && /Çeviri, viral anlar ve B-roll[^.]*Pro'da/.test(m); }));
 ok("Pro kullanıcıya tüm liste", /^Çeviri, AI metin kontrolü, viral anlar, B-roll/.test(SO.aiMetni(true, false)) && /çeviri/.test(SO.aiMetni(true, true)));
@@ -288,7 +288,7 @@ ok("anahtarKaydet: yerel motor hazırsa 'local' kalır, değilse groq; Ayarlar a
   /if \(!K\.whisperLocal\(\)\) s\.provider = "groq"/.test(ksGovde) && /set-apikey/.test(ksGovde) && /set-provider/.test(ksGovde) && /ayarDegisti\("anahtar"\)/.test(ksGovde));
 
 /* ================= 7) AI düğmeleri: Pro kapısı anahtar denetiminden ÖNCE ================= */
-[["js/viral.js", "Viral anlar", "highlights"], ["js/broll-ui.js", "B-roll önerileri", "highlights"], ["js/captions.js", "Çeviri", "translate"]].forEach(function (x) {
+[["js/viral.js", "Viral anlar", "highlights"], ["js/broll-ui.js", "B-roll önerileri", "broll"], ["js/captions.js", "Çeviri", "translate"]].forEach(function (x) {
   var src = fs.readFileSync(path.join(KOK, x[0]), "utf8");
   var istek = src.indexOf('KOnboarding.anahtarIste("' + x[1] + '")');
   var kapi = src.lastIndexOf('Pro.gate("' + x[2] + '"', istek);
@@ -399,6 +399,7 @@ function sahte(opts) {
     httpGet: function () { return Promise.resolve({ status: 200 }); },
     cs: { evalScript: function () { say.eval++; }, openURLInDefaultBrowser: function () {} }
   };
+  if (opts.host) K.hostKodu = function () { return opts.host; };
   var win = {
     K: K,
     KEngine: {
@@ -476,6 +477,19 @@ ok("rehber açıkken kurulum: Small, cuBLAS yok; örnek yokken ffmpeg önden", J
 var tCuda = sahte({ ayarVardi: false, model: true, build: "cuda" });
 tCuda.OB.init();
 ok("rehber kurulumu çalışan cuBLAS motorunu CPU'ya düşürmez", tCuda.OB.kurulumSecenekleri().useGpu === true, J(tCuda.OB.kurulumSecenekleri()));
+// İnceleme bulgusu: After Effects'te rehber açılıyordu; "Örnekte dene" engelli KS_importSample'ı çağırıyor, gizli Premiere
+// düğmelerini (#cap-apply) gösteriyordu. AE'de karar baştan "yok"; Ayarlar › Destek'ten de açılmaz
+var tAe = sahte({ ayarVardi: false, host: "AEFT" });
+tAe.OB.init();
+ok("After Effects (taze kurulum): rehber açılmaz, karar 'yok', kurulum kartı yerinde, Premiere'e çağrı yok", tAe.OB.karar() === "yok" &&
+  tAe.ogeler["ilk-adim"].hidden === true && tAe.ogeler["cap-setup"].parentNode !== tAe.ogeler["ia-motor-govde"] && tAe.say.call === 0 &&
+  !(tAe.ayarlar.onboarding && tAe.ayarlar.onboarding.surum), J({ karar: tAe.OB.karar(), gizli: tAe.ogeler["ilk-adim"].hidden }));
+tAe.OB.ac();
+ok("After Effects: 'Kurulum rehberini aç' rehberi açmaz, nedenini söyler", tAe.OB.karar() === "yok" && tAe.ogeler["ilk-adim"].hidden === true &&
+  tAe.say.toast.indexOf("Kurulum rehberi yalnız Premiere Pro'da.") !== -1 && !(tAe.ayarlar.onboarding && tAe.ayarlar.onboarding.surum), J(tAe.say.toast));
+var tPr = sahte({ ayarVardi: false, host: "PPRO" });
+tPr.OB.init();
+ok("Premiere (hostKodu PPRO): rehber eskisi gibi açılır", tPr.OB.karar() === "tam" && tPr.ogeler["ilk-adim"].hidden === false);
 ok("adım başlıkları klavyeyle açılan düğmeler: aria-expanded senkron", /<button type="button" class="ia-adim-bas" id="ia-motor-bas" aria-expanded="false"/.test(html) &&
   ["motor", "ornek", "stil", "ai"].every(function (ad) { return html.indexOf('id="ia-' + ad + '-bas"') > 0 && html.indexOf('id="ia-' + ad + '-govde"') > 0; }) &&
   t1.ogeler["ia-motor-bas"].getAttribute("aria-expanded") === "true" && t1.ogeler["ia-ai-bas"].getAttribute("aria-expanded") === "false");
@@ -747,7 +761,8 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     /* ================= 9) index.html / app.js bağlantıları ================= */
     var appSrc = fs.readFileSync(path.join(KOK, "js", "app.js"), "utf8");
     ok("app.js: rehber guvenli('Onboarding') ile başlar", /guvenli\("Onboarding", function \(\) \{ if \(window\.KOnboarding\) KOnboarding\.init\(\); \}\)/.test(appSrc));
-    ok("app.js: rehber tam kartken yenilikler penceresi açılmaz", /if \(rehber !== "tam"\) yenilikleriGoster\(\)/.test(appSrc));
+    ok("app.js: rehber tam kartken yenilikler penceresi açılmaz (After Effects'te hiç açılmaz: maddeleri gizli sekmelere gider)",
+      /if \(rehber !== "tam" && !aeMod\) yenilikleriGoster\(\)/.test(appSrc) && /var aeMod = window\.SufloAePanel && SufloAePanel\.aktif\(\);/.test(appSrc));
     var sira = ["js/captions.js", "js/onboarding-steps.js", "js/onboarding.js", "js/app.js"].map(function (f) { return html.indexOf('<script src="' + f + '"'); });
     ok("betik sırası: captions → onboarding-steps → onboarding → app", sira.every(function (x, i) { return x > 0 && (i === 0 || x > sira[i - 1]); }), J(sira));
     ok("kart Altyazı sekmesinin en üstünde, kurulum notundan önce", html.indexOf('id="ilk-adim"') > html.indexOf('id="tab-captions"') && html.indexOf('id="ilk-adim"') < html.indexOf('id="cap-setup"'));

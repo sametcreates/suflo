@@ -3,10 +3,10 @@
   "collection": "Suflo Pro — Full Animation Showcase",
   "creator": "sametcreates",
   "publicPreviewOnly": true,
-  "sourceFileCount": 262,
-  "uniqueItemCount": 242,
+  "sourceFileCount": 267,
+  "uniqueItemCount": 247,
   "groupCounts": {
-    "text": 84,
+    "text": 89,
     "other": 123,
     "buton": 35
   },
@@ -1998,6 +1998,51 @@
       "match": "SUFLO BUTON - Yükle.mogrt",
       "preview": "previews/242-yukle.webp",
       "video": "previews/242-yukle.webm"
+    },
+    {
+      "id": "243-highlighted-text",
+      "name": "Highlighted Text",
+      "category": "Highlight",
+      "group": "text",
+      "match": "AutoCaptions Titles/SUFLO MOGRT - Highlighted Text.mogrt",
+      "preview": "previews/243-highlighted-text.webp",
+      "video": "previews/243-highlighted-text.webm"
+    },
+    {
+      "id": "244-money-text-pro",
+      "name": "Money Text Pro",
+      "category": "Style",
+      "group": "text",
+      "match": "AutoCaptions Titles/SUFLO MOGRT - Money Text Pro.mogrt",
+      "preview": "previews/244-money-text-pro.webp",
+      "video": "previews/244-money-text-pro.webm"
+    },
+    {
+      "id": "245-cinematic-duo",
+      "name": "Cinematic Duo",
+      "category": "Style",
+      "group": "text",
+      "match": "AutoCaptions Titles/SUFLO MOGRT - Cinematic Duo.mogrt",
+      "preview": "previews/245-cinematic-duo.webp",
+      "video": "previews/245-cinematic-duo.webm"
+    },
+    {
+      "id": "246-comment-your-word",
+      "name": "Comment Your Word",
+      "category": "Social Comment",
+      "group": "text",
+      "match": "AutoCaptions Titles/SUFLO MOGRT - Comment Your Word.mogrt",
+      "preview": "previews/246-comment-your-word.webp",
+      "video": "previews/246-comment-your-word.webm"
+    },
+    {
+      "id": "247-apple-selection",
+      "name": "Apple Selection",
+      "category": "Highlight",
+      "group": "text",
+      "match": "AutoCaptions Titles/SUFLO MOGRT - Apple Selection.mogrt",
+      "preview": "previews/247-apple-selection.webp",
+      "video": "previews/247-apple-selection.webm"
     }
   ]
 }

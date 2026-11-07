@@ -164,10 +164,20 @@ function ffprobe(p) {
 }
 
 w.KShortsPaket.init();
+// Stil kütüphanesi (parti 3): hazır görünümler kategori <optgroup>'larında; seçenekler (değer ve sayı: 1 + GORUNUMLER) aynı
+var paketSecenekleri = [];
+DOM["cap-paket-stil"].childNodes.forEach(function (n) { if (n.tagName === "optgroup") n.childNodes.forEach(function (o) { paketSecenekleri.push(o); }); else paketSecenekleri.push(n); });
+var paketGruplari = DOM["cap-paket-stil"].childNodes.filter(function (n) { return n.tagName === "optgroup"; });
 ok("init: stil listesi Altyazı Efektleri (sekmedeki efekt + hazır görünümler), eski stil kartı yok, varsayılan sekmedeki efekt",
-  DOM["cap-paket-stil"].childNodes.length === 1 + w.SufloAltyaziEfekt.GORUNUMLER.length && DOM["cap-paket-stil"].childNodes[0].value === "panel" &&
-  DOM["cap-paket-stil"].childNodes.every(function (o) { return !w.SufloAltyaziEfekt.eskiGorunum(o.value); }) && DOM["cap-paket-stil"].value === "panel",
+  paketSecenekleri.length === 1 + w.SufloAltyaziEfekt.GORUNUMLER.length && paketSecenekleri[0].value === "panel" && paketSecenekleri[0].tagName === "option" &&
+  paketSecenekleri.every(function (o) { return o.tagName === "option" && !w.SufloAltyaziEfekt.eskiGorunum(o.value); }) && DOM["cap-paket-stil"].value === "panel" &&
+  paketSecenekleri.slice(1).map(function (o) { return o.value; }).sort().join(",") === w.SufloAltyaziEfekt.GORUNUMLER.map(function (g) { return g.id; }).sort().join(","),
   DOM["cap-paket-stil"].value);
+ok("init: görünümler kategori başına <optgroup> (Viral · Shorts, Minimal, Podcast, Eğitim, Sinematik, Marka), her grupta o kategorinin görünümleri",
+  paketGruplari.map(function (g) { return g.label; }).join("|") === w.SufloAltyaziEfekt.KATEGORILER.map(function (k) { return k.ad; }).join("|") &&
+  paketGruplari.every(function (g, i) { var k = w.SufloAltyaziEfekt.KATEGORILER[i].id;
+    return g.childNodes.length > 0 && g.childNodes.every(function (o) { return w.SufloAltyaziEfekt.gorunum(o.value).kategori === k; }); }),
+  paketGruplari.map(function (g) { return g.label + ":" + g.childNodes.length; }).join(" "));
 ok("init: düğme seçili an sayısını gösterir", DOM["cap-paket-olustur"].textContent === "Paketi oluştur (2 Shorts)" && !DOM["cap-paket-olustur"].disabled);
 ok("init: kayıtsız seçimde kredi satırı kapalı (isteğe bağlı), çubuk üstte", DOM["cap-paket-kredi"].checked === false && DOM["cap-paket-ilerleme-konum"].value === "ust");
 DOM["cap-paket-stil"].value = "canli";

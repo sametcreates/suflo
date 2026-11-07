@@ -56,6 +56,9 @@ function kes(imza) {
 var M = new Function("SEG", "CT", "CL", [
   "var segments = SEG;",
   "function styleText(t) { return t; }",
+  "var K = { settings: function () { return {}; } }, window = {}, emojisizCikti = false, katmanKareHizi = 0;",
+  kes("function kufurMaskesiAcik("),
+  kes("function kufurMaskele("),
   kes("function satirlariTopla("),
   kes("function cueler("),
   "return { cueler: cueler };"
@@ -114,6 +117,59 @@ ok("ekli kapanis strip", C.stripEmphasis("*Instagram*’dan para *kazan*!") === 
 ok("ekli kapanis motor", E.markEmphasis(E.splitToWords([{ start: 0, end: 2, text: "*YouTube*'a gel *hemen*" }])).map(function (c) { return c.text + (c.vurgu ? "!" : ""); }).join(" ") === "YouTube'a! gel hemen!");
 ok("parantezli kapanis", JSON.stringify(C.emphasisMask("bunu *kimse*) bilmiyor")) === "[false,true,false]");
 ok("Ctrl+B yalniz yildizli kelimeye yildiz eklemez", C.toggleRange("a * b", 2, 2).text === "a * b" && C.toggleRange("*", 0, 1).text === "*");
+
+
+/* parti 6: ekli birim, okunusla sayi, hitap/dolgu, deger sozlugu, satir basina sinir */
+function av(x) { return C.autoEmphasis(x); }
+ok("ekli birim: '3 ayda' ve '10 bin' ayri vurgu", av("Bu yöntemle 3 ayda 10 bin takipçi kazandım") === "Bu yöntemle *3 ayda* *10 bin* takipçi kazandım",
+  av("Bu yöntemle 3 ayda 10 bin takipçi kazandım"));
+ok("ekli birimler: saatte, günde, dakikada, yılda, TL'ye, bin'e, milyonluk",
+  av("2 saatte bitti") === "*2 saatte* bitti" && av("Günde 5 dakikada hallet") === "Günde *5 dakikada* hallet" &&
+  av("100 TL'ye aldım bunu") === "*100 TL'ye* aldım bunu" && av("5 bin'e sattım") === "*5 bin'e* sattım" &&
+  av("1 milyonluk ev aldı") === "*1 milyonluk* ev aldı" && av("10 yılda değişti") === "*10 yılda* değişti",
+  [av("2 saatte bitti"), av("Günde 5 dakikada hallet"), av("100 TL'ye aldım bunu"), av("5 bin'e sattım"), av("1 milyonluk ev aldı")].join(" | "));
+ok("buyukluk + birim zinciri: '10 bin TL', '3 milyon dolar'", av("Ayda 10 bin TL kazanıyorum") === "Ayda *10 bin TL* kazanıyorum" && av("Toplam 3 milyon dolar.") === "Toplam *3 milyon dolar*.");
+ok("hitap/dolgu vurgulanmaz: 'Gerçekten inanılmaz bir deneyimdi arkadaşlar'", av("Gerçekten inanılmaz bir deneyimdi arkadaşlar") === "Gerçekten *inanılmaz* bir deneyimdi arkadaşlar",
+  av("Gerçekten inanılmaz bir deneyimdi arkadaşlar"));
+ok("okunusla sayi: 'Yüzde elli indirim fırsatı kaçmaz'", av("Yüzde elli indirim fırsatı kaçmaz") === "*Yüzde elli* indirim fırsatı kaçmaz", av("Yüzde elli indirim fırsatı kaçmaz"));
+ok("okunusla sayi: 'İki milyon', 'iki buçuk saat', 'Bir milyon dolar', 'yüzde 30'",
+  av("İki milyon kişi izledi") === "*İki milyon* kişi izledi" && av("iki buçuk saat sürdü") === "*iki buçuk saat* sürdü" &&
+  av("Bir milyon dolar") === "*Bir milyon dolar*" && av("yüzde 30 indirim") === "*yüzde 30* indirim");
+ok("cok anlamli sayi sozcukleri tek basina sayi degil ('bir gün', 'yedi', 'iki kişi', 'altı')",
+  av("bir gün gelecek") === "bir gün gelecek" && av("iki kişi geldi") === "iki kişi geldi" && !/\*yedi\*/.test(av("Yemeği yedi ve gitti hemen oradan")) &&
+  av("masanın altı dolu") === "masanın altı dolu");
+ok("deger sozlugu onceligi: 'ücretsiz' kisa satirda da", av("Bu tamamen ücretsiz!") === "Bu tamamen *ücretsiz*!", av("Bu tamamen ücretsiz!"));
+ok("deger sozlugu: 'en iyi' tek aralik, cumlecik basina bir, uzun satirda en cok 2",
+  av("Bunu asla yapma, en iyi yol bu değil, ilk adım şu") === "Bunu *asla* yapma, *en iyi* yol bu değil, ilk adım şu",
+  av("Bunu asla yapma, en iyi yol bu değil, ilk adım şu"));
+ok("5 kelimelik satirda en cok 1 vurgu (degerli sozcuklerden yalniz biri)", C.emphasisMask(av("Asla bedava gizli sır yok")).filter(Boolean).length === 1 &&
+  C.emphasisMask(av("Asla bedava gizli sır yok ama yarın")).filter(Boolean).length === 1, av("Asla bedava gizli sır yok"));
+ok("sayi gruplari siniri doldurunca anahtar kelime eklenmez", av("Bu yöntemle 3 ayda 10 bin takipçi ücretsiz") === "Bu yöntemle *3 ayda* *10 bin* takipçi ücretsiz");
+ok("'son olarak' dolgu, 'son şans' deger", av("Son olarak şunu söyleyeyim size") .indexOf("*Son") === -1 && av("Bu son şans") === "Bu *son* şans");
+ok("Hatay / sonra / ilkokul deger sozlugune takilmaz", !/\*(Hatay|sonra|ilkokul)\*/.test(av("Hatay sonra ilkokul")), av("Hatay sonra ilkokul"));
+// Doğrulama: değer sözlüğünün "hata" kalıbı yalnız şehir adını dışlamalı; /^hata(?!y)/ "hatayı / hataya / hataydı"yı da dışlıyordu
+ok("deger sozlugu: 'hatayı', 'hataya', 'hataydı' vurgulanır; 'Hatay'da' vurgulanmaz",
+  av("Bu hatayı sakın yapma") === "Bu *hatayı* sakın yapma" && av("Kimse hataya düşmesin lütfen") === "Kimse *hataya* düşmesin lütfen" &&
+  av("Bu bir hataydı") === "Bu bir *hataydı*" && av("Hatay'da gezdik biz") .indexOf("*Hatay") === -1,
+  [av("Bu hatayı sakın yapma"), av("Kimse hataya düşmesin lütfen"), av("Bu bir hataydı"), av("Hatay'da gezdik biz")].join(" | "));
+["Bu yöntemle 3 ayda 10 bin takipçi kazandım", "Yüzde elli indirim fırsatı kaçmaz", "Bunu asla yapma, en iyi yol bu değil, ilk adım şu", "Bu tamamen ücretsiz!", "1 milyonluk ev aldı"].forEach(function (x) {
+  var a = av(x);
+  ok("idempotent ve geri donuslu  [" + x + "]", av(a) === a && C.stripEmphasis(a) === x && E.stripEmphasis(a) === x, a);
+});
+ok("elle isaretli satira dokunulmaz (yeni kurallarla da)", av("Bu *benim* 3 ayda ücretsiz") === "Bu *benim* 3 ayda ücretsiz");
+ok("durak listesi: stil motorunun Altyazı Efektleri listesiyle ayni", JSON.stringify(E.ANLAMSIZ_KELIME) === JSON.stringify(C.VURGU_DURAK_KELIMELER) &&
+  ["arkadaşlar", "gerçekten", "aslında", "şimdi", "tabii", "yani", "işte", "evet", "tamam", "bence", "sanki"].every(function (w) { return C.VURGU_DURAK_KELIMELER.indexOf(w) !== -1; }));
+// Altyazı Efektleri büyüyen vurgu: işaret yokken anahtar hitap değil, en uzun ANLAMLI kelime
+var kelimeCue = ["harika", "bir", "gün", "arkadaşlar"].map(function (w, i) { return { start: i * 0.4, end: i * 0.4 + 0.36, text: w }; });
+var buy = E.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: { anim: "buyuyen-vurgu" } }).ass;
+ok("efekt büyüyen vurgu: hitap ('arkadaşlar') değil 'harika' büyür", /\{\\fscx1\d\d\\fscy1\d\d\}harika/.test(buy) && !/\{\\fscx1[1-9]\d\\fscy1[1-9]\d\}arkadaşlar/.test(buy),
+  (buy.match(/\\fscx\d+\\fscy\d+\}[^{]+/g) || []).slice(0, 6).join(" "));
+var hepsiDurak = ["evet", "tamam", "arkadaşlar"].map(function (w, i) { return { start: i * 0.4, end: i * 0.4 + 0.36, text: w }; });
+var buy2 = E.compile({ styleId: "efekt", cues: hepsiDurak, cueKind: "words", width: 1920, height: 1080, overrides: { anim: "buyuyen-vurgu" } }).ass;
+ok("efekt büyüyen vurgu: kartta yalnız durak sözcüğü varsa eski seçim (en uzun)", /\{\\fscx1\d\d\\fscy1\d\d\}arkadaşlar/.test(buy2));
+// eski stillerin meaningfulWord'ü değişmedi
+var SE_SRC = fs.readFileSync(path.join(__dirname, "..", "js", "style-engine.js"), "utf8");
+ok("eski stillerin meaningfulWord listesi aynen", /var ignore = \/\^\(ve\|ile\|bir\|bu\|şu\|o\|da\|de\|mi\|mı\|mu\|mü\|için\|ama\|the\|a\|an\|and\|or\|of\|to\)\$\/i;/.test(SE_SRC));
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

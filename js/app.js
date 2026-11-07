@@ -76,19 +76,21 @@ window.KApp = (function () {
     var elx = el("ctx-text");
     var dot = el("host-dot");
     var strip = el("context-strip");
+    // After Effects (deneysel): sekans yerine kompozisyon, klip yerine katman
+    var ae = !!(window.SufloAePanel && SufloAePanel.aktif());
     if (!ctx.connected) {
       dot.className = "host-dot off";
       strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="dim">' +
-        (K.nodeOK ? "Premiere'e bağlanılamadı" : "önizleme modu — Premiere dışında") + "</span>";
+        (K.nodeOK ? (ae ? "After Effects'e bağlanılamadı" : "Premiere'e bağlanılamadı") : "önizleme modu — Premiere dışında") + "</span>";
       return;
     }
     dot.className = "host-dot ok";
     if (!ctx.hasSeq) {
-      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="dim">Sequence yok</span>' +
-        '<span class="pill">bir sequence aç</span>';
+      strip.innerHTML = CLAP_IC + (ae ? '<span id="ctx-text" class="dim">Kompozisyon yok</span><span class="pill">bir kompozisyon aç</span>'
+        : '<span id="ctx-text" class="dim">Sequence yok</span><span class="pill">bir sequence aç</span>');
     } else if (ctx.sel) {
       var pill = (ctx.selCount > 1)
-        ? ctx.selCount + " klip seçili"
+        ? (ae ? ctx.selCount + " katman seçili" : ctx.selCount + " klip seçili")
         : ctx.sel.dur.toFixed(1) + " sn";
       strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
         '<span class="pill live"></span>';
@@ -96,7 +98,7 @@ window.KApp = (function () {
       strip.querySelector(".pill").textContent = pill;
     } else {
       strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
-        '<span class="pill">Klip seçilmedi</span>';
+        (ae ? '<span class="pill">Katman seçilmedi</span>' : '<span class="pill">Klip seçilmedi</span>');
       strip.querySelector(".sel-name").textContent = ctx.sequence;
     }
   }
@@ -405,12 +407,17 @@ window.KApp = (function () {
   function aramaKaydi() {
     var navlar = [];
     Array.prototype.forEach.call(document.querySelectorAll(".yan-menu .ky-oge[data-tab]"), function (b) {
+      // After Effects (deneysel): gizlenen Premiere araçları aranmaz (js/ae-panel.js data-ae-gizli)
+      if (b.hasAttribute && b.hasAttribute("data-ae-gizli")) return;
       var ad = b.querySelector(".ky-metin b"), alt = b.querySelector(".ky-metin i");
       navlar.push({ tab: b.getAttribute("data-tab"), kat: b.getAttribute("data-kat") || "", ad: navAdi(ad),
         alt: alt ? uiOzgun(alt).replace(/\s+/g, " ").trim() : "", pro: !!b.querySelector("[data-kilit]") });
     });
     // sekmesi panelde olmayan eylem listelenmez (3.4'te hepsinin sekmesi var; test-arac-ara denetler)
-    var kayit = AA.kayitKur(navlar, { mevcut: function (e) { return !!el("tab-" + e.tab); } });
+    var kayit = AA.kayitKur(navlar, { mevcut: function (e) {
+      var t = el("tab-" + e.tab);
+      return !!t && !(t.hasAttribute && t.hasAttribute("data-ae-gizli"));
+    } });
     kayit.forEach(function (o) {
       o.adGoster = uiMetni(o.ad);
       o.altGoster = o.alt ? uiMetni(o.alt) : "";
@@ -471,7 +478,7 @@ window.KApp = (function () {
         var kilit = document.createElement("span");
         kilit.className = "arac-ara-kilit";
         kilit.textContent = "PRO";
-        // tarafsız: deneme hakkı her Pro araçta yok (SFX, Motion Presetleri, Podcast, Sahneleri bul…; inceleme 2)
+        // tarafsız: deneme hakkı her Pro araçta yok (SFX, Motion Presetleri, Podcast, B-roll…; inceleme 2)
         kilit.title = uiMetni("Suflo Pro özelliği");
         satir.appendChild(kilit);
       }
@@ -729,6 +736,23 @@ window.KApp = (function () {
   }
 
   // "İndir & kur" tıkı (Ayarlar ve Altyazı kurulum kartı): programla çağrı (olaysız) her zaman geçerli
+  /*
+   * Ayarlar › Altyazı › metin temizliği (ikisi de varsayılan kapalı):
+   *   dolguSil:   yeni transkriptte ııı / eee / hmm / um atılır (captions.js kurSecenekleri → caption-text.js dolgulariAt)
+   *   kufurMaske: yalnız çıktı anında maske (captions.js cueler → js/kufur-maske.js); transkript değişmez
+   */
+  function metinTemizlikAyarlari(s) {
+    [["set-dolgu-sil", "dolguSil"], ["set-kufur-maske", "kufurMaske"]].forEach(function (a) {
+      var e = el(a[0]);
+      if (!e) return;
+      e.checked = s[a[1]] === true;
+      e.addEventListener("change", function () {
+        K.settings()[a[1]] = this.checked;
+        K.saveSettings();
+      });
+    });
+  }
+
   /*
    * Ayarlar › Altyazı: satır modlarında (32 / 42 karakter, 2 satır × 42) en kısa / en uzun ekran
    * süresi ve kısa parça birleştirme (caption-text.js segmentleriKur). Geçersiz değer sınıra çekilir;
@@ -1296,9 +1320,9 @@ window.KApp = (function () {
         if (title) title.textContent = !pro ? "Pro içerikleri tek tıkla otomatik kurulur" : (s.phase === "ready" ? "Pro kütüphanen hazır" : (working ? "Kütüphanen hazırlanıyor" : "Bir kez etkinleştir, hep güncel kal"));
         if (detail) {
           if (s.phase === "syncing") detail.textContent = (s.detail || "İçerikler eşitleniyor") + (s.bytesTotal ? " · " + bytes(s.bytesDone) + " / " + bytes(s.bytesTotal) : "");
-          else if (s.phase === "ready") detail.textContent = "262 animasyon + 1.076 SFX + 30 Motion BG + preset paketi hazır" + (s.version ? " · içerik " + s.version : "") + ". Yeni içerikler arka planda kontrol edilir.";
+          else if (s.phase === "ready") detail.textContent = "267 animasyon + 1.076 SFX + 30 Motion BG + preset paketi hazır" + (s.version ? " · içerik " + s.version : "") + ". Yeni içerikler arka planda kontrol edilir.";
           else if (s.phase === "error") detail.textContent = "Kurulu içeriklerin etkilenmedi. Bağlantı geldiğinde yeniden deneyebilirsin.";
-          else detail.textContent = pro ? "Suflo açıldığında yeni içerikleri kontrol eder; yalnız değişen dosyaları indirir." : "Pro lisansını etkinleştirince 17 altyazı stili, 262 animasyon, 1.076 SFX, 30 Motion BG ve preset paketi otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.";
+          else detail.textContent = pro ? "Suflo açıldığında yeni içerikleri kontrol eder; yalnız değişen dosyaları indirir." : "Pro lisansını etkinleştirince 31 altyazı stili, 267 animasyon, 1.076 SFX, 30 Motion BG ve preset paketi otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.";
         }
         if (status) {
           status.className = "inline-status" + (s.phase === "error" ? " bad" : (s.phase === "ready" ? " good" : ""));
@@ -1487,6 +1511,8 @@ window.KApp = (function () {
         K.saveSettings();
       });
     }
+    // Ayarlar › Altyazı › Dolgu seslerini altyazıdan çıkar (yeni transkriptler) ve Küfürleri maskele (yalnız çıktı)
+    metinTemizlikAyarlari(s);
     // Ayarlar › Altyazı › en kısa / en uzun süre ve kısa parçaları birleştir (satır modları, 3.2 adım 4)
     altyaziSureAyarlari(s);
     el("set-provider").value = s.provider || "groq";
@@ -1896,7 +1922,8 @@ window.KApp = (function () {
         // yorumladigi & ^ % gibi karakterler hic iceri girmesin.
         ad: (paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip").replace(/[^A-Za-z0-9._-]/g, "_"),
         // GitHub her release dosyasi icin "sha256:<hex>" ozeti yayinlar: indirilen
-        // dosya bununla dogrulanmadan otomatik kurulum yapilmaz
+        // dosya bununla dogrulanmadan otomatik kurulum yapilmaz. Ozet yoksa ("") panel
+        // hic indirmez; kullanici surum sayfasina yonlendirilir (guncellemeyiIndir)
         sha256: paket && /^sha256:[0-9a-f]{64}$/i.test(String(paket.digest || "")) ? String(paket.digest).slice(7).toLowerCase() : "",
         zip: !!zip,
         not: ilkSatir.slice(0, 90)
@@ -1995,9 +2022,20 @@ window.KApp = (function () {
     });
   }
 
+  // Doğrulama özeti olmayan sürüm: panel indirmez / kurmaz; sürüm sayfası elle indirmek için açılır
+  function ozetsizGuncelleme() {
+    var sayfa = "https://github.com/" + K.REPO + "/releases/latest";
+    el("update-not").textContent = "Bu sürümün dosyası doğrulama özeti (SHA-256) taşımıyor; güvenlik için otomatik kurulum yapılmadı. " +
+      "Sürüm sayfasından elle indir: github.com/" + K.REPO + "/releases/latest";
+    toast("Otomatik kurulum yapılmadı: dosya doğrulanamıyor — github.com/" + K.REPO + "/releases sayfasından elle indir", "warn");
+    K.log("[güncelleme] v" + guncelleme.surum + " dosyasında SHA-256 özeti yok — otomatik kurulum reddedildi");
+    try { K.cs.openURLInDefaultBrowser(sayfa); } catch (eAc) {}
+  }
+
   async function guncellemeyiIndir() {
     if (!guncelleme) return;
     var b = el("update-indir");
+    if (!guncelleme.sha256) { ozetsizGuncelleme(); return; }
     b.disabled = true;
     var eski = uiOzgun(b);   // özgün Türkçe: iş sürerken dil değişse de doğru dile döner
     b.textContent = "İniyor…";
@@ -2009,14 +2047,13 @@ window.KApp = (function () {
         b.textContent = "%" + Math.round(f * 100);
       }, 0, undefined, { key: "zxp:" + guncelleme.surum });
       if (!d.ok) throw new Error(d.error || "indirilemedi");
-      if (guncelleme.sha256) {
-        b.textContent = "Doğrulanıyor…";
-        var ozet = await dosyaOzeti(hedef);
-        if (ozet !== guncelleme.sha256) {
-          try { K.fs.unlinkSync(hedef); } catch (eSil) {}
-          K.log("[güncelleme] SHA-256 uyuşmadı: " + ozet + " != " + guncelleme.sha256);
-          throw new Error("indirilen dosya doğrulanamadı (bozuk ya da değiştirilmiş)");
-        }
+      // Özet zorunlu (ozetsizGuncelleme yukarıda durdurur): doğrulanmamış dosya açılmaz / kurulmaz
+      b.textContent = "Doğrulanıyor…";
+      var ozet = await dosyaOzeti(hedef);
+      if (!guncelleme.sha256 || ozet !== guncelleme.sha256) {
+        try { K.fs.unlinkSync(hedef); } catch (eSil) {}
+        K.log("[güncelleme] SHA-256 uyuşmadı: " + ozet + " != " + guncelleme.sha256);
+        throw new Error("indirilen dosya doğrulanamadı (bozuk ya da değiştirilmiş)");
       }
 
       // Önce tek tık kurulumu dene — başarırsa kullanıcıya yalnız yeniden başlatma kalır
@@ -2069,6 +2106,8 @@ window.KApp = (function () {
     // Arayüz dili EN ÖNCE: bağlam yoklamasından ve her pencereden önce. Dil settings.json'da
     // (uiLang); eski kurulumlar Türkçe kalır, taze kurulumda rehberin 0. adımı sorar
     guvenli("Dil", arayuzDiliniBaslat);
+    // After Effects (deneysel): Premiere'e özgü araçlar gizlenir, AE betiği yüklenir. Premiere'de hiçbir şey yapmaz
+    guvenli("After Effects", function () { if (window.SufloAePanel) SufloAePanel.init(); });
 
     // Sürüm etiketleri tek kaynaktan (bridge.js VERSION) beslenir: elle yazılan
     // "v1.7" her yayında geride kalıyor, kullanıcı hangi sürümde olduğunu bilemiyordu
@@ -2174,27 +2213,29 @@ window.KApp = (function () {
     setTimeout(function () {
       try {
         var rehber = window.KOnboarding && KOnboarding.karar ? KOnboarding.karar() : "yok";
-        if (rehber !== "tam") yenilikleriGoster();
+        // After Effects'te yeniliklerin maddeleri (Eğri, Kesim, Hız Rampası) gizli sekmelere gider: gösterilmez
+        var aeMod = window.SufloAePanel && SufloAePanel.aktif();
+        if (rehber !== "tam" && !aeMod) yenilikleriGoster();
       } catch (eY) {}
     }, 900);
   }
 
   /*
-   * "Suflo 3.4'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
-   * derinliginde (Egri sol menude, Ozel egri Hiz Rampasi kartlarinda);
+   * "Suflo 3.5'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (senkron dogrulama Gelismis ayarlar katinda, metin temizligi Ayarlar'da);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
    * Eski surumden yukselten kullanicida yeniliklerGoruldu eski surum oldugundan pencere bir kez acilir.
    * eylem: "aracAra" sekme yerine Arac ara paletini acar (KApp.aracAra).
    */
   var YENILIKLER = {
-    surum: "3.4",
-    alt: "Eğri, canlı sessizlik kesimi ve Araç ara",
+    surum: "3.5",
+    alt: "Altyazı yenilemesi ve sesle senkron doğrulama",
     maddeler: [
-      { ikon: "~", baslik: "Eğri", metin: "Kendi anahtar karelerine hazır ya da çizdiğin eğri; düzenlemek ücretsiz, uygulamak Pro.", sekme: "egri", hedef: "egri-editor" },
-      { ikon: "∿", baslik: "Varışta yaylan", metin: "Hareket inişte hedefi biraz aşar, salınıp oturur (Pro).", sekme: "egri", hedef: "egri-yaylan" },
-      { ikon: "✂", baslik: "Canlı eşikli kesim", metin: "Kaydırıcılar kesimleri anında günceller; sekans ya da In → Out, müzik bölünmez (Pro).", sekme: "cut", hedef: "cut-scope" },
-      { ikon: "»", baslik: "Özel hız eğrisi", metin: "Hız Rampası'nda kendi hız eğrini çiz (Pro).", sekme: "hiz", hedef: "hiz-grid" },
-      { ikon: "⌘", baslik: "Araç ara", metin: "Ctrl+K (⌘K) ile her araca ve eyleme saniyede ulaş.", eylem: "aracAra" }
+      { ikon: "①", baslik: "Üç adımda altyazı", metin: "Oluştur, stil seç, uygula; gelişmiş ayarlar katlı, akış sade.", sekme: "captions", hedef: "cap-adimlar" },
+      { ikon: "✦", baslik: "Yazı animasyonları", metin: "25 özgün animasyon ve 30 hazır görünüm; önizlemek ücretsiz, eklemek Pro.", sekme: "captions", hedef: "cap-efekt-galeri" },
+      { ikon: "∿", baslik: "Sesle senkron doğrulama", metin: "Kelimeler ve kartlar ses dalgasına oturur; raporla kontrol et, tek tıkla geri al.", sekme: "captions", acilir: "cap-gelismis", hedef: "cap-senkron-sar" },
+      { ikon: "A", baslik: "AutoCaptions koleksiyonu", metin: "19 görünüm, 12 animasyon ve 14 Premiere şablonu (Pro).", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "⌫", baslik: "Metin temizliği", metin: "Dolgu seslerini çıkar, küfürleri yalnız çıktıda maskele.", sekme: "settings", hedef: "set-dolgu-sil" }
     ]
   };
 
