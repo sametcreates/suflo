@@ -110,14 +110,21 @@ var dg = cp.spawnSync("php", ["-r", "$c = require $argv[1]; $s = trim(stream_get
   "'bilgi' => password_get_info($c['password_hash']), 'dsn' => $c['dsn'], 'ao' => $c['allowed_origins'], 'acik' => $c['mcp_acik'], 'kok' => $c['kok_url'], 'pass' => $c['db_pass']]);", cfgDosya],
   { input: TEST_SIFRE, encoding: "utf8" });
 var dj = JSON.parse(dg.stdout || "{}");
+// dsn: 'sqlite:' . __DIR__ . '/studio.sqlite'. PHP __DIR__'i gercek yoldan yazar (macOS /var -> /private/var, Windows'ta
+// RUNNER~1 gibi 8.3 kisa ad uzun ada acilir): klasor metin olarak degil, gercek yol olarak AYAR olmali.
+function dsnKendiKlasorunde(dsn) {
+  if (typeof dsn !== "string" || dsn.indexOf("sqlite:") !== 0 || !/[\\/]studio\.sqlite$/.test(dsn)) return false;
+  try { return fs.realpathSync.native(path.dirname(dsn.slice(7))) === fs.realpathSync.native(AYAR); } catch (e) { return false; }
+}
 ok("ayar: bcrypt maliyet 12 ozeti dogrulaniyor; dsn kendi klasorunde sqlite; allowed_origins assets; mcp_acik true; kok_url assets",
   dj.dogru === true && dj.bilgi && dj.bilgi.algoName === "bcrypt" && dj.bilgi.options.cost === 12 &&
-  dj.dsn === "sqlite:" + AYAR + "/studio.sqlite" && JSON.stringify(dj.ao) === '["https://assets.suflo.app"]' && dj.acik === true &&
+  dsnKendiKlasorunde(dj.dsn) && JSON.stringify(dj.ao) === '["https://assets.suflo.app"]' && dj.acik === true &&
   dj.kok === "https://assets.suflo.app" && dj.pass === "", dg.stdout + dg.stderr);
 ok("ayar: duz sifre config.php'de yok; dosyalar yalniz sahibine acik (0600)", cfgMetin.indexOf(TEST_SIFRE) === -1 &&
   (process.platform === "win32" || ((fs.statSync(cfgDosya).mode & 0o777) === 0o600 && (fs.statSync(sifreDosya).mode & 0o777) === 0o600)));
 var rb = cp.spawnSync(process.execPath, [ARAC, "ayar", "--cikis", AYAR], { encoding: "utf8" });
-ok("ayar: ikinci calistirma var olan sifrenin uzerine yazmaz", rb.status === 1 && fs.readFileSync(sifreDosya, "utf8").trim() === TEST_SIFRE, rb.stderr);
+ok("ayar: ikinci calistirma var olan sifrenin uzerine yazmaz", rb.status === 1 && TEST_SIFRE !== "" && fs.existsSync(sifreDosya) &&
+  fs.readFileSync(sifreDosya, "utf8").trim() === TEST_SIFRE, rb.stderr);
 var rc = cp.spawnSync(process.execPath, [ARAC, "ayar", "--cikis", path.join(O.ROOT, "tmp-ayar-deneme")], { encoding: "utf8" });
 ok("ayar: repo icine yazilmaz", rc.status === 1 && !fs.existsSync(path.join(O.ROOT, "tmp-ayar-deneme")), rc.stderr);
 var iki = P.ayarYap(path.join(TMP, "ozel-2"));

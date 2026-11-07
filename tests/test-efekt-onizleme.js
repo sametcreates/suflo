@@ -118,7 +118,7 @@ function ortam() {
   b.api.kodUygula(yeniStil);
   await bekle(5);
   ok("çizim sürerken kod uygulandı: eski ayarlı ffmpeg hemen öldürülür, çıktısı silinir", b.run.length === 1 && b.run[0].olduruldu === true &&
-    b.api.durum().calisiyor === false && b.silinen.some(function (p) { return /preview-.*\.webm$/.test(p) || /[\/]is-/.test(p); }), JSON.stringify(b.api.durum()));
+    b.api.durum().calisiyor === false && b.silinen.some(function (p) { return /preview-.*\.webm$/.test(p) || /[\\/]is-/.test(p); }), JSON.stringify(b.api.durum()));
   await bekle(230);
   ok("eski (öldürülen) çizim gösterilmez; kodun görünümü yeniden çizilir; iki ffmpeg hiç aynı anda yok", b.run.length === 2 && b.dom["cap-render-onizleme"].src === "" &&
     b.eszamanli.enCok === 1, b.run.length + " / " + b.eszamanli.enCok);

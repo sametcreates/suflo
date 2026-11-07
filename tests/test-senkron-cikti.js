@@ -309,7 +309,7 @@ function ortam(o) {
   ok("hız engeli: %100 klip geçer; getSpeed ≠ 1, ters oynatma, süre oranı (zaman yeniden eşleme / hız) atlanır; eski host (alan yok) yalnız oran",
     HE({ speed: 1, reversed: false }, 1) === "" && HE({ speed: 1.5 }, 1) === "Hızı değiştirilmiş klipte senkron doğrulama yapılmadı" &&
     HE({ speed: 1, reversed: true }, 1) === "Ters oynatılan klipte senkron doğrulama yapılmadı" && HE({ speed: 1 }, 0.8) !== "" && HE({}, 1) === "" && HE(null, 1.2) !== "" && HE(null, 1) === "");
-  var host = fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8");
+  var host = fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8").replace(/\r\n/g, "\n");   // Windows (core.autocrlf): CRLF
   var hsc = host.slice(host.indexOf("function KS_getSelectedClips("), host.indexOf("/* ---------- Suflo Pro: yerlesik Motion presetleri"));
   // gerçek KS_getSelectedClips sahte Premiere'de: hız, ters, iç içe sekans sayısı
   function zaman(s) { return { seconds: s }; }

@@ -366,11 +366,42 @@ window.K = (function () {
   }
 
   /*
+   * İptal sonucu süreç GERÇEKTEN kapanınca döner. Windows'ta ölmekte olan ffmpeg / whisper-cli çıktı dosyasını ve
+   * çalışma klasörünü kapanana dek kilitli tutar (EBUSY / EPERM): sonuç hemen dönseydi çağıranın finally'deki silmesi
+   * (overlay-*, stil önizleme iş klasörü, yarım çıktı, geçici WAV) taskkill işini bitirmeden çalışır, dosyalar kalırdı.
+   * "close" stdio'yu tutan bütün süreçler (Chocolatey / scoop shim'inin başlattığı asıl ffmpeg.exe dahil) bitince gelir.
+   * Kapanış hiç gelmezse (takılmış sürücü, öldürülemeyen süreç) en geç IPTAL_KAPANIS_MS sonra yine döner: arayüz kilitlenmez.
+   *   kapanisIzleyici()  süreç açılınca; döner { kapandi(), bekle(fn) }
+   *   kapandi()          "close" / "error" geldi: bekleyen fn hemen çağrılır
+   *   bekle(fn)          süreç kapanınca (ya da süre dolunca) fn bir kez
+   */
+  var IPTAL_KAPANIS_MS = 3000;
+  function kapanisIzleyici() {
+    var kapali = false, bekleyen = null, saat = null;
+    function cagir() {
+      if (!bekleyen) return;
+      var fn = bekleyen;
+      bekleyen = null;
+      if (saat) { clearTimeout(saat); saat = null; }
+      fn();
+    }
+    return {
+      kapandi: function () { kapali = true; cagir(); },
+      bekle: function (fn) {
+        bekleyen = fn;
+        if (kapali) { cagir(); return; }
+        saat = setTimeout(cagir, IPTAL_KAPANIS_MS);
+      }
+    };
+  }
+
+  /*
    * opts.timeout   ms (varsayılan 5 dk)
    * opts.cwd       çalışma klasörü
    * opts.onStderr  fn(parça) — stderr akarken (ilerleme yüzdesi)
    * opts.onStdout  fn(parça) — stdout akarken (whisper-cli segment satırları); tam çıktı yine birikir
-   * opts.iptal     K.iptalJetonu(): iptalde süreç ağacı öldürülür, { code: -2, iptal: true } döner
+   * opts.iptal     K.iptalJetonu(): iptalde süreç ağacı öldürülür, { code: -2, iptal: true } süreç kapanınca
+   *                (en geç IPTAL_KAPANIS_MS) döner: ardından çıktı / çalışma klasörü Windows'ta da silinebilir
    * opts.surecGrubu (3.3) macOS/Linux'ta süreç kendi grubunda açılır (detached); iptal ve zaman
    *                aşımı bütün grubu öldürür (yt-dlp'nin açtığı alt süreçler dahil). Windows'ta
    *                taskkill /T zaten ağacı kapsar.
@@ -448,13 +479,16 @@ window.K = (function () {
         }
         resolve({ code: code, stdout: out, stderr: err });
       }
+      var kapanis = kapanisIzleyici();
       if (jeton) {
         birak = jeton.dinle(function () {
           if (done) return;
           kapat();
           surecAgaciniOldur(child, !!opts.surecGrubu);
           log("run IPTAL [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kullanici iptal etti");
-          resolve({ code: -2, iptal: true, stdout: out, stderr: err });
+          var sonuc = { code: -2, iptal: true, stdout: out, stderr: err };
+          // süreç ağacı gerçekten kapanınca: çağıran hemen ardından çıktıyı / çalışma klasörünü siler (Windows kilidi)
+          kapanis.bekle(function () { resolve(sonuc); });
         });
       }
       // setEncoding: cok baytli harfler parca sinirinda bolunup U+FFFD olmasin
@@ -472,8 +506,8 @@ window.K = (function () {
         err += s;
         if (opts.onStderr && !done) opts.onStderr(s);
       });
-      child.on("error", function (e) { err += String(e); finish(-1); });
-      child.on("close", finish);
+      child.on("error", function (e) { err += String(e); finish(-1); kapanis.kapandi(); });
+      child.on("close", function (code) { finish(code); kapanis.kapandi(); });
     });
   }
 
@@ -483,7 +517,7 @@ window.K = (function () {
    * utf8 metin olarak biriktirir: ham PCM baytları U+FFFD'ye döner, ses bozulur. stderr metindir, birikir.
    *   opts.onData(Buffer)  stdout parçası (fırlatırsa süreç öldürülür, { code: -1, hata } döner)
    *   opts.onStderr(s)     stderr parçası (metin)
-   *   opts.iptal           K.iptalJetonu(): süreç ağacı öldürülür, { code: -2, iptal: true }
+   *   opts.iptal           K.iptalJetonu(): süreç ağacı öldürülür, { code: -2, iptal: true } (süreç kapanınca, run gibi)
    *   opts.timeout         ms (varsayılan 5 dk)
    * Döner: Promise<{ code, stderr, bayt, iptal?, hata? }>
    */
@@ -521,13 +555,16 @@ window.K = (function () {
         kapat();
         resolve({ code: -1, stderr: err + "\n[zaman aşımı]", bayt: bayt });
       }, opts.timeout || 300000);
+      var kapanis = kapanisIzleyici();
       if (jeton) {
         birak = jeton.dinle(function () {
           if (done) return;
           kapat();
           surecAgaciniOldur(child, false);
           log("runAkis IPTAL [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kullanici iptal etti");
-          resolve({ code: -2, iptal: true, stderr: err, bayt: bayt });
+          var sonuc = { code: -2, iptal: true, stderr: err, bayt: bayt };
+          // run gibi: okunan medya geçici WAV ise çağıran onu ancak süreç kapanınca silebilir (Windows kilidi)
+          kapanis.bekle(function () { resolve(sonuc); });
         });
       }
       // yalnız stderr metin: stdout ham bayt kalır (setEncoding yok)
@@ -557,8 +594,8 @@ window.K = (function () {
         }
         resolve({ code: code, stderr: err, bayt: bayt });
       }
-      child.on("error", function (e) { err += String(e); finish(-1); });
-      child.on("close", finish);
+      child.on("error", function (e) { err += String(e); finish(-1); kapanis.kapandi(); });
+      child.on("close", function (code) { finish(code); kapanis.kapandi(); });
     });
   }
 
@@ -2070,6 +2107,7 @@ window.K = (function () {
     iptalTikiGecerli: iptalTikiGecerli,
     baslatTikiGecerli: baslatTikiGecerli,
     IPTAL_ACILIS_MS: IPTAL_ACILIS_MS,
+    IPTAL_KAPANIS_MS: IPTAL_KAPANIS_MS,
     settingsPath: settingsPath,
     extensionPath: extensionPath,
     httpUpload: httpUpload,

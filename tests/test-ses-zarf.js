@@ -12,6 +12,7 @@ var cp = require("child_process");
 var Z = require("../js/ses-zarf.js");
 var SZ = require("../js/sessizlik.js");
 var G = require("./_senkron-sentetik.js");
+var GK = require("./_gercek-k.js");
 var gecen = 0, toplam = 0;
 function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
 function J(x) { return JSON.stringify(x); }
@@ -182,14 +183,29 @@ function sahteK(secenek) {
     // 44.1 kHz stereo: 0.5–0.9 sn 440 Hz, 1.3–1.75 sn 300 Hz (yalnız sol kanal), 2.2–2.6 sn 600 Hz
     var ifade = "0.3*sin(2*PI*440*t)*between(t,0.5,0.9)+0.2*sin(2*PI*600*t)*between(t,2.2,2.6)|0.3*sin(2*PI*440*t)*between(t,0.5,0.9)+0.3*sin(2*PI*300*t)*between(t,1.3,1.75)+0.2*sin(2*PI*600*t)*between(t,2.2,2.6)";
     var u = cp.spawnSync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc='" + ifade + "':s=44100:d=3", "-c:a", "pcm_s16le", wav], { encoding: "utf8" });
+    /*
+     * bridge.js runAkis'in node karşılığı: iptalde süreç AĞACI öldürülür (Windows taskkill /T /F; burada ayrı süreç
+     * grubu), sonuç süreç kapanınca döner. Windows CI'nin ffmpeg'i Chocolatey shim'i: child.kill yalnız shim'i öldürür,
+     * asıl ffmpeg 10 dk'lık -re akışını sürdürür ve stdout borusunu açık tutar; node süreci özeti yazdıktan sonra da
+     * kapanamaz (tools/test.js 180 sn zaman aşımı). acilan: testin sonunda hiçbir süreç açık kalmamalı.
+     */
+    var acilan = [];
     function gercekK() {
       return {
         fs: fs, log: function () {},
         findFfmpeg: function () { return Promise.resolve("ffmpeg"); },
         runAkis: function (cmd, ar, o) {
           return new Promise(function (resolve) {
-            var ch = cp.spawn(cmd, ar), bitti = false, err = "", bayt = 0, birak = null;
-            if (o.iptal) birak = o.iptal.dinle(function () { if (bitti) return; bitti = true; ch.kill("SIGKILL"); resolve({ code: -2, iptal: true, stderr: err, bayt: bayt, pid: ch.pid }); });
+            var ch = cp.spawn(cmd, ar, { windowsHide: true, detached: process.platform !== "win32" }), bitti = false, err = "", bayt = 0, birak = null;
+            acilan.push(ch);
+            ch.on("close", function () { ch.suflo_kapandi = true; ch.emit("suflo-kapandi"); });
+            if (o.iptal) birak = o.iptal.dinle(function () {
+              if (bitti) return;
+              bitti = true;
+              GK.agaciOldur(ch);
+              var sonuc = { code: -2, iptal: true, stderr: err, bayt: bayt, pid: ch.pid };
+              GK.kapanincaCagir(ch, function () { resolve(sonuc); });
+            });
             ch.stdout.on("data", function (d) { if (bitti) return; bayt += d.length; o.onData(d); });
             ch.stderr.on("data", function (d) { err += d; });
             ch.on("close", function (code) { if (bitti) return; bitti = true; if (birak) birak(); resolve({ code: code, stderr: err, bayt: bayt }); });
@@ -222,6 +238,8 @@ function sahteK(secenek) {
     };
     var r4 = await Z.sesZarfiCikar({ K: uzunK, media: path.join(dir, "uzun.wav"), dur: 600, iptal: j3 });
     ok("gerçek ffmpeg iptali: 10 dk'lık akış ilk parçada iptal → { iptal: true }, süreç öldürülür (< 5 sn)", r4.iptal === true && sure3 < 5000, sure3 + " ms");
+    ok("gerçek ffmpeg iptali: sonuç süreç ağacı kapandıktan sonra; hiçbir ffmpeg açık kalmadı (yetim süreç / açık boru yok)",
+      acilan.length === 3 && acilan.every(function (c) { return c.suflo_kapandi === true; }), acilan.map(function (c) { return !!c.suflo_kapandi; }).join(","));
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch (eR) {}
   }
 

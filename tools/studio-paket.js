@@ -273,9 +273,15 @@ function ayarYap(cikis, kokUrl) {
   var metin = ayarMetni(ozet, kokUrl);
   fs.writeFileSync(cfg, metin, { mode: 0o600, flag: "wx" });
   fs.writeFileSync(txt, sifre + "\n", { mode: 0o600, flag: "wx" });
+  /*
+   * dsn'deki klasor __DIR__'den gelir; PHP onu GERCEK yoldan yazar (macOS'ta /var -> /private/var, Windows'ta
+   * RUNNER~1 gibi 8.3 kisa adlar uzun ada acilir). Verilen yolla metin olarak karsilastirilmaz: iki taraf da realpath.
+   */
   var k = cp.spawnSync("php", ["-r", "$c = require $argv[1]; $s = trim(stream_get_contents(STDIN));" +
+    "$d = (is_array($c) && is_string($c['dsn'] ?? null) && strpos($c['dsn'], 'sqlite:') === 0) ? substr($c['dsn'], 7) : '';" +
     "echo (is_array($c) && password_verify($s, $c['password_hash']) && $c['mcp_acik'] === true && $c['kok_url'] === $argv[2]" +
-    " && $c['allowed_origins'] === ['https://assets.suflo.app'] && strpos($c['dsn'], 'sqlite:' . dirname($argv[1]) . '/') === 0) ? 'tamam' : 'hata';",
+    " && $c['allowed_origins'] === ['https://assets.suflo.app'] && $d !== '' && basename($d) === 'studio.sqlite'" +
+    " && realpath(dirname($d)) !== false && realpath(dirname($d)) === realpath(dirname($argv[1]))) ? 'tamam' : 'hata';",
     cfg, kokUrl], { input: sifre, encoding: "utf8" });
   // Uretilen dosya PHP olarak gecerli ve sifre ozetle dogrulaniyor mu
   if (k.stdout !== "tamam") {

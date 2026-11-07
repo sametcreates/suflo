@@ -5,6 +5,8 @@
 // sınırlarında tolerans yok: parça libass'e mutlak zamanı (setpts=PTS+bas, tam sayı kare) verdiği için aynı kareyi
 // çizer; fark çıkarsa bu bir hatadır. Ayrıca: piksel biçimi (argb), ses yok, kare zamanları ardışık, ilerleme yüzdesi,
 // gerçek iptal (bütün parça süreçleri ölür, geçici klasör ve yarım çıktı silinir) ve parça hatasında tek süreçe dönüş.
+// K.fs Windows kilidini taklit eder (_gercek-k.js windowsKilidi): kapanmamış ffmpeg'in klasörü silinemez; iptal ve parça
+// hatası temizliği ancak süreçler gerçekten kapanınca (K.run sözleşmesi, bridge.js ile aynı) başarılı olur.
 var fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process");
 var KOK = path.join(__dirname, "..");
 var OR = require(path.join(KOK, "js", "overlay-render.js"));
@@ -50,7 +52,7 @@ function zamanlar(f) {
   ok("kare sayısı round(6,02 × 29,97) = 180", beklenen === 180, beklenen);
 
   // 1) tek süreç (cpus 1: eşik yok sayılmaz, tek parça)
-  var K1 = gercekK({ tmp: tmp, srt: srt });
+  var K1 = gercekK({ tmp: tmp, srt: srt, windowsKilidi: true });
   var t1 = Date.now();
   var tek = await OR.render(K1, temel({ cikti: path.join(srt, "tek.mov"), cpus: 1 }));
   var sureTek = Date.now() - t1;
@@ -58,7 +60,7 @@ function zamanlar(f) {
 
   // 2) parçalı (3 parçaya zorla), ilerleme durumu toplanır
   var durumlar = [];
-  var K2 = gercekK({ tmp: tmp, srt: srt });
+  var K2 = gercekK({ tmp: tmp, srt: srt, windowsKilidi: true });
   var t2 = Date.now();
   var par = await OR.render(K2, temel({ cikti: path.join(srt, "parcali.mov"), parcaZorla: 3, durum: function (m) { durumlar.push(m); } }));
   var surePar = Date.now() - t2;
@@ -102,7 +104,7 @@ function zamanlar(f) {
   ok("geçici klasörler silindi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
 
   // 3) gerçek iptal: parçalar çizerken iptal → hepsi ölür, yarım çıktı ve geçici klasör yok
-  var K3 = gercekK({ tmp: tmp, srt: srt });
+  var K3 = gercekK({ tmp: tmp, srt: srt, windowsKilidi: true });
   var jeton = OR.yerelJeton(), iptalCikti = path.join(srt, "iptal.mov"), hata = null;
   var t3 = Date.now();
   var p3 = OR.render(K3, temel({ cikti: iptalCikti, parcaZorla: 3, sure: 20, iptal: jeton,
@@ -116,7 +118,7 @@ function zamanlar(f) {
 
   // 4) parça hatası → nedeni günlüğe yazılır, tek süreçle yeniden çizilir (sonuç yine doğru)
   var bozuk = 0;
-  var K4 = gercekK({ tmp: tmp, srt: srt, runSar: function (exe, args, opt) {
+  var K4 = gercekK({ tmp: tmp, srt: srt, windowsKilidi: true, runSar: function (exe, args, opt) {
     if (/parca-1/.test(String(opt.cwd)) && !bozuk++) return Promise.resolve({ code: 1, stdout: "", stderr: "[Parsed_subtitles_3 @ 0x1] bozuk parça\n" });
     return null;
   } });

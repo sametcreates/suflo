@@ -1,6 +1,8 @@
 // Suflo testi: K.run iptali ve canlı stdout (3.2 adım 3, js/bridge.js)
-//  - sahte child_process.spawn: hiç bitmeyen süreç; iptal Windows'ta taskkill /pid N /T /F,
+//  - sahte child_process.spawn: kendiliğinden bitmeyen süreç; iptal Windows'ta taskkill /pid N /T /F,
 //    macOS'ta SIGKILL; sonuç { code: -2, iptal: true }; aktifSurec sayacı düşer; zamanlayıcı temizlenir
+//  - iptal sonucu süreç gerçekten kapanınca ("close") gelir: Windows'ta ölmekte olan süreç çıktıyı kilitli tutar,
+//    çağıranın silmesi ancak o zaman başarılı olur; hiç kapanmayan süreçte en geç K.IPTAL_KAPANIS_MS sonra
 //  - opts.onStdout parça parça çağrılır, tam çıktı yine birikir
 //  - K.iptalJetonu: dinle / bırak / ikinci iptal etkisiz; başlamadan iptal edilmiş iş süreç açmaz
 //  - K.download iptali: istek kesilir, .part korunur, sonraki indirme kaldığı yerden devam eder
@@ -20,16 +22,24 @@ var TMP = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-iptal-"));
  * Köprüyü sahte platform ve sahte child_process ile yükle.
  * Döner: { K, cagrilar, cocuklar, zamanlayicilar() → bekleyen zamanlayıcı sayısı }
  */
-function yukle(platform) {
+function yukle(platform, secenek) {
+  secenek = secenek || {};
   var cagrilar = { spawn: [], execFile: [], kill: [] };
   var cocuklar = [];
+  // Öldürülen süreç kapanır ("close"; secenek.kapanmaMs gecikmeyle: taskkill / TerminateProcess anında bitmez).
+  // secenek.olmez: öldürülse de hiç kapanmaz (takılmış sürücü / öldürülemeyen süreç)
+  function oldur(c) {
+    if (secenek.olmez || c.olduruldu) return;
+    c.olduruldu = true;
+    setTimeout(function () { c.emit("close", null); }, secenek.kapanmaMs || 0);
+  }
   function sahteCocuk() {
     var c = new EventEmitter();
     c.pid = 7000 + cocuklar.length;
     c.stdout = new EventEmitter(); c.stdout.setEncoding = function () {};
     c.stderr = new EventEmitter(); c.stderr.setEncoding = function () {};
-    // hiç bitmez: kill yalnız kaydedilir (gerçek bir takılmış whisper-cli gibi)
-    c.kill = function (sig) { cagrilar.kill.push({ pid: c.pid, sig: sig === undefined ? "(varsayilan)" : sig }); return true; };
+    // kendiliğinden bitmez (gerçek bir takılmış whisper-cli gibi); kill kaydedilir
+    c.kill = function (sig) { cagrilar.kill.push({ pid: c.pid, sig: sig === undefined ? "(varsayilan)" : sig }); oldur(c); return true; };
     cocuklar.push(c);
     return c;
   }
@@ -37,7 +47,10 @@ function yukle(platform) {
     spawn: function (cmd, args, o) { cagrilar.spawn.push({ cmd: cmd, args: args, o: o }); return sahteCocuk(); },
     execFile: function (cmd, args, o, cb) {
       cagrilar.execFile.push({ cmd: cmd, args: args, o: o });
-      if (typeof cb === "function") setImmediate(function () { cb(null, "", ""); });
+      setImmediate(function () {
+        if (cmd === "taskkill") cocuklar.forEach(function (c) { if (String(c.pid) === String(args[1])) oldur(c); });
+        if (typeof cb === "function") cb(null, "", "");
+      });
       return new EventEmitter();
     },
     execSync: function () { return ""; },
@@ -120,6 +133,33 @@ async function surecTestleri() {
   var rm = await ism;
   ok("macOS: child.kill('SIGKILL'), taskkill yok", m.cagrilar.kill.length === 1 && m.cagrilar.kill[0].sig === "SIGKILL" && m.cagrilar.execFile.length === 0, js(m.cagrilar));
   ok("macOS: { code: -2, iptal: true }, sayaç 0, zamanlayıcı yok", rm.code === -2 && rm.iptal === true && m.K.surecSayisi() === 0 && m.zamanlayicilar() === 0);
+
+  /* ---------- iptal sonucu süreç kapanınca (Windows: ölmekte olan ffmpeg çıktıyı kilitli tutar) ---------- */
+  var wk = yukle("win32", { kapanmaMs: 120 });
+  var jk = wk.K.iptalJetonu(), dondu = false;
+  var isk = wk.K.run("ffmpeg.exe", ["-i", "a.mp4", "cikti.mov"], { iptal: jk, cwd: "C:\\gecici\\overlay-1" });
+  isk.then(function () { dondu = true; });
+  jk.iptal();
+  await bekle(40);
+  ok("iptal: taskkill gönderildi, sayaç düştü ama süreç kapanmadan sonuç dönmez (çağıran kilitli çıktıyı silmeye kalkmaz)",
+    wk.cagrilar.execFile.length === 1 && wk.K.surecSayisi() === 0 && dondu === false, "dondu=" + dondu);
+  var rk = await isk;
+  ok("iptal: süreç kapanınca { code: -2, iptal: true }; bekleme zamanlayıcısı kalmaz", rk.code === -2 && rk.iptal === true && wk.zamanlayicilar() === 0, wk.zamanlayicilar());
+  var jk2 = wk.K.iptalJetonu(), dondu2 = false;
+  var isk2 = wk.K.runAkis("ffmpeg.exe", ["-i", "gecici.wav", "-f", "s16le", "pipe:1"], { iptal: jk2, onData: function () {} });
+  isk2.then(function () { dondu2 = true; });
+  jk2.iptal();
+  await bekle(40);
+  var dondu2Erken = dondu2;
+  var rk2 = await isk2;
+  ok("runAkis iptali de süreç kapanınca döner (okunan geçici WAV ardından silinebilir)", dondu2Erken === false && rk2.iptal === true && wk.zamanlayicilar() === 0);
+  var wo = yukle("win32", { olmez: true });
+  var jo = wo.K.iptalJetonu(), t0 = Date.now();
+  var iso = wo.K.run("ffmpeg.exe", [], { iptal: jo });
+  jo.iptal();
+  var ro = await iso, beklenen = wo.K.IPTAL_KAPANIS_MS, gecenMs = Date.now() - t0;
+  ok("hiç kapanmayan süreç: iptal sonucu en geç K.IPTAL_KAPANIS_MS (" + beklenen + " ms) sonra yine döner, zamanlayıcı kalmaz",
+    ro.iptal === true && beklenen >= 1000 && beklenen <= 5000 && gecenMs >= beklenen - 50 && gecenMs < beklenen + 1500 && wo.zamanlayicilar() === 0, gecenMs + " ms");
 
   /* ---------- birden çok süreç: yalnız iptal edilen ölür ---------- */
   var w2 = yukle("win32");
