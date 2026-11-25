@@ -26,23 +26,24 @@ html.replace(/data-tab="([^"]+)"/g, function (_, t) { sekmeler[t] = 1; });
   if (id) ok("madde '" + m.baslik + "': hedef öğe index.html'de", html.indexOf('id="' + id + '"') !== -1, id);
 });
 var hedefler = (Y ? Y.maddeler : []).map(function (m) { return (m.eylem ? "eylem:" + m.eylem : m.sekme + ":" + (m.hedef || m.acilir || "")); }).join(" ");
-["captions:cap-adimlar", "captions:cap-efekt-galeri", "captions:cap-senkron-sar", "captions:cap-yeni-efekt-bant", "settings:set-dolgu-sil"].forEach(function (h) {
-  ok("v3.5 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
+// 3.6: yeni efektler başta (ilk madde bant), yeni şablon / başlıklar kütüphanede; 3.5'in ücretsiz öne çıkanları duruyor
+["captions:cap-yeni-efekt-bant", "text:mogrt-grid", "captions:cap-adimlar", "captions:cap-senkron-sar", "settings:set-dolgu-sil"].forEach(function (h) {
+  ok("v3.6 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
+ok("v3.6 ilk madde Yeni efektler bandına götürür", !!Y && Y.maddeler[0].hedef === "cap-yeni-efekt-bant" && Y.maddeler[0].baslik === "Yeni efektler");
 // Senkron doğrulama Gelişmiş ayarlar katının içinde: madde katı açar
 var mSk = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Sesle senkron doğrulama"; })[0];
 ok("madde 'Sesle senkron doğrulama' Gelişmiş ayarlar katını açar", !!mSk && mSk.acilir === "cap-gelismis" && html.indexOf('id="cap-gelismis"') !== -1, mSk && mSk.acilir);
 // Yapay zekâ köprüsü (MCP) ve After Effects (deneysel) Yenilikler penceresinde öne çıkarılmaz (sürüm notu ve sitede duyurulur)
-ok("yapay zekâ köprüsü ve After Effects 3.5 Yenilikler penceresinde yok", !/MCP|köprü|After Effects/i.test(JSON.stringify(Y ? Y.maddeler : [])));
+ok("yapay zekâ köprüsü ve After Effects Yenilikler penceresinde yok", !/MCP|köprü|After Effects/i.test(JSON.stringify(Y ? Y.maddeler : [])));
 
 // Pro kapılı içerik pencerede (Pro) işaretli: AutoCaptions yalnız Pro (deneme hakkı yok)
-["Yeni efektler"].forEach(function (b) {
+["Yeni efektler", "Yeni şablonlar ve başlıklar"].forEach(function (b) {
   var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];
   ok("madde '" + b + "' (Pro) işaretli", !!m && /\(Pro\)\.?$/.test(m.metin), m && m.metin);
 });
-// Yazı animasyonları: önizlemek ücretsiz, eklemek Pro — madde bunu söyler
-var mYa = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Yazı animasyonları"; })[0];
-ok("madde 'Yazı animasyonları' eklemenin Pro olduğunu söyler", !!mYa && /önizlemek ücretsiz, eklemek Pro/.test(mYa.metin), mYa && mYa.metin);
+// Pencerede AutoCaptions adı geçmez (panelde koleksiyon adı yazılmaz)
+ok("Yenilikler'de AutoCaptions adı yok", !/autocaptions/i.test(JSON.stringify(Y || {})));
 // Ücretsiz özellikler: (Pro) işareti yok
 ["Üç adımda altyazı", "Sesle senkron doğrulama", "Metin temizliği"].forEach(function (b) {
   var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];

@@ -7070,7 +7070,7 @@ window.KCaptions = (function () {
     if (katmanIptal || katmanHazirlaniyor) { uygulaDurumu("Altyazı katmanı zaten hazırlanıyor: bitmesini bekle ya da İptal'e bas.", "warn"); return; }
     // Pro: animasyonlu katman (ucretsizde kanca basligiyla ortak 3 deneme hakki; deneme ciktisi filigranli)
     // AutoCaptions koleksiyonu (görünüm ya da animasyon) yalnız Pro: deneme hakkı onda geçmez, ücretsizde yalnız önizlenir
-    if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro() && typeof autoCaptionsIcerigi === "function" && autoCaptionsIcerigi()) { Pro.gate("overlay"); return; }
+    if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro() && typeof autoCaptionsIcerigi === "function" && autoCaptionsIcerigi()) { Pro.gate("yeniEfekt"); return; }
     if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { overlayUygula().then(uygulaEtiketiniSifirla); } })) return;
     // Deneme yalniz Altyazi Efektleri icin: tercihlerden geri yuklenen bir MOGRT stili deneme kapisindan sizmasin
     if (typeof Pro !== "undefined" && !Pro.isPro() && secilenMogrt) {

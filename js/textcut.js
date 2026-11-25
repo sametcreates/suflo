@@ -445,7 +445,7 @@
    *          atilir (uzun kliplerde komut satiri sinirini asmamak icin)
    *   opts.only: true ise TERSI — yalniz kesilecek parcalar calinir
    *          ("Yalnız kesilecekleri dinle"); kesim yoksa "" (calinacak bir sey yok)
-   * Doner: ffmpeg -af ifadesi; kesim yoksa "" (oldugu gibi cal).
+   * Doner: ffmpeg -filter_complex grafigi ([0:a] → [out]); kesim yoksa "" (oldugu gibi cal).
    */
   function previewFilter(cuts, clip, maxSn, opts) {
     var tl = Number(clip.clipEnd) - Number(clip.clipStart);
@@ -454,13 +454,31 @@
     var parcalar = (cuts || []).map(function (c) {
       var a = Math.max(0, (Number(c.start) - Number(clip.clipStart)) / hiz);
       var b = Math.min(sinir, Math.max(0, (Number(c.end) - Number(clip.clipStart)) / hiz));
-      return b > a ? "between(t," + a.toFixed(3) + "," + b.toFixed(3) + ")" : "";
-    }).filter(Boolean);
+      return { start: a, end: b };
+    }).filter(function (r) { return isFinite(r.start) && r.end > r.start; });
     if (!parcalar.length) return "";
-    if (opts && opts.only) return "aselect='" + parcalar.join("+") + "',asetpts=N/SR/TB";
-    // aselect kesilen ornekleri atar, asetpts zamani kesintisiz yeniden numaralar
-    return "aselect='not(" + parcalar.join("+") + ")',asetpts=N/SR/TB";
+    /*
+     * aselect YOK: ffmpeg 8.0.1'de (Ubuntu 26.04) aselect hiçbir kareyi atmıyor (aselect=0 bile tüm sesi bırakıyor,
+     * CI teşhisi), Dinle önizlemesi kesimsiz çalıyordu. Çalınacak parçalar atrim ile örnek hassasiyetinde kırpılır,
+     * concat ile art arda eklenir. Çıktı -filter_complex grafiği: giriş [0:a], çıkış [out] (dinle.js -map "[out]").
+     */
+    var calinacak = opts && opts.only
+      ? invertRanges(invertRanges(parcalar, 0, 1e9), 0, 1e9)          // sıralı, çakışmasız kesimler
+      : invertRanges(parcalar, 0, sinir === Infinity ? 1e9 : sinir);   // tutulan parçalar
+    if (!calinacak.length) calinacak = [{ start: 0, end: 0.001 }];      // her şey kesildi: neredeyse boş önizleme
+    var parca = function (r) {
+      return "atrim=start=" + r.start.toFixed(3) + (r.end >= 1e9 ? "" : ":end=" + r.end.toFixed(3)) + ",asetpts=PTS-STARTPTS";
+    };
+    if (calinacak.length === 1) return "[0:a]" + parca(calinacak[0]) + "[out]";
+    var n = calinacak.length, bol = "[0:a]asplit=" + n, kol = [], son = "";
+    calinacak.forEach(function (r, k) {
+      bol += "[s" + k + "]";
+      kol.push("[s" + k + "]" + parca(r) + "[k" + k + "]");
+      son += "[k" + k + "]";
+    });
+    return bol + ";" + kol.join(";") + ";" + son + "concat=n=" + n + ":v=0:a=1[out]";
   }
+
 
   return {
     previewFilter: previewFilter,

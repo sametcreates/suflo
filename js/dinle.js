@@ -60,7 +60,8 @@ window.KDinle = function (audioId) {
       ? window.SufloTextCut.previewFilter(cuts, o.clip, sure, { only: true })
       : window.SufloTextCut.previewFilter(cuts, o.clip, sure);
     if (only && !filtre) throw new Error("Dinlenecek kesim yok.");
-    if (filtre) args.push("-af", filtre);
+    // Filtre grafiği (textcut.js previewFilter): atrim parçaları + concat, çıkış etiketi [out]
+    if (filtre) args.push("-filter_complex", filtre, "-map", "[out]");
     args.push(cikti);
     var r = await K.run(ff, args, { timeout: Math.max(120000, sure * 1000) });
     var gecersiz = benim !== surum || (o.gecerli && !o.gecerli());
