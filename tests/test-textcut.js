@@ -90,6 +90,23 @@ if (!cpx.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error) {
   var ry = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-af", "asetnsamples=n=441000:p=0," + only, yalniz], { encoding: "utf8" });
   var sureY = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", yalniz], { encoding: "utf8" }).stdout);
   chk("gercek ffmpeg: \"yalnız kesilecekleri dinle\" büyük karelerde de 1.5 sn", ry.status === 0 && Math.abs(sureY - 1.5) < 0.02, sureY + " " + (ry.stderr || ""));
+  // Kanıt: bir kontrol kalırsa ffmpeg sürümü ve filtre varyantlarının gerçek süreleri yazılır (CI günlüğünde teşhis için)
+  if (Math.abs(sure - 8.5) >= 0.05 || Math.abs(sureB - 8.5) >= 0.02 || Math.abs(sureY - 1.5) >= 0.02) {
+    console.log("    TESHIS " + String(cpx.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).stdout || "").split("\n")[0]);
+    [["yalin aselect", "aselect='not(between(t,1,2))'"], ["lt(t,5)", "aselect='lt(t,5)'"], ["asetnsamples+lt", "asetnsamples=n=256:p=0,aselect='lt(t,5)'"],
+     ["atrim 0-5", "atrim=end=5"], ["pts lt", "aselect='lt(pts*TB,5)'"], ["n lt", "aselect='lt(n,100)'"], ["sabit 0", "aselect=0"]].forEach(function (v) {
+      var o = px.join(dir, "t.wav");
+      var rr = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-af", v[1], o], { encoding: "utf8" });
+      var d = cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=duration,duration_ts,nb_frames", "-of", "compact", o], { encoding: "utf8" });
+      var bilgi = cpx.spawnSync("ffmpeg", ["-v", "error", "-i", o, "-f", "null", "-"], { encoding: "utf8" });
+      var say = cpx.spawnSync("ffmpeg", ["-i", o, "-af", "ashowinfo", "-f", "null", "-"], { encoding: "utf8" });
+      var kare = (String(say.stderr || "").match(/nb_samples:\d+/g) || []);
+      console.log("    TESHIS " + v[0] + ": durum " + rr.status + " | " + String(d.stdout || "").replace(/\n/g, " ") + " | kare " + kare.length +
+        " ilk " + (kare[0] || "-") + " | hata " + String(rr.stderr || bilgi.stderr || "").replace(/\n/g, " ").slice(0, 160));
+    });
+    var gi = cpx.spawnSync("ffmpeg", ["-i", giris, "-af", "ashowinfo", "-f", "null", "-"], { encoding: "utf8" });
+    console.log("    TESHIS giris ilk kareler: " + (String(gi.stderr || "").match(/pts_time:[^ ]+.*?nb_samples:\d+/g) || []).slice(0, 2).join(" || "));
+  }
   try { fsx.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
 } else console.log("ATLA gercek ffmpeg onizleme testi");
 
