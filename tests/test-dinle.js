@@ -68,7 +68,7 @@ function bekle() { return new Promise(function (r) { setImmediate(r); }); }
   var r4 = await p4;
   var af4 = a4[a4.indexOf("-af") + 1];
   ok("only: tum klip okunur", a4[a4.indexOf("-t") + 1] === "900");
-  ok("only: aselect between (not yok), 300 aralik siniri", /^aselect='between/.test(af4) && (af4.match(/between/g) || []).length === 300, (af4.match(/between/g) || []).length);
+  ok("only: aselect between (not yok), 300 aralik siniri", /^asetnsamples=n=256:p=0,aselect='between/.test(af4) && (af4.match(/between/g) || []).length === 300, (af4.match(/between/g) || []).length);
   ok("only: kisaltildi bayragi (320 > 300)", r4.ok && r4.kisaltildi === true);
   var hata = "";
   try { await D.cal({ mediaPath: "/m.mp4", inPoint: 0, dur: 60, cuts: [], clip: { clipStart: 0, clipEnd: 60, dur: 60 }, only: true }); } catch (eO) { hata = eO.message; }

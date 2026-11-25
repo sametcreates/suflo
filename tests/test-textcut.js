@@ -67,7 +67,7 @@ var kisa = T.buildCuts([w(0, 1, "a"), w(1, 1.05, "ı"), w(1.05, 2, "b")], [false
 chk("kullanicinin sildigi cok kisa kelime de kesilir", kisa.length === 1 && kisa[0].start === 1 && kisa[0].end === 1.05, JSON.stringify(kisa));
 /* "Dinle" onizlemesi */
 var pf = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 });
-chk("previewFilter: klip-ici kaynak zamanlari", pf === "aselect='not(between(t,1.000,2.000)+between(t,4.000,4.500))',asetpts=N/SR/TB", pf);
+chk("previewFilter: klip-ici kaynak zamanlari, önce küçük karelere bölünür", pf === "asetnsamples=n=256:p=0,aselect='not(between(t,1.000,2.000)+between(t,4.000,4.500))',asetpts=N/SR/TB", pf);
 chk("previewFilter: %200 hizda kaynak zamani iki kati", /between\(t,2\.000,4\.000\)/.test(T.previewFilter([{ start: 11, end: 12 }], { clipStart: 10, clipEnd: 15, dur: 10 })));
 chk("previewFilter: kesim yoksa bos", T.previewFilter([], { clipStart: 0, clipEnd: 5, dur: 5 }) === "");
 var cpx = require("child_process"), fsx = require("fs"), osx = require("os"), px = require("path");
@@ -79,6 +79,17 @@ if (!cpx.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error) {
   var r = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-ss", "0", "-t", "10", "-i", giris, "-vn", "-af", pf, cikis], { encoding: "utf8" });
   var sure = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", cikis], { encoding: "utf8" }).stdout);
   chk("gercek ffmpeg: 10 sn - 1.5 sn kesim = 8.5 sn onizleme", r.status === 0 && Math.abs(sure - 8.5) < 0.05, sure + " " + (r.stderr || ""));
+  // ffmpeg sesi büyük karelerle verse de (Ubuntu 26.04 CI'da görüldü: önizleme 10 sn kalıyordu) kesim uygulanır: kaynağı
+  // 10 sn'lik tek kareye toplayıp aynı filtreyi uygula
+  var buyuk = px.join(dir, "buyuk.wav");
+  var rb = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-af", "asetnsamples=n=441000:p=0," + pf, buyuk], { encoding: "utf8" });
+  var sureB = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", buyuk], { encoding: "utf8" }).stdout);
+  chk("gercek ffmpeg: büyük ses karelerinde de kesim uygulanır (8.5 sn)", rb.status === 0 && Math.abs(sureB - 8.5) < 0.02, sureB + " " + (rb.stderr || ""));
+  var only = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }, 10, { only: true });
+  var yalniz = px.join(dir, "yalniz.wav");
+  var ry = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-af", "asetnsamples=n=441000:p=0," + only, yalniz], { encoding: "utf8" });
+  var sureY = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", yalniz], { encoding: "utf8" }).stdout);
+  chk("gercek ffmpeg: \"yalnız kesilecekleri dinle\" büyük karelerde de 1.5 sn", ry.status === 0 && Math.abs(sureY - 1.5) < 0.02, sureY + " " + (ry.stderr || ""));
   try { fsx.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
 } else console.log("ATLA gercek ffmpeg onizleme testi");
 
@@ -161,6 +172,6 @@ chk("invertRanges: kenarlarda dogru", JSON.stringify(inv) === JSON.stringify([{ 
 chk("invertRanges: bos liste tum aralik", JSON.stringify(T.invertRanges([], 2, 5)) === JSON.stringify([{ start: 2, end: 5 }]));
 chk("previewFilter: varsayilan bayt bayt ayni", T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }) === pf);
 var only = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }, null, { only: true });
-chk("previewFilter only: aselect between()", only === "aselect='between(t,1.000,2.000)+between(t,4.000,4.500)',asetpts=N/SR/TB", only);
+chk("previewFilter only: aselect between()", only === "asetnsamples=n=256:p=0,aselect='between(t,1.000,2.000)+between(t,4.000,4.500)',asetpts=N/SR/TB", only);
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

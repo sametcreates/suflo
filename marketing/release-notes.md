@@ -5,6 +5,9 @@
 - **Yeni efektlere özel Pro penceresi:** yeni bir efekti önizleyip eklemek istediğinde pencere o efektlerin örneklerini, kaç yeni efekt, animasyon ve şablon olduğunu gösterir. Altyazı Efektleri'ni eklerken açılan pencere de artık önizlemede gördüğün katmanı anlatır. Önizleme her zaman ücretsiz.
 - **Ödeme sayfası açılmazsa:** satın al düğmesi tarayıcıyı açamazsa (kurumsal bilgisayar, varsayılan tarayıcı yok) ödeme adresi panoya kopyalanır ve panel ne yapacağını söyler; açılırsa kısa bir yol bildirimi görünür.
 
+### Düzeltildi
+- **Konuşmadan kes › Dinle:** ffmpeg 8 kullanan bilgisayarlarda önizleme kesimleri atlayıp sesi olduğu gibi çalıyordu. Artık her ffmpeg sürümünde kesimler uygulanır ve önizleme daha hassas (yaklaşık 5 ms).
+
 ### Değişmeyenler
 - Fiyatlar, ücretsiz / Pro sınırı, deneme hakları, stil kodları ve kayıtlı stiller değişmedi.
 

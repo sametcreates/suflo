@@ -457,9 +457,13 @@
       return b > a ? "between(t," + a.toFixed(3) + "," + b.toFixed(3) + ")" : "";
     }).filter(Boolean);
     if (!parcalar.length) return "";
-    if (opts && opts.only) return "aselect='" + parcalar.join("+") + "',asetpts=N/SR/TB";
+    // aselect KARE başına karar verir: ffmpeg sesi büyük karelerle verirse (bazı sürüm / derlemeler, ör. Ubuntu 26.04)
+    // between(t,…) yalnız karenin başında bakılır ve kesim hiç uygulanmaz (önizleme kesimsiz çalardı). Önce 256 örneklik
+    // karelere böl: sürümden bağımsız, 48 kHz'de ~5 ms hassasiyet (eskiden ~21 ms'lik 1024 örnek)
+    var bol = "asetnsamples=n=256:p=0,";
+    if (opts && opts.only) return bol + "aselect='" + parcalar.join("+") + "',asetpts=N/SR/TB";
     // aselect kesilen ornekleri atar, asetpts zamani kesintisiz yeniden numaralar
-    return "aselect='not(" + parcalar.join("+") + ")',asetpts=N/SR/TB";
+    return bol + "aselect='not(" + parcalar.join("+") + ")',asetpts=N/SR/TB";
   }
 
   return {
