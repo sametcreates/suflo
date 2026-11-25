@@ -31,8 +31,9 @@ function bekle() { return new Promise(function (r) { setImmediate(r); }); }
   await bekle();
   var a1 = calismalar[0];
   ok("uzun klip: yalniz ilk 300 sn okunur", a1[a1.indexOf("-t") + 1] === "300");
-  var af = a1[a1.indexOf("-af") + 1];
-  ok("uzun klip: sinir disi kesimler filtreye girmez", /between\(t,10\.000,12\.000\)/.test(af) && !/400/.test(af), af);
+  var af = a1[a1.indexOf("-filter_complex") + 1];
+  ok("uzun klip: sinir disi kesimler filtreye girmez, cikis [out] eslenir", /atrim=start=0\.000:end=10\.000,/.test(af) && /atrim=start=12\.000:end=300\.000,/.test(af) && !/400/.test(af) &&
+    a1[a1.indexOf("-map") + 1] === "[out]" && a1.indexOf("-af") === -1, af);
   gecerli = false;          // ffmpeg calisirken klip degisti
   bekleyen.shift()();
   var r1 = await p1;
@@ -66,9 +67,9 @@ function bekle() { return new Promise(function (r) { setImmediate(r); }); }
   var a4 = calismalar[calismalar.length - 1];
   bekleyen.shift()();
   var r4 = await p4;
-  var af4 = a4[a4.indexOf("-af") + 1];
+  var af4 = a4[a4.indexOf("-filter_complex") + 1];
   ok("only: tum klip okunur", a4[a4.indexOf("-t") + 1] === "900");
-  ok("only: aselect between (not yok), 300 aralik siniri", /^asetnsamples=n=256:p=0,aselect='between/.test(af4) && (af4.match(/between/g) || []).length === 300, (af4.match(/between/g) || []).length);
+  ok("only: yalniz kesimler atrim ile, 300 aralik siniri", /^\[0:a\]asplit=300/.test(af4) && (af4.match(/atrim=/g) || []).length === 300 && /concat=n=300:v=0:a=1\[out\]$/.test(af4), (af4.match(/atrim=/g) || []).length);
   ok("only: kisaltildi bayragi (320 > 300)", r4.ok && r4.kisaltildi === true);
   var hata = "";
   try { await D.cal({ mediaPath: "/m.mp4", inPoint: 0, dur: 60, cuts: [], clip: { clipStart: 0, clipEnd: 60, dur: 60 }, only: true }); } catch (eO) { hata = eO.message; }

@@ -6,7 +6,7 @@
 - **Ödeme sayfası açılmazsa:** satın al düğmesi tarayıcıyı açamazsa (kurumsal bilgisayar, varsayılan tarayıcı yok) ödeme adresi panoya kopyalanır ve panel ne yapacağını söyler; açılırsa kısa bir yol bildirimi görünür.
 
 ### Düzeltildi
-- **Konuşmadan kes › Dinle:** ffmpeg 8 kullanan bilgisayarlarda önizleme kesimleri atlayıp sesi olduğu gibi çalıyordu. Artık her ffmpeg sürümünde kesimler uygulanır ve önizleme daha hassas (yaklaşık 5 ms).
+- **Konuşmadan kes › Dinle:** ffmpeg 8 kullanan bilgisayarlarda önizleme kesimleri atlayıp sesi olduğu gibi çalıyordu. Önizleme artık kesimleri ffmpeg sürümünden bağımsız, örnek hassasiyetinde uygular.
 
 ### Değişmeyenler
 - Fiyatlar, ücretsiz / Pro sınırı, deneme hakları, stil kodları ve kayıtlı stiller değişmedi.

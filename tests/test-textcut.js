@@ -67,8 +67,12 @@ var kisa = T.buildCuts([w(0, 1, "a"), w(1, 1.05, "ı"), w(1.05, 2, "b")], [false
 chk("kullanicinin sildigi cok kisa kelime de kesilir", kisa.length === 1 && kisa[0].start === 1 && kisa[0].end === 1.05, JSON.stringify(kisa));
 /* "Dinle" onizlemesi */
 var pf = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 });
-chk("previewFilter: klip-ici kaynak zamanlari, önce küçük karelere bölünür", pf === "asetnsamples=n=256:p=0,aselect='not(between(t,1.000,2.000)+between(t,4.000,4.500))',asetpts=N/SR/TB", pf);
-chk("previewFilter: %200 hizda kaynak zamani iki kati", /between\(t,2\.000,4\.000\)/.test(T.previewFilter([{ start: 11, end: 12 }], { clipStart: 10, clipEnd: 15, dur: 10 })));
+chk("previewFilter: klip-ici kaynak zamanlari; tutulan parçalar atrim + concat (aselect yok: ffmpeg 8'de kare atmıyor)", pf ===
+  "[0:a]asplit=3[s0][s1][s2];[s0]atrim=start=0.000:end=1.000,asetpts=PTS-STARTPTS[k0];[s1]atrim=start=2.000:end=4.000,asetpts=PTS-STARTPTS[k1];" +
+  "[s2]atrim=start=4.500,asetpts=PTS-STARTPTS[k2];[k0][k1][k2]concat=n=3:v=0:a=1[out]" && pf.indexOf("aselect") === -1, pf);
+chk("previewFilter: %200 hizda kaynak zamani iki kati", /atrim=start=0\.000:end=2\.000,.*atrim=start=4\.000,/.test(T.previewFilter([{ start: 11, end: 12 }], { clipStart: 10, clipEnd: 15, dur: 10 })));
+chk("previewFilter: maxSn sinirli tutulan son parca sinirda biter", /atrim=start=4\.500:end=6\.000,asetpts=PTS-STARTPTS\[k2\]/.test(T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }, 6)));
+chk("previewFilter: tek parca asplit / concat olmadan", T.previewFilter([{ start: 10, end: 12 }], { clipStart: 10, clipEnd: 20, dur: 10 }) === "[0:a]atrim=start=2.000,asetpts=PTS-STARTPTS[out]");
 chk("previewFilter: kesim yoksa bos", T.previewFilter([], { clipStart: 0, clipEnd: 5, dur: 5 }) === "");
 var cpx = require("child_process"), fsx = require("fs"), osx = require("os"), px = require("path");
 if (!cpx.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error) {
@@ -76,37 +80,20 @@ if (!cpx.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error) {
   var giris = px.join(dir, "ses.wav"), cikis = px.join(dir, "onizleme.wav");
   cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=10", giris]);
   // gercek panel argumanlari: -ss inPoint -t dur, ardindan filtre
-  var r = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-ss", "0", "-t", "10", "-i", giris, "-vn", "-af", pf, cikis], { encoding: "utf8" });
+  var r = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-ss", "0", "-t", "10", "-i", giris, "-vn", "-filter_complex", pf, "-map", "[out]", cikis], { encoding: "utf8" });
   var sure = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", cikis], { encoding: "utf8" }).stdout);
   chk("gercek ffmpeg: 10 sn - 1.5 sn kesim = 8.5 sn onizleme", r.status === 0 && Math.abs(sure - 8.5) < 0.05, sure + " " + (r.stderr || ""));
   // ffmpeg sesi büyük karelerle verse de (Ubuntu 26.04 CI'da görüldü: önizleme 10 sn kalıyordu) kesim uygulanır: kaynağı
   // 10 sn'lik tek kareye toplayıp aynı filtreyi uygula
   var buyuk = px.join(dir, "buyuk.wav");
-  var rb = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-af", "asetnsamples=n=441000:p=0," + pf, buyuk], { encoding: "utf8" });
+  var rb = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-filter_complex", "[0:a]asetnsamples=n=441000:p=0[b];" + pf.replace("[0:a]", "[b]"), "-map", "[out]", buyuk], { encoding: "utf8" });
   var sureB = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", buyuk], { encoding: "utf8" }).stdout);
   chk("gercek ffmpeg: büyük ses karelerinde de kesim uygulanır (8.5 sn)", rb.status === 0 && Math.abs(sureB - 8.5) < 0.02, sureB + " " + (rb.stderr || ""));
   var only = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }, 10, { only: true });
   var yalniz = px.join(dir, "yalniz.wav");
-  var ry = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-af", "asetnsamples=n=441000:p=0," + only, yalniz], { encoding: "utf8" });
+  var ry = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-filter_complex", "[0:a]asetnsamples=n=441000:p=0[b];" + only.replace("[0:a]", "[b]"), "-map", "[out]", yalniz], { encoding: "utf8" });
   var sureY = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", yalniz], { encoding: "utf8" }).stdout);
   chk("gercek ffmpeg: \"yalnız kesilecekleri dinle\" büyük karelerde de 1.5 sn", ry.status === 0 && Math.abs(sureY - 1.5) < 0.02, sureY + " " + (ry.stderr || ""));
-  // Kanıt: bir kontrol kalırsa ffmpeg sürümü ve filtre varyantlarının gerçek süreleri yazılır (CI günlüğünde teşhis için)
-  if (Math.abs(sure - 8.5) >= 0.05 || Math.abs(sureB - 8.5) >= 0.02 || Math.abs(sureY - 1.5) >= 0.02) {
-    console.log("    TESHIS " + String(cpx.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).stdout || "").split("\n")[0]);
-    [["yalin aselect", "aselect='not(between(t,1,2))'"], ["lt(t,5)", "aselect='lt(t,5)'"], ["asetnsamples+lt", "asetnsamples=n=256:p=0,aselect='lt(t,5)'"],
-     ["atrim 0-5", "atrim=end=5"], ["pts lt", "aselect='lt(pts*TB,5)'"], ["n lt", "aselect='lt(n,100)'"], ["sabit 0", "aselect=0"]].forEach(function (v) {
-      var o = px.join(dir, "t.wav");
-      var rr = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", giris, "-vn", "-af", v[1], o], { encoding: "utf8" });
-      var d = cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=duration,duration_ts,nb_frames", "-of", "compact", o], { encoding: "utf8" });
-      var bilgi = cpx.spawnSync("ffmpeg", ["-v", "error", "-i", o, "-f", "null", "-"], { encoding: "utf8" });
-      var say = cpx.spawnSync("ffmpeg", ["-i", o, "-af", "ashowinfo", "-f", "null", "-"], { encoding: "utf8" });
-      var kare = (String(say.stderr || "").match(/nb_samples:\d+/g) || []);
-      console.log("    TESHIS " + v[0] + ": durum " + rr.status + " | " + String(d.stdout || "").replace(/\n/g, " ") + " | kare " + kare.length +
-        " ilk " + (kare[0] || "-") + " | hata " + String(rr.stderr || bilgi.stderr || "").replace(/\n/g, " ").slice(0, 160));
-    });
-    var gi = cpx.spawnSync("ffmpeg", ["-i", giris, "-af", "ashowinfo", "-f", "null", "-"], { encoding: "utf8" });
-    console.log("    TESHIS giris ilk kareler: " + (String(gi.stderr || "").match(/pts_time:[^ ]+.*?nb_samples:\d+/g) || []).slice(0, 2).join(" || "));
-  }
   try { fsx.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
 } else console.log("ATLA gercek ffmpeg onizleme testi");
 
@@ -189,6 +176,7 @@ chk("invertRanges: kenarlarda dogru", JSON.stringify(inv) === JSON.stringify([{ 
 chk("invertRanges: bos liste tum aralik", JSON.stringify(T.invertRanges([], 2, 5)) === JSON.stringify([{ start: 2, end: 5 }]));
 chk("previewFilter: varsayilan bayt bayt ayni", T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }) === pf);
 var only = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }, null, { only: true });
-chk("previewFilter only: aselect between()", only === "asetnsamples=n=256:p=0,aselect='between(t,1.000,2.000)+between(t,4.000,4.500)',asetpts=N/SR/TB", only);
+chk("previewFilter only: yalniz kesimler atrim + concat", only === "[0:a]asplit=2[s0][s1];[s0]atrim=start=1.000:end=2.000,asetpts=PTS-STARTPTS[k0];[s1]atrim=start=4.000:end=4.500,asetpts=PTS-STARTPTS[k1];[k0][k1]concat=n=2:v=0:a=1[out]", only);
+chk("previewFilter only: çakışan kesimler birleşir", T.previewFilter([{ start: 11, end: 12 }, { start: 11.5, end: 13 }], { clipStart: 10, clipEnd: 20, dur: 10 }, null, { only: true }) === "[0:a]atrim=start=1.000:end=3.000,asetpts=PTS-STARTPTS[out]");
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
