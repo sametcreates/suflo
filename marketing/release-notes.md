@@ -1,3 +1,13 @@
+## Suflo 3.6.0 — Yeni altyazı efektleri bir tık uzağında
+
+### İyileştirildi
+- **Yenilikler penceresi:** güncellemeden sonra ilk açılışta yeni altyazı efektleri en başta; **Göster**'e basınca Altyazı Efektleri › **Yeni** bandına gider. Yeni şablon ve başlıklar da kütüphanede tek tıkla açılır.
+- **Yeni efektlere özel Pro penceresi:** yeni bir efekti önizleyip eklemek istediğinde pencere o efektlerin örneklerini, kaç yeni efekt, animasyon ve şablon olduğunu gösterir. Altyazı Efektleri'ni eklerken açılan pencere de artık önizlemede gördüğün katmanı anlatır. Önizleme her zaman ücretsiz.
+- **Ödeme sayfası açılmazsa:** satın al düğmesi tarayıcıyı açamazsa (kurumsal bilgisayar, varsayılan tarayıcı yok) ödeme adresi panoya kopyalanır ve panel ne yapacağını söyler; açılırsa kısa bir yol bildirimi görünür.
+
+### Değişmeyenler
+- Fiyatlar, ücretsiz / Pro sınırı, deneme hakları, stil kodları ve kayıtlı stiller değişmedi.
+
 ## Suflo 3.5.1 — Yeni efektler öne çıktı
 
 ### İyileştirildi

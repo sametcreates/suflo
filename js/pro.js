@@ -104,6 +104,7 @@
     assexport: 'Stilli ASS disa aktarma',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
     captionStyles: '31 gerçek altyazı stili',
+    yeniEfekt: '19 yeni altyazı efekti (Altyazı Efektleri › Yeni)',
     presets:   'Panelden uygulanan 290 Motion ve efekt preseti',
     sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
     motionbg:  'Motion BG (hareketli zeminler + overlay videolari)',
@@ -625,19 +626,35 @@
     var label = FEATURE_LABELS[feature] || 'Bu ozellik';
     var isMogrt = feature === 'mogrt' || feature === 'propack';
     var isCaption = feature === 'captionStyles';
+    // Yeni efektler (Altyazı Efektleri › Yeni, denemesiz) ve stilli altyazı katmanı: kendi başlık, görsel ve listesiyle
+    var isYeni = feature === 'yeniEfekt';
+    var isOverlay = feature === 'overlay';
     var isSfx = feature === 'sfx';
     var isPreset = feature === 'presets';
-    var title = isCaption ? 'Altyazın hazır. Şimdi videon gibi görünsün.' :
+    var title = isYeni ? 'Seçtiğin yeni efekt hazır. Altyazına Pro ile ekle.' :
+      isOverlay ? 'Önizlediğin altyazı efektini timeline\'a ekle' :
+      isCaption ? 'Altyazın hazır. Şimdi videon gibi görünsün.' :
       (isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 267 animasyon ve grafik' :
       (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' :
       (isPreset ? '290 preset doğrudan Suflo panelinde' : label)));
-    var desc = isCaption ? 'Creator Punch, Karaoke, Glitch, Typewriter, 14 yeni stil ve 13 stil daha. Birini seç; Suflo tüm altyazı satırlarına ve sekans oranına kendisi uygulasın.' :
+    var desc = isYeni ? '19 yeni altyazı efekti ve 12 yeni yazı animasyonu: ışıltılı, kutulu, eğik serif ve kayan stiller. Önizlemek ücretsiz; Pro ile altyazın tek tıkla timeline\'a bu efektle yazılır.' :
+      isOverlay ? '49 hazır görünüm ve 37 yazı animasyonu, önizlemede gördüğün gibi şeffaf bir katman olarak timeline\'a eklenir. Kelime kelime vurgu, konum ve Marka Kiti dahil.' :
+      isCaption ? 'Creator Punch, Karaoke, Glitch, Typewriter, 14 yeni stil ve 13 stil daha. Birini seç; Suflo tüm altyazı satırlarına ve sekans oranına kendisi uygulasın.' :
       (isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
       (isSfx ? '14 koleksiyondaki 1.076 sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
       (isPreset ? '12 yerleşik hareket + Suflo Smooth paketindeki 270 preset seçili klibe doğrudan uygulanır; 8 özel preset uyumluluk modunda açılır.' :
       'Bu profesyonel i\u015f ak\u0131\u015f\u0131 Suflo Pro ile a\u00e7\u0131l\u0131r. Bir kere al, saya\u00e7 ve abonelik olmadan kullan.')));
     var visual;
-    if (isCaption) {
+    if (isYeni) {
+      visual = '<div class="pro-upsell-mogrt pro-upsell-caption" aria-label="Yeni altyazı efekti örnekleri">' +
+        '<img src="assets/pro-caption-showcase/previews/19-autocaptions-aura.webp" alt="Aura altyazı efekti">' +
+        '<img src="assets/pro-caption-showcase/previews/23-autocaptions-editorial.webp" alt="Editorial altyazı efekti">' +
+        '<img src="assets/pro-caption-showcase/previews/26-autocaptions-rojo.webp" alt="Rojo altyazı efekti">' +
+      '</div>';
+    } else if (isOverlay) {
+      // Altyazı Efektleri libass ile çizilir: Premiere şablonu görseli göstermeyiz (gördüğün = eklenen)
+      visual = '<div class="pro-upsell-tool"><i>\u2726</i><span><b>49 görünüm \u00b7 37 yazı animasyonu</b><small>Önizlemedeki altyazı aynısıyla şeffaf katman olarak eklenir</small></span></div>';
+    } else if (isCaption) {
       visual = '<div class="pro-upsell-mogrt pro-upsell-caption" aria-label="Gerçek altyazı stili örnekleri">' +
         '<img src="assets/pro-caption-showcase/previews/11-mr-beast.webp" alt="Creator Punch altyazı stili">' +
         '<img src="assets/pro-caption-showcase/previews/08-karaoke.webp" alt="Karaoke altyazı stili">' +
@@ -659,13 +676,18 @@
     } else {
       visual = '<div class="pro-upsell-tool"><i>\u2726</i><span><b>Daha h\u0131zl\u0131 bitir</b><small>Tekrarlanan kurgu i\u015fini Suflo\'ya b\u0131rak</small></span></div>';
     }
-    var proof = isCaption
+    var proof = isYeni
+      ? '<div class="pro-upsell-proof"><i><b>19</b> yeni efekt</i><i><b>12</b> yeni animasyon</i><i><b>14</b> yeni şablon</i></div>'
+      : isCaption
       ? '<div class="pro-upsell-proof"><i><b>31</b> gerçek stil</i><i><b>14</b> yeni stil</i><i><b>65</b> MOGRT</i></div>'
       : '<div class="pro-upsell-proof"><i><b>267</b> animasyon</i><i><b>290</b> preset</i><i><b>1.076</b> SFX</i></div>';
-    var benefits = isCaption
+    var benefits = (isYeni || isOverlay)
+      ? '<ul class="pro-upsell-liste"><li>Önizlemede gördüğün altyazı, aynısıyla timeline\'da</li><li>Reels, Shorts ve YouTube için doğru konum ve boyut</li><li>Lisansı bir kez gir; yeni efektler otomatik gelsin</li></ul>'
+      : isCaption
       ? '<ul class="pro-upsell-liste"><li>Reels, YouTube ve kare video için otomatik oran</li><li>Bir seçimle tüm altyazı satırlarına uygula</li><li>Lisansı gir; dosyalar ve yenileri otomatik gelsin</li></ul>'
       : '<ul class="pro-upsell-liste"><li>Otomatik sessizlik kesimi + ritim marker</li><li>31 altyazı stili + 267 animasyon + 290 preset + 1.076 SFX</li><li>Lisansı bir kez gir; yeni içerikler otomatik gelsin</li></ul>';
-    var buyText = isCaption ? '31 Stili ve Tüm Pro\'yu Aç \u2192' : 'Suflo Pro\'yu Al \u2192';
+    var buyText = isYeni ? 'Yeni Efektleri ve Tüm Pro\'yu Aç \u2192' :
+      (isCaption ? '31 Stili ve Tüm Pro\'yu Aç \u2192' : 'Suflo Pro\'yu Al \u2192');
     ensureUpsellCss();
     var old = document.getElementById('pro-upsell');
     if (old) old.parentNode.removeChild(old);

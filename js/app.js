@@ -25,6 +25,25 @@ window.KApp = (function () {
     return SufloPricing.checkoutUrl(arayuzDili(), feature, surum, kod);
   }
 
+  /*
+   * Ödeme / Pro sayfasını varsayılan tarayıcıda aç. CEP'in openURLInDefaultBrowser'ı hata vermeden hiçbir şey
+   * açmayabilir (kurumsal politika, varsayılan tarayıcı yok): kullanıcı boşlukta kalmasın diye her açılışta
+   * kısa bir bildirim yolu söyler; çağrı istisna atarsa adres panoya kopyalanır (kopyalanamazsa bildirimde yazar).
+   */
+  function odemeSayfasiniAc(url) {
+    var acildi = false;
+    try { if (K.cs && typeof K.cs.openURLInDefaultBrowser === "function") { K.cs.openURLInDefaultBrowser(url); acildi = true; } }
+    catch (e) { acildi = false; }
+    if (acildi) {
+      toast("Ödeme sayfası tarayıcında açılıyor. Açılmazsa: suflo.app/pro", "good", 7000);
+      return true;
+    }
+    var kopya = false;
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(url); kopya = true; } } catch (e2) {}
+    toast(kopya ? "Tarayıcı açılamadı; ödeme adresi panoya kopyalandı, tarayıcına yapıştır." : "Tarayıcı açılamadı; suflo.app/pro adresinden devam et.", "warn", 10000);
+    return false;
+  }
+
   // Davet şeridi anı: ilk kesim (magiccut.js), ilk Shorts (viral.js), 5. başarılı uygulama (captions.js)
   function davetAni(olay) {
     try { if (window.KDavet && KDavet.ani) KDavet.ani(olay); } catch (e) { K.log("davet: " + (e && e.message ? e.message : e)); }
@@ -1240,7 +1259,7 @@ window.KApp = (function () {
     el("pro-buy").addEventListener("click", function (e) {
       e.preventDefault();
       // Lemon Squeezy checkout (fiyat ve para birimi: js/pricing.js)
-      K.cs.openURLInDefaultBrowser(proCheckoutUrl("settings"));
+      odemeSayfasiniAc(proCheckoutUrl("settings"));
     });
   }
 
@@ -2144,7 +2163,7 @@ window.KApp = (function () {
       Pro.init();
       Pro.onUpgrade(function (feature, intent) {
         if (intent === "buy") {
-          K.cs.openURLInDefaultBrowser(proCheckoutUrl(feature));
+          odemeSayfasiniAc(proCheckoutUrl(feature));
           return;
         }
         if (intent === "demo") {
@@ -2228,13 +2247,13 @@ window.KApp = (function () {
    * eylem: "aracAra" sekme yerine Arac ara paletini acar (KApp.aracAra).
    */
   var YENILIKLER = {
-    surum: "3.5",
-    alt: "Altyazı yenilemesi ve sesle senkron doğrulama",
+    surum: "3.6",
+    alt: "Yeni altyazı efektleri en üstte",
     maddeler: [
+      { ikon: "✧", baslik: "Yeni efektler", metin: "19 yeni altyazı efekti ve 12 animasyon: Altyazı Efektleri › Yeni'den birini seç, altyazın o efektle yazılsın (Pro).", sekme: "captions", hedef: "cap-yeni-efekt-bant" },
+      { ikon: "A", baslik: "Yeni şablonlar ve başlıklar", metin: "14 altyazı şablonu ve 5 başlık animasyonu listelerin en üstünde, YENİ rozetiyle (Pro).", sekme: "text", hedef: "mogrt-grid" },
       { ikon: "①", baslik: "Üç adımda altyazı", metin: "Oluştur, stil seç, uygula; gelişmiş ayarlar katlı, akış sade.", sekme: "captions", hedef: "cap-adimlar" },
-      { ikon: "✦", baslik: "Yazı animasyonları", metin: "25 özgün animasyon ve 30 hazır görünüm; önizlemek ücretsiz, eklemek Pro.", sekme: "captions", hedef: "cap-efekt-galeri" },
       { ikon: "∿", baslik: "Sesle senkron doğrulama", metin: "Kelimeler ve kartlar ses dalgasına oturur; raporla kontrol et, tek tıkla geri al.", sekme: "captions", acilir: "cap-gelismis", hedef: "cap-senkron-sar" },
-      { ikon: "✧", baslik: "Yeni efektler", metin: "19 yeni altyazı efekti, 12 animasyon ve 14 Premiere şablonu; altyazını doğrudan bunlarla yaz (Pro).", sekme: "captions", hedef: "cap-yeni-efekt-bant" },
       { ikon: "⌫", baslik: "Metin temizliği", metin: "Dolgu seslerini çıkar, küfürleri yalnız çıktıda maskele.", sekme: "settings", hedef: "set-dolgu-sil" }
     ]
   };

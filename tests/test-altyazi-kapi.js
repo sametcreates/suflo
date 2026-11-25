@@ -25,9 +25,10 @@ function govde(imza) {
 var TABAN = JSON.parse(oku("tests/fixtures/pro-kapi-5d153e7.json")).satirlar;
 // Bilinçli olarak eklenen kapı satırları ("js/dosya.js: kırpılmış satır" → adet). Yenilemede YOK.
 // AutoCaptions koleksiyonu (ClashiVFX, yazarın izniyle) yalnız Suflo Pro içeriği: görünümü ya da animasyonu seçiliyken
-// stilli katman denemesiz Pro.gate("overlay") ister (ücretsizde yalnız önizleme); galeride Pro'suzken PRO rozeti.
+// stilli katman denemesiz Pro.gate("yeniEfekt") ister (3.6: "overlay" yerine kendi penceresi; deneme listesinde değil, yine
+// isPro ile açılır; ücretsizde yalnız önizleme); galeride Pro'suzken PRO rozeti.
 var BILINCLI_EK = {
-  'js/captions.js: if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro() && typeof autoCaptionsIcerigi === "function" && autoCaptionsIcerigi()) { Pro.gate("overlay"); return; }': 1,
+  'js/captions.js: if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro() && typeof autoCaptionsIcerigi === "function" && autoCaptionsIcerigi()) { Pro.gate("yeniEfekt"); return; }': 1,
   'js/captions.js: if (typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro()) {': 1
 };
 var simdi = {};
@@ -50,8 +51,8 @@ ok("Premiere stilli katman: Pro.gate(\"overlay\", { deneme: true, … }) (3 dene
   /Pro\.gate\("overlay", \{ deneme: true, yeniden: function \(\) \{ overlayUygula\(\)/.test(govde("async function overlayUygula(")));
 // AutoCaptions koleksiyonu yalnız Pro: kontrol deneme kapısından ÖNCE, denemesiz Pro.gate("overlay"); görünüm, eşleşen ayar ya da animasyon koleksiyondansa
 var ovl = govde("async function overlayUygula("), acGovde = govde("function autoCaptionsIcerigi(");
-ok("AutoCaptions görünüm / animasyonu: deneme hakkı geçmez (denemesiz Pro.gate(\"overlay\") deneme kapısından önce), ücretsizde yalnız önizleme",
-  ovl.indexOf("autoCaptionsIcerigi()) { Pro.gate(\"overlay\"); return; }") > 0 &&
+ok("AutoCaptions görünüm / animasyonu: deneme hakkı geçmez (denemesiz Pro.gate(\"yeniEfekt\") deneme kapısından önce; yeniEfekt deneme listesinde yok), ücretsizde yalnız önizleme",
+  ovl.indexOf("autoCaptionsIcerigi()) { Pro.gate(\"yeniEfekt\"); return; }") > 0 && !require(path.join(KOK, "js", "deneme.js")).listede("yeniEfekt") &&
   ovl.indexOf("autoCaptionsIcerigi()") < ovl.indexOf('Pro.gate("overlay", { deneme: true') &&
   /koleksiyon === "autocaptions"/.test(acGovde) && /secilenGorunum\) \|\| acMi\(sonGorunum\)/.test(acGovde) && /gorunumuBul\(a\)/.test(acGovde) &&
   /SufloYaziAnimasyon\.bul\(a\.anim\)/.test(acGovde));
