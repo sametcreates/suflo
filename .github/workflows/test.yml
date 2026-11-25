@@ -49,7 +49,9 @@ jobs:
   # Suflo Studio uctan uca: gercek Chromium + php -S + SQLite, masaustu ve telefon. studio.js baska hicbir CI isinde
   # tarayicida yuklenmez; bu iste Playwright ya da pdo_sqlite yoksa test atlanmaz, kalir (STUDIO_E2E_ZORUNLU).
   studio-e2e:
-    runs-on: ubuntu-latest
+    # ubuntu-latest 26.04'e geçti; Playwright 1.56.1 orada Chromium kuramıyor ("does not support chromium on
+    # ubuntu26.04-x64"). Playwright sürümü yükselene kadar bu iş 24.04'te koşar.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
