@@ -377,6 +377,46 @@ async function calis() {
   ok("Meta'ya ulasilamazsa 502", h5.status === 502 && h5.json.meta_http === 0, h5.metin);
   config({});
 
+  /* ---------- deneme araci (tools/ls-webhook-dene.js) gercek sunucuya karsi ---------- */
+  // spawnSync KULLANILMAZ: bu surecteki sahte Meta sunucusu yanit verebilsin diye arac eszamansiz kosar
+  function arac(env) {
+    return new Promise(function (resolve) {
+      var e = Object.assign({}, process.env, env || {});
+      Object.keys(e).forEach(function (k) { if (e[k] === undefined) delete e[k]; });
+      var p = cp.spawn(process.execPath, [path.join(ROOT, "tools", "ls-webhook-dene.js"), "http://127.0.0.1:" + phpPort + "/pro/v1/ls-webhook.php"], { env: e });
+      var cikti = "";
+      p.stdout.on("data", function (d) { cikti += d; }); p.stderr.on("data", function (d) { cikti += d; });
+      var zaman = setTimeout(function () { try { p.kill(); } catch (x) {} }, 60000);
+      p.on("close", function (kod) { clearTimeout(zaman); resolve({ kod: kod, cikti: cikti }); });
+    });
+  }
+  var aracCiktilari = [];
+  async function aracKos(env) { var r = await arac(env); aracCiktilari.push(r.cikti); return r; }
+  config({});
+  once = meta.istekler.length;
+  var a1 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: undefined });
+  ok("deneme araci, sir yokken: dosya yerinde ve HAZIR der, imzali istek atmaz", a1.kod === 0 && /Dosya yerinde/.test(a1.cikti) && /HAZIR/.test(a1.cikti) && meta.istekler.length === once, a1.cikti);
+  var a2 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: SIR });
+  ok("deneme araci, test kodu bosken: imza dogru der, Meta'ya bir sey gitmez", a2.kod === 0 && /Imza ve kurulum DOGRU/.test(a2.cikti) && meta.istekler.length === once, a2.cikti);
+  config({ meta_test_event_code: "TEST12345" });
+  var a3 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: SIR });
+  var ma = meta.istekler[once];
+  ok("deneme araci, test kodu varken: TAMAM, Meta'ya test koduyla 1,00 TRY'lik Purchase gider", a3.kod === 0 && /TAMAM/.test(a3.cikti) && meta.istekler.length === once + 1 && ma.alanlar.test_event_code === "TEST12345" &&
+    ma.data[0].event_name === "Purchase" && ma.data[0].custom_data.value === 1 && ma.data[0].custom_data.currency === "TRY" && /^deneme-d+$/.test(ma.data[0].event_id) &&
+    JSON.stringify(ma.data[0].user_data.em) === JSON.stringify([crypto.createHash("sha256").update("deneme@suflo.app").digest("hex")]) && ma.data[0].user_data.client_user_agent === "Suflo-Webhook-Deneme/1.0",
+    a3.cikti + " " + JSON.stringify(ma && ma.data));
+  var a4 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: "yanlis-sir-0123456789abcdef" });
+  ok("deneme araci, yanlis sirla: imza reddedildi der, cikis kodu 1", a4.kod === 1 && /imza reddedildi/.test(a4.cikti) && meta.istekler.length === once + 1, a4.cikti);
+  meta.mod = "hata";
+  var a5 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: SIR });
+  meta.mod = "ok";
+  ok("deneme araci, Meta reddederse: hata kodunu ve iletisini gosterir, cikis kodu 1", a5.kod === 1 && /Meta olayi reddetti/.test(a5.cikti) && /kod 190/.test(a5.cikti) && /Invalid OAuth access token/.test(a5.cikti), a5.cikti);
+  config({ meta_capi_enabled: false });
+  var a6 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: undefined });
+  ok("deneme araci, ozellik kapaliyken: EKSIK der, cikis kodu 1", a6.kod === 1 && /EKSIK/.test(a6.cikti), a6.cikti);
+  ok("deneme araci hicbir ciktisinda siri ya da belirteci yazmaz", aracCiktilari.length === 6 && aracCiktilari.every(function (c) { return c.indexOf(SIR) === -1 && c.indexOf(TOKEN) === -1 && c.indexOf("yanlis-sir") === -1; }));
+  config({});
+
   /* ---------- gunluk ve sizinti ---------- */
   var satirlar = gunlukSatirlari(), hamGunluk = gunlukOku();
   ok("gunluk: gonderildi / atlandi / basarisiz satirlari, zaman damgali", satirlar.some(function (s) { return s.result === "sent" && s.received === 1 && /^TRACE/.test(s.trace) && s.click_id === true && s.browser_id === true; }) &&

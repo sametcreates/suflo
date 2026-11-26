@@ -85,7 +85,7 @@
     ".olc .olc-a{min-height:0;padding:0;border:0;border-radius:4px;background:none;color:#b6aaff;font-weight:600;",
     "text-decoration:underline;text-underline-offset:3px;margin-left:6px}",
     ".olc .olc-ayr{flex:1 1 100%;font-size:12.5px;color:#8a8a96;border-top:1px solid #1c1c22;padding-top:10px}",
-    ".olc .olc-s{flex:1 1 100%;font-size:12px;color:#70707c}",
+    ".olc .olc-s{flex:1 1 100%;font-size:12px;color:#8a8a96}",
     ".olc [hidden]{display:none!important}",
     "[data-olcum-ac]{cursor:pointer;text-decoration:underline;text-underline-offset:3px}",
     "@keyframes olcGel{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}",
