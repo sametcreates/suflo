@@ -259,12 +259,14 @@ if ($o['test'] && $testKodu === '') $atla('test_mode');
 
 if ($o['total'] - $o['tax'] <= 0 || preg_match('/^[A-Z]{3}$/', $o['currency']) !== 1) $atla('no_value');
 
-// Siteden gelen alanlar bicimine uymuyorsa atilir; oldugu gibi Meta'ya aktarilmaz
-$fbc = metin($o['custom']['fbc'] ?? '');
-if (preg_match('/^fb\.[0-9]\.[0-9]{10,16}\.[A-Za-z0-9_.\-]{8,1000}$/', $fbc) !== 1) $fbc = '';
+// Lemon Squeezy 255 karakterden uzun ozel alani kabul etmez; site uzun degerleri iki parcaya boler
+// (fbc + fbc2, ua + ua2), burada birlestirilir. Bicimine uymayan deger atilir, Meta'ya aktarilmaz.
+$fbc = metin($o['custom']['fbc'] ?? '') . metin($o['custom']['fbc2'] ?? '');
+if (preg_match('/^fb\.[0-9]\.[0-9]{10,16}\.[A-Za-z0-9_.\-]{8,470}$/', $fbc) !== 1) $fbc = '';
 $fbp = metin($o['custom']['fbp'] ?? '');
 if (preg_match('/^fb\.[0-9]\.[0-9]{10,16}\.[0-9]{1,24}$/', $fbp) !== 1) $fbp = '';
-$ua = substr(trim((string)preg_replace('/[^\x20-\x7E]/', '', metin($o['custom']['ua'] ?? ''))), 0, 512);
+$ua = metin($o['custom']['ua'] ?? '') . metin($o['custom']['ua2'] ?? '');
+$ua = substr(trim((string)preg_replace('/[^\x20-\x7E]/', '', $ua)), 0, 512);
 
 $olay = meta_olay($cfg, $o, $eventId, $fbc, $fbp, $ua);
 // Eslestirilecek hicbir bilgi yoksa Meta olayi zaten reddeder: bosuna yeniden deneme dongusu baslatma

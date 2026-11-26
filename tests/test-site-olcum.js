@@ -102,7 +102,7 @@ function ortam(sec) {
       setItem: function (k, v) { if (sec.depoHata) throw new Error("engelli"); depo[k] = String(v); }
     },
     location: { hostname: sec.host || "suflo.app", protocol: sec.protokol || "https:", search: sec.search || "", pathname: sec.yol || "/" },
-    navigator: { userAgent: UA, sendBeacon: function (u) { ag.push("beacon " + u); return true; } },
+    navigator: { userAgent: sec.ua || UA, sendBeacon: function (u) { ag.push("beacon " + u); return true; } },
     crypto: { randomUUID: function () { sayac++; return "00000000-0000-4000-8000-" + ("000000000000" + sayac).slice(-12); } },
     innerHeight: 800,
     setTimeout: function (f) { zamanlayici.push(f); return zamanlayici.length; },
@@ -142,9 +142,11 @@ function q(href) {
   return o;
 }
 function anahtarlar(href) { return String(href).split("?")[1].split("&").map(function (p) { return decodeURIComponent(p.split("=")[0]); }); }
-var K = { e: "checkout[custom][event_id]", c: "checkout[custom][fbc]", p: "checkout[custom][fbp]", u: "checkout[custom][ua]",
+var K = { e: "checkout[custom][event_id]", c: "checkout[custom][fbc]", c2: "checkout[custom][fbc2]", p: "checkout[custom][fbp]", u: "checkout[custom][ua]", u2: "checkout[custom][ua2]",
   s: "checkout[custom][source]", f: "checkout[custom][feature]", v: "checkout[custom][app_version]" };
-function bizimAlanYok(href) { var p = q(href); return !(K.e in p) && !(K.c in p) && !(K.p in p) && !(K.u in p); }
+function bizimAlanYok(href) { var p = q(href); return !(K.e in p) && !(K.c in p) && !(K.c2 in p) && !(K.p in p) && !(K.u in p) && !(K.u2 in p); }
+// Lemon Squeezy 255 karakterden uzun özel alanda ödeme sayfasını HTTP 422 ile reddeder
+function enUzunOzel(href) { var p = q(href), m = 0; Object.keys(p).forEach(function (k) { if (/^checkout\[custom\]/.test(k)) m = Math.max(m, p[k].length); }); return m; }
 
 /* ---------------- 1) izin verilmeden hiçbir şey yüklenmez ---------------- */
 var a = ortam({ search: "?fbclid=" + FBCLID });
@@ -163,12 +165,12 @@ a.pencere("scroll"); a.pencere("load"); a.ileri();
 ok("izinsiz: satın al tıklaması da bir şey eklemez, olay göndermez", a.linkler[0].getAttribute("href") === GERCEK[0] && a.win.fbq === undefined &&
   a.cerezYazimlari.length === 0 && a.metaBetikleri().length === 0);
 ok("tıklama dinleyicileri yakalama aşamasında (lemon.js'ten önce)", a.belgeYakalama("click") && a.belgeYakalama("pointerdown"));
-ok("Ayrıntı düğmesi açıklamayı açar: çerez adları, süre ve e-posta özeti anlatılır", (function () {
+ok("Ayrıntı düğmesi açıklamayı açar: Meta pikseli, çerez adları, süre ve e-posta özeti anlatılır", (function () {
   var ayr = a.dugme("olc-a"), det = a.dugme("olc-ayr");
   if (!ayr || !det || det.hidden !== true || ayr.getAttribute("aria-expanded") !== "false") return false;
   ayr.tikla();
   var acik = det.hidden === false && ayr.getAttribute("aria-expanded") === "true";
-  return acik && /_fbp/.test(det.textContent) && /_fbc/.test(det.textContent) && /90 gün/.test(det.textContent) && /SHA-256/.test(det.textContent) && /Çerez tercihleri/.test(det.textContent);
+  return acik && /Meta pikseli/.test(det.textContent) && /Facebook\/Instagram/.test(det.textContent) && /_fbp/.test(det.textContent) && /_fbc/.test(det.textContent) && /90 gün/.test(det.textContent) && /SHA-256/.test(det.textContent) && /Çerez tercihleri/.test(det.textContent);
 })());
 
 /* ---------------- 2) ret ---------------- */
@@ -330,11 +332,51 @@ ok("yerelde çerez alan adsız ve Secure'suz yazılır", /^_fbc=fb\.1\.\d+\./.te
 });
 var en = ortam({ lang: "en" });
 ok("İngilizce sayfada İngilizce şerit", en.serit().getAttribute("lang") === "en" && en.dugme("olc-r").textContent === "Decline" && en.dugme("olc-k").textContent === "Accept" &&
-  /Meta pixel/.test(tumMetin(en.serit())) && !/[ğışĞİŞçöüÇÖÜ]/.test(tumMetin(en.serit())), tumMetin(en.serit()));
-ok("Türkçe şerit ne yüklendiğini ve reddin sonucunu söyler", /Meta pikseli/.test(tumMetin(a2.serit() || ortam().serit())) && /reddedersen hiçbir şey yüklenmez/.test(tumMetin(ortam().serit())));
+  /use cookies to see whether our ads work/.test(en.dugme("olc-m").textContent) && /If you decline, nothing is loaded/.test(en.dugme("olc-m").textContent) &&
+  /Meta pixel/.test(en.dugme("olc-ayr").textContent) && !/[ğışĞİŞçöüÇÖÜ]/.test(tumMetin(en.serit())), tumMetin(en.serit()));
+var trSerit = ortam();
+ok("Türkçe şeridin ilk cümlesi sade: çerez, ne için ve reddin sonucu", /çerez kullanmak istiyoruz/.test(trSerit.dugme("olc-m").textContent) && /Reklamlarımızın/.test(trSerit.dugme("olc-m").textContent) &&
+  /Reddedersen hiçbir şey yüklenmez/.test(trSerit.dugme("olc-m").textContent), trSerit.dugme("olc-m").textContent);
+ok("hangi şirketin betiği yüklendiği Ayrıntı'da açıkça yazar (ilk cümlede değil)", !/Meta/.test(trSerit.dugme("olc-m").textContent) && /Meta'nın \(Facebook\/Instagram\) ölçüm betiği, yani Meta pikseli/.test(trSerit.dugme("olc-ayr").textContent));
+ok("şeritte çerez resmi var, ekran okuyucudan gizli", (function () { var r = trSerit.dugme("olc-i"); return !!r && r.textContent === "\uD83C\uDF6A" && r.getAttribute("aria-hidden") === "true" && r.parentNode === trSerit.dugme("olc-u") && trSerit.dugme("olc-m").parentNode === trSerit.dugme("olc-u"); })());
 ok("SufloOlcum.izin() ve ac()", (function () { var x = ortam(); var bos = x.win.SufloOlcum.izin() === ""; x.dugme("olc-r").tikla(); x.win.SufloOlcum.ac(); return bos && x.win.SufloOlcum.izin() === "red" && !!x.serit(); })());
 var ikiKez = ortam({ once: "window.SufloOlcum = { izin: function () { return 'x'; } };" });
 ok("betik iki kez eklenirse ikincisi çalışmaz", ikiKez.serit() === null && ikiKez.win.SufloOlcum.izin() === "x");
+
+/* ---------------- 8b) uzun değerler: Lemon Squeezy'nin 255 karakter sınırı ---------------- */
+var UZUN_UA = "Mozilla/5.0 (Linux; Android 14; SM-S918B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/141.0.7390.122 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/531.0.0.48.72;IABMV/1;] Instagram 401.0.0.48.79 Android (34/14; 450dpi; 1080x2340; samsung; SM-S918B; dm3q; qcom; tr_TR; 79";
+function tik(n) { return ("IwY2xjawUZUN" + "AbCdEfGhIj0123456789_-".repeat(40)).slice(0, n); }
+function kabul(sec) { sec.depo = { suflo_olcum_izni: JSON.stringify({ v: 1, d: "kabul", t: SIMDI }) }; return ortam(sec); }
+var uz = kabul({ ua: UZUN_UA, search: "?fbclid=" + tik(300) });
+uz.belge("click", uz.linkler[0]);
+var pu = q(uz.linkler[0].getAttribute("href"));
+ok("uygulama içi tarayıcının uzun kimliği (" + UZUN_UA.length + " karakter) iki parçaya bölünür, birleşince aynısı", UZUN_UA.length > 255 && pu[K.u].length === 250 && pu[K.u] + pu[K.u2] === UZUN_UA, (pu[K.u] || "").length + "+" + (pu[K.u2] || "").length);
+ok("uzun tıklama kimliği iki parçaya bölünür, birleşince çerezdeki fbc", pu[K.c].length === 250 && pu[K.c] + pu[K.c2] === uz.cerezler._fbc && uz.cerezler._fbc === "fb.1." + SIMDI + "." + tik(300), (pu[K.c] || "").length + "+" + (pu[K.c2] || "").length);
+ok("hiçbir özel alan 250 karakteri aşmaz (sınır 255)", enUzunOzel(uz.linkler[0].getAttribute("href")) === 250, enUzunOzel(uz.linkler[0].getAttribute("href")));
+[8, 100, 230, 231, 232, 250, 300, 400, 470].forEach(function (n) {
+  [UA, UZUN_UA, "U".repeat(700)].forEach(function (ua, i) {
+    var x = kabul({ ua: ua, search: "?fbclid=" + tik(n), cerezler: { _fbp: "fb.1.1794999999000.123456789012345678901234" } });
+    x.belge("pointerdown", x.linkler[0]); x.belge("click", x.linkler[0]);
+    var px = q(x.linkler[0].getAttribute("href")), birlesik = (px[K.c] || "") + (px[K.c2] || "");
+    ok("fbclid " + n + " karakter, tarayıcı kimliği #" + (i + 1) + ": her alan ≤ 250, fbc eksiksiz", enUzunOzel(x.linkler[0].getAttribute("href")) <= 250 && birlesik === "fb.1." + SIMDI + "." + tik(n) &&
+      ((px[K.u] || "") + (px[K.u2] || "")) === ua.slice(0, 500), enUzunOzel(x.linkler[0].getAttribute("href")) + " / " + birlesik.length);
+  });
+});
+var cokUzun = kabul({ search: "?fbclid=" + tik(471) });
+ok("iki parçaya sığmayan tıklama kimliği kırpılmaz, hiç eklenmez; çerez de yazılmaz", !(K.c in q(cokUzun.linkler[0].getAttribute("href"))) && !(K.c2 in q(cokUzun.linkler[0].getAttribute("href"))) &&
+  cokUzun.cerezler._fbc === undefined && !!q(cokUzun.linkler[0].getAttribute("href"))[K.e]);
+var uzunCerez = kabul({ cerezler: { _fbc: "fb.1.1790000000000." + tik(480) } });
+ok("pikselin yazdığı aşırı uzun _fbc bağlantıya eklenmez (ödeme bozulmasın)", !(K.c in q(uzunCerez.linkler[0].getAttribute("href"))) && enUzunOzel(uzunCerez.linkler[0].getAttribute("href")) <= 250);
+var kisalan = kabul({ ua: UZUN_UA, cerezler: { _fbc: "fb.1.1790000000000." + tik(300) } });
+ok("önce uzun: fbc2 ve ua2 var", !!q(kisalan.linkler[0].getAttribute("href"))[K.c2] && !!q(kisalan.linkler[0].getAttribute("href"))[K.u2]);
+kisalan.cerezler._fbc = "fb.1.1790000000000.KisaTiklama_1"; kisalan.win.navigator.userAgent = UA;
+kisalan.belge("click", kisalan.linkler[0]);
+var pk = q(kisalan.linkler[0].getAttribute("href"));
+ok("değer kısalınca eski ikinci parça bağlantıda kalmaz", pk[K.c] === "fb.1.1790000000000.KisaTiklama_1" && !(K.c2 in pk) && pk[K.u] === UA && !(K.u2 in pk), kisalan.linkler[0].getAttribute("href"));
+kisalan.belge("click", kisalan.tercih); kisalan.dugme("olc-r").tikla();
+var uzGeri = kabul({ ua: UZUN_UA, search: "?fbclid=" + tik(300) });
+uzGeri.belge("click", uzGeri.tercih); uzGeri.dugme("olc-r").tikla();
+ok("geri çekmede ikinci parçalar da sökülür", bizimAlanYok(uzGeri.linkler[0].getAttribute("href")) && uzGeri.linkler[0].getAttribute("href") === GERCEK[0], uzGeri.linkler[0].getAttribute("href"));
 
 /* ---------------- 9) davet betiğiyle birlikte ---------------- */
 var DAVET = (/<script id="davet-site">([\s\S]*?)<\/script>/.exec(trHtml) || ["", ""])[1];
@@ -373,6 +415,7 @@ ok("/pro yönlendirmesi sorgu dizgisini (fbclid, d, ref) taşır; JS'siz yönlen
 ok("olcum.js: innerHTML / document.write / eval / ağ çağrısı yok", !/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|fetch\(|XMLHttpRequest|sendBeacon|new Image/.test(KOD));
 ok("olcum.js: tek dış adres Meta betiği, piksel kimliği doğru", (KOD.match(/https?:\/\/[^\s"']+/g) || []).join(",") === META && KOD.indexOf('"' + PIKSEL + '"') !== -1,
   (KOD.match(/https?:\/\/[^\s"']+/g) || []).join(","));
+ok("olcum.js: parça boyu Lemon Squeezy'nin 255 sınırının altında", Number((/var PARCA = (\d+);/.exec(KOD) || [])[1]) === 250);
 ok("olcum.js: depoya yalnız izin anahtarı yazılır", (KOD.match(/localStorage\.setItem\(/g) || []).length === 1 && /localStorage\.setItem\(ANAHTAR, v\)/.test(KOD) && !/sessionStorage/.test(KOD));
 var Fiyat = require(path.join(ROOT, "js", "pricing.js"));
 var sabit = /var FIYAT = (\d+), PARA = "([A-Z]{3})";/.exec(KOD) || [];

@@ -9,7 +9,8 @@
  *  - Meta pikseli (fbevents.js) yüklenir: PageView; Pro bölümü/sayfası görülünce ViewContent;
  *    satın al düğmesine basılınca InitiateCheckout. Her olay kendi eventID'siyle gider.
  *  - Reklamdan gelindiyse (URL'de fbclid) ve _fbc çerezi yoksa _fbc kurulur (90 gün).
- *  - Lemon Squeezy ödeme bağlantılarına checkout[custom][event_id | fbc | fbp | ua] eklenir.
+ *  - Lemon Squeezy ödeme bağlantılarına checkout[custom][event_id | fbc | fbp | ua] eklenir
+ *    (255 karakter sınırı yüzünden uzun fbc ve ua iki parça gider: fbc2, ua2).
  *    Sunucu (server/pro-v1/ls-webhook.php) siparişi bu alanlarla Meta Conversions API'ye
  *    Purchase olarak bildirir. event_id alanı aynı zamanda "bu alıcı onay verdi" işaretidir:
  *    alan yoksa sunucu Meta'ya hiçbir şey göndermez.
@@ -34,23 +35,31 @@
   var EN = /^en\b/i.test(String(d.documentElement.getAttribute("lang") || ""));
   var LS = /^https:\/\/[a-z0-9-]+\.lemonsqueezy\.com\/checkout\//i;
   var OZEL = "checkout%5Bcustom%5D%5B";
-  var ALAN = { kimlik: OZEL + "event_id%5D", fbc: OZEL + "fbc%5D", fbp: OZEL + "fbp%5D", ua: OZEL + "ua%5D" };
-  var TIK = /^[A-Za-z0-9_.\-]{8,1000}$/;
-  var FBC = /^fb\.[0-9]\.[0-9]{10,16}\.[A-Za-z0-9_.\-]{8,1000}$/;
+  // Lemon Squeezy ödeme sayfası 255 karakterden uzun bir özel alanı HTTP 422 ile reddeder (ödeme
+  // hiç açılmaz; 26 Kasım 2026'da ölçüldü). Uzun değerler bu yüzden 250'lik iki parçaya bölünür
+  // (fbc + fbc2, ua + ua2); sunucu birleştirir. İki parçaya sığmayan tıklama kimliği hiç eklenmez.
+  var PARCA = 250;
+  var ALAN = { kimlik: OZEL + "event_id%5D", fbc: OZEL + "fbc%5D", fbc2: OZEL + "fbc2%5D", fbp: OZEL + "fbp%5D",
+    ua: OZEL + "ua%5D", ua2: OZEL + "ua2%5D" };
+  var TIK = /^[A-Za-z0-9_.\-]{8,470}$/;
+  var FBC = /^fb\.[0-9]\.[0-9]{10,16}\.[A-Za-z0-9_.\-]{8,470}$/;
   var FBP = /^fb\.[0-9]\.[0-9]{10,16}\.[0-9]{1,24}$/;
+  var CEREZ_RESMI = "🍪";
 
+  // Şeridin ilk cümlesi sade tutulur (çerez + ne için); hangi şirketin betiği yüklendiği ve neyin
+  // gönderildiği "Ayrıntı"da açıkça yazar.
   var M = EN ? {
     baslik: "Cookie choice",
-    metin: "We'd like to use the Meta pixel to see whether our ads work. If you accept, Meta advertising cookies are stored in your browser; if you decline, nothing is loaded.",
+    metin: "We'd like to use cookies to see whether our ads work. If you decline, nothing is loaded.",
     ayrinti: "Details",
-    ayrintiMetni: "If you accept, Meta's (Facebook/Instagram) measurement script is loaded. Your page view, viewing the Pro section and clicking the buy button are reported to Meta, and the _fbp cookie (plus _fbc if you came from an ad) is stored in your browser for 90 days. If you buy, the order amount, these cookie values, your browser's user agent and an irreversible hash (SHA-256) of your email are sent to Meta. If you decline, the site works exactly the same. You can change your choice any time with \"Cookie preferences\" at the bottom of the page.",
+    ayrintiMetni: "If you accept, Meta's (Facebook/Instagram) measurement script, the Meta pixel, is loaded. Your page view, viewing the Pro section and clicking the buy button are reported to Meta, and the _fbp cookie (plus _fbc if you came from an ad) is stored in your browser for 90 days. If you buy, the order amount, these cookie values, your browser's user agent and an irreversible hash (SHA-256) of your email are sent to Meta. If you decline, the site works exactly the same. You can change your choice any time with \"Cookie preferences\" at the bottom of the page.",
     red: "Decline", kabul: "Accept",
     simdi: "Current choice: ", kabulEdildi: "accepted", reddedildi: "declined"
   } : {
     baslik: "Çerez tercihi",
-    metin: "Reklamlarımızın işe yarayıp yaramadığını görmek için Meta pikselini kullanmak istiyoruz. Kabul edersen tarayıcına Meta reklam çerezleri yazılır; reddedersen hiçbir şey yüklenmez.",
+    metin: "Reklamlarımızın işe yarayıp yaramadığını görmek için çerez kullanmak istiyoruz. Reddedersen hiçbir şey yüklenmez.",
     ayrinti: "Ayrıntı",
-    ayrintiMetni: "Kabul edersen Meta'nın (Facebook/Instagram) ölçüm betiği yüklenir. Sayfayı görüntülemen, Pro bölümüne bakman ve satın alma düğmesine basman Meta'ya bildirilir; tarayıcına _fbp ve reklamdan geldiysen _fbc çerezi yazılır (90 gün). Satın alırsan sipariş tutarı, bu çerez değerleri, tarayıcı bilgin ve e-postanın geri döndürülemez özeti (SHA-256) Meta'ya iletilir. Reddedersen site aynı şekilde çalışır. Tercihini sayfanın altındaki \"Çerez tercihleri\" bağlantısından istediğin an değiştirebilirsin.",
+    ayrintiMetni: "Kabul edersen Meta'nın (Facebook/Instagram) ölçüm betiği, yani Meta pikseli yüklenir. Sayfayı görüntülemen, Pro bölümüne bakman ve satın alma düğmesine basman Meta'ya bildirilir; tarayıcına _fbp ve reklamdan geldiysen _fbc çerezi yazılır (90 gün). Satın alırsan sipariş tutarı, bu çerez değerleri, tarayıcı bilgin ve e-postanın geri döndürülemez özeti (SHA-256) Meta'ya iletilir. Reddedersen site aynı şekilde çalışır. Tercihini sayfanın altındaki \"Çerez tercihleri\" bağlantısından istediğin an değiştirebilirsin.",
     red: "Reddet", kabul: "Kabul et",
     simdi: "Şu anki tercihin: ", kabulEdildi: "kabul", reddedildi: "ret"
   };
@@ -63,7 +72,9 @@
     "animation:olcGel .28s cubic-bezier(.16,1,.3,1)}",
     ".olc:focus{outline:none}",
     ".olc p{margin:0;padding:0;max-width:none;color:inherit;font:inherit;letter-spacing:0}",
-    ".olc .olc-m{flex:1 1 340px;min-width:0}",
+    ".olc .olc-u{display:flex;align-items:flex-start;gap:12px;flex:1 1 340px;min-width:0}",
+    ".olc .olc-i{flex:0 0 auto;font-size:22px;line-height:1.3;user-select:none}",
+    ".olc .olc-m{flex:1 1 auto;min-width:0}",
     ".olc .olc-d{display:flex;gap:8px;margin-left:auto;flex:0 0 auto}",
     ".olc button{font-family:inherit;font-size:13px;font-weight:700;line-height:1.2;letter-spacing:0;cursor:pointer;border-radius:999px;",
     "padding:9px 16px;border:1px solid #33333d;background:transparent;color:#f4f4f7;min-height:36px}",
@@ -134,7 +145,7 @@
   function tarayici() {
     var s = "";
     try { s = String(w.navigator.userAgent || ""); } catch (e) { s = ""; }
-    return s.replace(/[^\x20-\x7e]/g, "").slice(0, 300);
+    return s.replace(/[^\x20-\x7e]/g, "").slice(0, 2 * PARCA);
   }
   function kimlik() {
     try { if (w.crypto && typeof w.crypto.randomUUID === "function") return w.crypto.randomUUID(); } catch (e) {}
@@ -247,19 +258,21 @@
   function isle(a, yeniKimlik) {
     var href = a.getAttribute("href") || "";
     if (!LS.test(href)) return "";
-    var k = "";
+    var k = "", c = "", p = "", u = "";
     if (secim === "kabul") {
       k = yeniKimlik ? kimlik() : (deger(href, ALAN.kimlik) || kimlik());
-      href = koy(href, ALAN.kimlik, k);
-      href = koy(href, ALAN.fbc, fbcAl());
-      href = koy(href, ALAN.fbp, fbpAl());
-      href = koy(href, ALAN.ua, tarayici());
-    } else {
-      href = koy(href, ALAN.kimlik, "");
-      href = koy(href, ALAN.fbc, "");
-      href = koy(href, ALAN.fbp, "");
-      href = koy(href, ALAN.ua, "");
+      c = fbcAl();
+      if (c.length > 2 * PARCA) c = "";     // kırpılmış tıklama kimliği geçersizdir: hiç ekleme
+      p = fbpAl();
+      u = tarayici();
     }
+    // Boş değer alanı söker: izin yoksa (ret, geri çekme) altısı da kalkar. Hiçbir değer PARCA'yı aşmaz.
+    href = koy(href, ALAN.kimlik, k);
+    href = koy(href, ALAN.fbc, c.slice(0, PARCA));
+    href = koy(href, ALAN.fbc2, c.slice(PARCA));
+    href = koy(href, ALAN.fbp, p);
+    href = koy(href, ALAN.ua, u.slice(0, PARCA));
+    href = koy(href, ALAN.ua2, u.slice(PARCA));
     if (href !== a.getAttribute("href")) a.setAttribute("href", href);
     return k;
   }
@@ -296,12 +309,17 @@
     serit.setAttribute("lang", EN ? "en" : "tr");
     serit.setAttribute("tabindex", "-1");
 
+    var ust = el("div", "olc-u");
+    var resim = el("span", "olc-i", CEREZ_RESMI);
+    resim.setAttribute("aria-hidden", "true");
     var metin = el("p", "olc-m", M.metin);
     var ayr = el("button", "olc-a", M.ayrinti);
     ayr.setAttribute("type", "button");
     ayr.setAttribute("aria-expanded", "false");
     ayr.setAttribute("aria-controls", "olcum-ayrinti");
     metin.appendChild(ayr);
+    ust.appendChild(resim);
+    ust.appendChild(metin);
 
     var dugmeler = el("div", "olc-d");
     var red = el("button", "olc-r", M.red), kab = el("button", "olc-k", M.kabul);
@@ -314,7 +332,7 @@
     ayrinti.id = "olcum-ayrinti";
     ayrinti.hidden = true;
 
-    serit.appendChild(metin);
+    serit.appendChild(ust);
     serit.appendChild(dugmeler);
     if (secim) serit.appendChild(el("p", "olc-s", M.simdi + (secim === "kabul" ? M.kabulEdildi : M.reddedildi)));
     serit.appendChild(ayrinti);

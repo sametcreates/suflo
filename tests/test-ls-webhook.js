@@ -43,7 +43,7 @@ ok("yukleme agaci ls-webhook.php'yi public_html'e koyar", /copyFileSync\(path\.j
 var hta = fs.readFileSync(path.join(ROOT, "server", "pro-v1", ".htaccess"), "utf8");
 ok(".htaccess webhook dosyasini engellemez, config'i engeller", /\^\(config\|manifest\)\\\.php\$/.test(hta) && !/webhook/.test(hta));
 var olcum = fs.readFileSync(path.join(ROOT, "docs", "js", "olcum.js"), "utf8");
-ok("site ile sunucu ayni alan adlarini kullanir (event_id, fbc, fbp, ua)", ["event_id", "fbc", "fbp", "ua"].every(function (k) {
+ok("site ile sunucu ayni alan adlarini kullanir (event_id, fbc + fbc2, fbp, ua + ua2)", ["event_id", "fbc", "fbc2", "fbp", "ua", "ua2"].every(function (k) {
   return olcum.indexOf(k + "%5D") !== -1 && PHP.indexOf("$o['custom']['" + k + "']") !== -1;
 }));
 ok("site ile sunucu ayni piksel kimligini kullanir", olcum.indexOf('"1084974704080878"') !== -1 && ORNEK.indexOf("'1084974704080878'") !== -1);
@@ -298,6 +298,17 @@ async function calis() {
   ok("eslestirilecek hicbir bilgi yoksa (e-posta, fbc, fbp, tarayici) gonderilmez", bilgisiz.status === 200 && bilgisiz.json.reason === "no_user_data" && meta.istekler.length === once, bilgisiz.metin);
   await gonder(siparis(function (o) { var c = o.meta.custom_data; delete c.fbc; delete c.fbp; delete c.ua; }));
   ok("yalniz e-posta varsa olay e-posta ozetiyle gider", meta.istekler.length === once + 1 && Object.keys(meta.istekler[once].data[0].user_data).join(",") === "em", JSON.stringify(meta.istekler[once] && meta.istekler[once].data[0].user_data));
+  // Lemon Squeezy 255 karakterden uzun ozel alani reddeder: site uzun degeri iki parcaya boler
+  once = meta.istekler.length;
+  var uzunFbc = "fb.1.1795000000000." + "Kq_-".repeat(75), uzunUa = UA + " " + "M".repeat(250);
+  await gonder(siparis(function (o) { var c = o.meta.custom_data; c.fbc = uzunFbc.slice(0, 250); c.fbc2 = uzunFbc.slice(250); c.ua = uzunUa.slice(0, 250); c.ua2 = uzunUa.slice(250); }));
+  ok("iki parcaya bolunmus fbc ve tarayici bilgisi birlestirilerek gider", meta.istekler.length === once + 1 && uzunFbc.length > 255 && meta.istekler[once].data[0].user_data.fbc === uzunFbc &&
+    meta.istekler[once].data[0].user_data.client_user_agent === uzunUa, JSON.stringify(meta.istekler[once] && meta.istekler[once].data[0].user_data));
+  once = meta.istekler.length;
+  await gonder(siparis(function (o) { var c = o.meta.custom_data; c.fbc2 = "<x>"; }));
+  await gonder(siparis(function (o) { var c = o.meta.custom_data; c.fbc = "fb.1.1795000000000." + "K".repeat(231); c.fbc2 = "L".repeat(250); }));
+  ok("ikinci parca bicimi bozarsa ya da toplam cok uzunsa fbc atilir", meta.istekler.length === once + 2 && !("fbc" in meta.istekler[once].data[0].user_data) && !("fbc" in meta.istekler[once + 1].data[0].user_data),
+    JSON.stringify([meta.istekler[once].data[0].user_data.fbc, meta.istekler[once + 1].data[0].user_data.fbc]));
   once = meta.istekler.length;
   await gonder(siparis(function (o) { o.meta.custom_data.ua = "A".repeat(2000); }));
   ok("tarayici bilgisi 512 karakterle sinirli", meta.istekler[once].data[0].user_data.client_user_agent.length === 512);
