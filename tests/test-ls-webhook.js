@@ -50,9 +50,11 @@ ok("site ile sunucu ayni piksel kimligini kullanir", olcum.indexOf('"10849747040
 
 var phpVar = cp.spawnSync("php", ["-v"], { encoding: "utf8" });
 if (phpVar.error || phpVar.status !== 0) {
-  // CI'daki php isi bu bolumu atlayamaz: LS_WEBHOOK_PHP_ZORUNLU=1 iken php yoksa test kalir
-  if (process.env.LS_WEBHOOK_PHP_ZORUNLU === "1") ok("php bulundu (LS_WEBHOOK_PHP_ZORUNLU=1)", false, phpVar.error || phpVar.stderr);
-  else console.log("ATLA php bulunamadi: sunucu bolumu calismadi (CI'da php olan kosucularda calisir)");
+  // GitHub'in Linux kosucusunda php hazir gelir (php isi de ona guvenir): orada sunucu bolumu
+  // sessizce atlanamaz, php yoksa test kalir. Baska yerde zorlamak icin LS_WEBHOOK_PHP_ZORUNLU=1.
+  var zorunlu = process.env.LS_WEBHOOK_PHP_ZORUNLU === "1" || (process.env.GITHUB_ACTIONS === "true" && process.platform === "linux");
+  if (zorunlu) ok("php bulundu (sunucu bolumu zorunlu)", false, phpVar.error || phpVar.stderr);
+  else console.log("ATLA php bulunamadi: sunucu bolumu calismadi (CI'da Linux kosucusunda calisir)");
   bitir();
 }
 
