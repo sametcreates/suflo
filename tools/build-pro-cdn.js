@@ -33,6 +33,8 @@ fs.rmSync(outRoot, { recursive: true, force: true });
 fs.mkdirSync(publicDir, { recursive: true });
 fs.mkdirSync(contentDir, { recursive: true });
 fs.copyFileSync(path.join(root, "server", "pro-v1", "index.php"), path.join(publicDir, "index.php"));
+// Meta'ya satin alma bildiren webhook: kendi ayar dosyasi (private/pro-v1/meta.php) olusturulana dek uyur
+fs.copyFileSync(path.join(root, "server", "pro-v1", "ls-webhook.php"), path.join(publicDir, "ls-webhook.php"));
 fs.copyFileSync(path.join(root, "server", "pro-v1", ".htaccess"), path.join(publicDir, ".htaccess"));
 
 var AUDIO = /\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$/i;
