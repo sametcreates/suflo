@@ -44,7 +44,7 @@ Servis, Lemon Squeezy doğrulama kotasını kötüye kullanıma karşı korumak 
 
 ## Meta Conversions API: sipariş → Purchase (uyuyan özellik)
 
-`ls-webhook.php`, Lemon Squeezy'nin `order_created` webhook'unu alır ve siparişi Meta Conversions API'ye `Purchase` olarak bildirir. `index.php`'den bağımsız tek dosyadır; aynı `private/pro-v1/config.php`'yi okur. `meta_capi_enabled => true`, dolu bir `meta_capi_token` ve en az 16 karakterlik `ls_webhook_secret` girilene dek `POST` isteklerine `503` döner. `GET` yalnız `{"ok":true,"service":"suflo-ls-webhook","ready":true|false}` verir.
+`ls-webhook.php`, Lemon Squeezy'nin `order_created` webhook'unu alır ve siparişi Meta Conversions API'ye `Purchase` olarak bildirir. `index.php`'den bağımsız tek dosyadır ve ayarlarını **kendi dosyasından**, `private/pro-v1/meta.php`'den okur (örneği `meta.example.php`). Pro servisinin `config.php`'sine hiç dokunmaz: Meta ayarı girilirken yapılacak bir yazım hatası lisans doğrulamayı ve içerik indirmeyi etkilemez, yalnız bu webhook'u durdurur. `meta.php` yokken, ya da `meta_capi_enabled => true`, dolu bir `meta_capi_token` ve en az 16 karakterlik `ls_webhook_secret` girilene dek `POST` isteklerine `503` döner. `GET` yalnız `{"ok":true,"service":"suflo-ls-webhook","ready":true|false}` verir.
 
 Üretim yolu: `public_html/pro/v1/ls-webhook.php` → `https://assets.suflo.app/pro/v1/ls-webhook.php`. Kurulum adımları `marketing/analytics-kurulum.md` içindedir.
 
@@ -58,6 +58,6 @@ Servis, Lemon Squeezy doğrulama kotasını kötüye kullanıma karşı korumak 
 
 **Çift sayım:** Lemon Squeezy'nin kendi Meta pikseli (Design → Meta pixel) ödeme sayfasında `fbq("track","Purchase",{event_id: <sipariş no>, ...})` çağırır: kimliği pikselin dördüncü parametresi (`eventID`) yerine özel veri olarak yollar. Meta tekilleştirmeyi yalnız `eventID` ile yapar; bu yüzden o olay sunucudan giden `Purchase` ile eşleştirilemez. Bu webhook açıkken Lemon Squeezy'deki "Meta pixel" anahtarı kapatılmalıdır, yoksa izin veren alıcıların satın alması iki kez sayılır.
 
-**Güvenlik:** `meta_capi_token` pikselinize olay yazma yetkisi verir. Yalnız `private/pro-v1/config.php`'de durur; isteğin gövdesinde gönderilir (adres satırında değil), yanıtlara ve günlüğe yazılmaz, Meta'nın hata iletisinde geçerse yıldızlanır. Sızdığından şüphelenirsen Events Manager'da yenisini üretip eskisini iptal et.
+**Güvenlik:** `meta_capi_token` pikselinize olay yazma yetkisi verir. Yalnız `private/pro-v1/meta.php`'de durur; isteğin gövdesinde gönderilir (adres satırında değil), yanıtlara ve günlüğe yazılmaz, Meta'nın hata iletisinde geçerse yıldızlanır. Sızdığından şüphelenirsen Events Manager'da yenisini üretip eskisini iptal et.
 
 **Sağlayıcı değişirse:** Lemon Squeezy'ye özgü kısım imza denetimi ile `ls_siparis()` işlevidir. `meta_olay()` ve `meta_gonder()` sağlayıcıdan bağımsızdır.

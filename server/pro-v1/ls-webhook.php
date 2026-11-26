@@ -12,8 +12,10 @@ declare(strict_types=1);
  * (docs/js/olcum.js) izin varsa odeme baglantisina checkout[custom][event_id] ekler; bu alan
  * yoksa (izin verilmedi ya da satin alma panelden basladi) Meta'ya hicbir sey gitmez.
  *
- * Erisim belirteci ve webhook sirri yalniz private/pro-v1/config.php'de durur; hicbir yanita ve
- * gunluge yazilmaz. meta_capi_enabled, meta_capi_token ve ls_webhook_secret ayarlanana dek
+ * Erisim belirteci ve webhook sirri yalniz private/pro-v1/meta.php'de durur; hicbir yanita ve
+ * gunluge yazilmaz. Bu dosya Pro icerik servisinin config.php'sini HIC okumaz: ayarlari ayri
+ * tutulur ki buradaki bir yazim hatasi lisans dogrulamayi ve icerik indirmeyi etkilemesin.
+ * meta.php yokken ya da meta_capi_enabled, meta_capi_token ve ls_webhook_secret ayarlanana dek
  * POST 503 doner (uyuyan ozellik). GET yalniz "hazir mi" bilgisini verir.
  */
 
@@ -194,7 +196,7 @@ function isaret_al(string $dir, string $siparisNo): array {
 }
 
 /* ---------------- istek ---------------- */
-$configPath = dirname((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__)) . '/private/pro-v1/config.php';
+$configPath = dirname((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__)) . '/private/pro-v1/meta.php';
 $cfg = [];
 if (is_file($configPath)) {
     $cfg = require $configPath;

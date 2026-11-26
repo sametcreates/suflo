@@ -113,19 +113,26 @@ satın almaya bağlanamıyordu. Reklam Yöneticisi'nde 1 Ağustos'tan beri 1 sat
    node -e "console.log(require('crypto').randomBytes(20).toString('hex'))"
    ```
    Çıkan 40 karakteri bir yere not et; iki yerde kullanacaksın (4. ve 6. adım).
-4. **Sunucuya koy (Hostinger Dosya Yöneticisi).**
+4. **Sunucuya koy (Hostinger Dosya Yöneticisi).** İki dosya, ikisi de yeni; var olan hiçbir
+   dosyayı değiştirmiyorsun.
    - `server/pro-v1/ls-webhook.php` dosyasını `public_html/pro/v1/` içine yükle.
-   - `private/pro-v1/config.php` dosyasını aç. Sondaki `];` satırından hemen önce şunları ekle
-     (bir üstteki satırın sonunda virgül olmalı):
+   - `private/pro-v1/` içinde **`meta.php`** adında yeni bir dosya oluştur ve şunu yapıştır
+     (iki değeri kendi belirtecin ve sırrınla değiştir):
      ```php
+     <?php
+     return [
          'meta_capi_enabled' => true,
          'meta_pixel_id' => '1084974704080878',
          'meta_capi_token' => 'BELIRTECI_BURAYA_YAPISTIR',
          'ls_webhook_secret' => 'SIRRI_BURAYA_YAPISTIR',
          'meta_test_event_code' => '',
+     ];
      ```
+   Ayarlar bilerek `config.php`'den ayrı duruyor: bu dosyada bir yazım hatası olursa yalnız
+   webhook çalışmaz, Pro lisansları ve içerik indirme etkilenmez.
 5. **Dosya yerinde mi bak.** Tarayıcıda `https://assets.suflo.app/pro/v1/ls-webhook.php` aç.
-   `"ready":true` yazmalı. `false` ise 4. adımdaki satırlardan biri eksik ya da boş.
+   `"ready":true` yazmalı. `false` ise `meta.php` yok ya da 4. adımdaki değerlerden biri boş.
+   Sayfa hata veriyorsa `meta.php`'de yazım hatası var (tırnak ya da virgül).
 6. **Lemon Squeezy'de webhook ekle.** Settings → Webhooks → "+":
    - Callback URL: `https://assets.suflo.app/pro/v1/ls-webhook.php`
    - Signing secret: 3. adımdaki sır
@@ -133,7 +140,7 @@ satın almaya bağlanamıyordu. Reklam Yöneticisi'nde 1 Ağustos'tan beri 1 sat
 7. **"Test events" ile doğrula (satın alma yapmadan).**
    - Events Manager → Test events (Olayları test et) → sunucu olayları için gösterilen test
      kodunu kopyala (`TEST12345` gibi).
-   - `config.php`'de `'meta_test_event_code' => 'TEST12345'` yap.
+   - `meta.php`'de `'meta_test_event_code' => 'TEST12345'` yap.
    - PowerShell'de, depo klasöründe:
      ```powershell
      $env:SUFLO_LS_WEBHOOK_SECRET = Read-Host "Webhook sırrı"

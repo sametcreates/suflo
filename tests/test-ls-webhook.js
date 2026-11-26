@@ -20,11 +20,15 @@ function bitir() { console.log("\n" + gecen + "/" + (gecen + kalan) + " gecti");
 
 /* ---------------- kaynak denetimleri (php gerekmez) ---------------- */
 var PHP = fs.readFileSync(path.join(ROOT, "server", "pro-v1", "ls-webhook.php"), "utf8");
-var ORNEK = fs.readFileSync(path.join(ROOT, "server", "pro-v1", "config.example.php"), "utf8");
-ok("ornek config: ozellik kapali, belirtec / sir / test kodu bos", /'meta_capi_enabled' => false/.test(ORNEK) && /'meta_capi_token' => ''/.test(ORNEK) &&
+var ORNEK = fs.readFileSync(path.join(ROOT, "server", "pro-v1", "meta.example.php"), "utf8");
+var PRO_ORNEK = fs.readFileSync(path.join(ROOT, "server", "pro-v1", "config.example.php"), "utf8");
+ok("ornek meta.php: ozellik kapali, belirtec / sir / test kodu bos", /'meta_capi_enabled' => false/.test(ORNEK) && /'meta_capi_token' => ''/.test(ORNEK) &&
   /'ls_webhook_secret' => ''/.test(ORNEK) && /'meta_test_event_code' => ''/.test(ORNEK) && /'meta_pixel_id' => '1084974704080878'/.test(ORNEK) &&
   /'meta_log_path'/.test(ORNEK) && /'meta_sent_dir'/.test(ORNEK));
-ok("ornek config eski anahtarlari da tasir (davet, lisans)", /'ls_api_key' => ''/.test(ORNEK) && /'referral_enabled' => false/.test(ORNEK) && /'davet_dir'/.test(ORNEK) && /'token_secret'/.test(ORNEK));
+// Meta ayarlari Pro servisinin config.php'sinden ayri durur: orada yapilan bir yazim hatasi lisans
+// dogrulamayi durdururdu. Webhook config.php'yi hic acmaz, Pro ornek config'i de Meta anahtari tasimaz.
+ok("webhook yalniz private/pro-v1/meta.php'yi okur, Pro config'ine dokunmaz", PHP.indexOf("'/private/pro-v1/meta.php'") !== -1 && !/\/config\.php/.test(PHP) &&
+  (PHP.match(/\brequire\b/g) || []).length === 1 && !/meta_|ls_webhook/.test(PRO_ORNEK) && /'token_secret'/.test(PRO_ORNEK) && !/token_secret|ls_api_key/.test(ORNEK));
 ok("belirtec ve sir yalniz cfg'den okunur (ortam degiskeni, GET/POST alani yok)", /\$cfg\['meta_capi_token'\]/.test(PHP) && /\$cfg\['ls_webhook_secret'\]/.test(PHP) &&
   !/getenv\(/.test(PHP) && !/\$_(GET|POST|REQUEST|COOKIE|ENV)\b/.test(PHP));
 ok("kaynakta gomulu belirtec / sir yok", !/EAA[A-Za-z0-9]{20,}/.test(PHP) && !/EAA[A-Za-z0-9]{20,}/.test(ORNEK) && !/Bearer\s+[A-Za-z0-9_\-]{20,}/.test(PHP));
@@ -38,8 +42,8 @@ ok("gunluk satirlari e-posta, belirtec, sir, fbc/fbp degeri tasimaz", gunlukler.
 ok("e-posta Meta'ya yalniz SHA-256 ozetiyle gider (baska hicbir yerde kullanilmaz)", /\$user\['em'\] = \[hash\('sha256', \$o\['email'\]\)\]/.test(PHP) &&
   PHP.replace(/\$o\['email'\] !== ''/g, "").replace(/filter_var\(\$o\['email'\], FILTER_VALIDATE_EMAIL\)/g, "").replace(/hash\('sha256', \$o\['email'\]\)/g, "").indexOf("$o['email']") === -1);
 var build = fs.readFileSync(path.join(ROOT, "tools", "build-pro-cdn.js"), "utf8");
-ok("yukleme agaci ls-webhook.php'yi public_html'e koyar", /copyFileSync\(path\.join\(root, "server", "pro-v1", "ls-webhook\.php"\), path\.join\(publicDir, "ls-webhook\.php"\)\)/.test(build) &&
-  /'meta_capi_enabled' => false/.test(build) && /'meta_capi_token' => ''/.test(build) && /'ls_webhook_secret' => ''/.test(build));
+ok("yukleme agaci ls-webhook.php'yi public_html'e koyar, uretilen Pro config'ine Meta anahtari yazmaz", /copyFileSync\(path\.join\(root, "server", "pro-v1", "ls-webhook\.php"\), path\.join\(publicDir, "ls-webhook\.php"\)\)/.test(build) &&
+  !/meta_capi|ls_webhook_secret/.test(build));
 var hta = fs.readFileSync(path.join(ROOT, "server", "pro-v1", ".htaccess"), "utf8");
 ok(".htaccess webhook dosyasini engellemez, config'i engeller", /\^\(config\|manifest\)\\\.php\$/.test(hta) && !/webhook/.test(hta));
 var olcum = fs.readFileSync(path.join(ROOT, "docs", "js", "olcum.js"), "utf8");
@@ -58,7 +62,7 @@ if (phpVar.error || phpVar.status !== 0) {
   bitir();
 }
 
-["server/pro-v1/ls-webhook.php", "server/pro-v1/config.example.php"].forEach(function (f) {
+["server/pro-v1/ls-webhook.php", "server/pro-v1/meta.example.php"].forEach(function (f) {
   var r = cp.spawnSync("php", ["-l", path.join(ROOT, f)], { encoding: "utf8" });
   ok("php -l " + f, r.status === 0, r.stdout + r.stderr);
 });
@@ -68,6 +72,8 @@ var PUB = path.join(TMP, "public_html", "pro", "v1"), PRIV = path.join(TMP, "pri
 fs.mkdirSync(PUB, { recursive: true });
 fs.mkdirSync(PRIV, { recursive: true });
 fs.copyFileSync(path.join(ROOT, "server", "pro-v1", "ls-webhook.php"), path.join(PUB, "ls-webhook.php"));
+// Pro servisinin config.php'si yerinde ama okunursa istegi dusurur: webhook'un ona hic dokunmadigi boyle sinanir
+fs.writeFileSync(path.join(PRIV, "config.php"), "<?php\nhttp_response_code(500);\necho 'config.php okunmamaliydi';\nexit;\n");
 
 var TOKEN = "EAATESTtoken0123456789abcdefghijklmnopqrstuvwxyzABCDEF";
 var SIR = "test-webhook-sirri-0123456789abcdef";
@@ -112,7 +118,6 @@ function bosPort() {
 var phpPort = 0, phpSurec = null;
 function config(ek) {
   var c = {
-    token_secret: "a".repeat(64), store_id: 454844, product_id: 1302656,
     meta_capi_enabled: true, meta_pixel_id: PIKSEL, meta_capi_token: TOKEN, ls_webhook_secret: SIR, meta_test_event_code: "",
     meta_api_version: "v27.0", meta_api_base: "http://127.0.0.1:" + metaPort, meta_event_source_url: "https://suflo.app/",
     meta_log_path: path.join(PRIV, "meta-webhook.log"), meta_sent_dir: path.join(PRIV, "meta-sent")
@@ -123,7 +128,7 @@ function config(ek) {
     if (typeof v === "number") return String(v);
     return "'" + String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   }
-  fs.writeFileSync(path.join(PRIV, "config.php"), "<?php\nreturn [\n" + Object.keys(c).map(function (k) { return "    '" + k + "' => " + phpDeger(c[k]); }).join(",\n") + "\n];\n");
+  fs.writeFileSync(path.join(PRIV, "meta.php"), "<?php\nreturn [\n" + Object.keys(c).map(function (k) { return "    '" + k + "' => " + phpDeger(c[k]); }).join(",\n") + "\n];\n");
 }
 function imza(govde, sir) { return crypto.createHmac("sha256", sir === undefined ? SIR : sir).update(govde).digest("hex"); }
 var yanitlar = [];

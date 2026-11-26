@@ -24,19 +24,5 @@ return [
     'referral_variant_ids' => [],      // indirimin gecerli oldugu varyantlar (TRY ve USD), bos = kapali
     'referrals_path' => __DIR__ . '/referrals.json',
     'attribution_path' => __DIR__ . '/attribution.jsonl',
-    'davet_dir' => __DIR__ . '/davet', // davet/t1 ve davet/t3 odul paketleri + manifest.json
-
-    // ---- Meta Conversions API: Lemon Squeezy siparisi -> Purchase (uyuyan ozellik) ----
-    // ls-webhook.php bu uc deger dolana ve meta_capi_enabled true olana dek 503 doner.
-    // Belirtec ve sir yalniz bu private dosyada durur; GitHub'a, panele, ZIP'e asla girmez.
-    // Kurulum adimlari: marketing/analytics-kurulum.md
-    'meta_capi_enabled' => false,
-    'meta_pixel_id' => '1084974704080878',   // "Suflo | Web ve Satin Alma" (gizli degil, sitede de yazar)
-    'meta_capi_token' => '',                 // Events Manager > Ayarlar > Conversions API > erisim belirteci
-    'ls_webhook_secret' => '',               // Lemon Squeezy > Settings > Webhooks > Signing secret (en az 16 karakter)
-    'meta_test_event_code' => '',            // yalniz dogrulama sirasinda (Events Manager > Test events), sonra bosalt
-    'meta_api_version' => 'v27.0',
-    'meta_event_source_url' => 'https://suflo.app/',
-    'meta_log_path' => __DIR__ . '/meta-webhook.log',
-    'meta_sent_dir' => __DIR__ . '/meta-sent'
+    'davet_dir' => __DIR__ . '/davet'  // davet/t1 ve davet/t3 odul paketleri + manifest.json
 ];

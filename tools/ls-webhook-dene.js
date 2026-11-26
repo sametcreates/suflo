@@ -7,7 +7,7 @@
  *   node tools/ls-webhook-dene.js                 imzali, TEST MODUNDA sahte bir siparis yollar
  *   node tools/ls-webhook-dene.js https://...     baska bir adresi dener
  *
- * Sahte siparis 1,00 TRY'dir ve test_mode isaretlidir: sunucu onu yalniz config.php'de
+ * Sahte siparis 1,00 TRY'dir ve test_mode isaretlidir: sunucu onu yalniz meta.php'de
  * meta_test_event_code doluyken Meta'ya iletir; olay Events Manager > Test events'te gorunur.
  * Kod bosken yanit "test_mode" olur ve Meta'ya hicbir sey gitmez (imza ve kurulum yine dogrulanir).
  */
@@ -60,7 +60,7 @@ function ornekSiparis() {
     console.error("HATA: webhook dosyasi bu adreste yok ya da eski (HTTP " + g.status + "). ls-webhook.php'yi public_html/pro/v1/ icine yukle.");
     process.exit(1);
   }
-  console.log("Dosya yerinde. Yapilandirma: " + (g.json.ready ? "HAZIR" : "EKSIK (meta_capi_enabled, meta_capi_token, ls_webhook_secret)"));
+  console.log("Dosya yerinde. Yapilandirma: " + (g.json.ready ? "HAZIR" : "EKSIK (private/pro-v1/meta.php: meta_capi_enabled, meta_capi_token, ls_webhook_secret)"));
   if (!sir) {
     console.log("Imzali deneme icin SUFLO_LS_WEBHOOK_SECRET ortam degiskenine webhook sirrini yaz ve yeniden calistir.");
     process.exit(g.json.ready ? 0 : 1);
@@ -71,16 +71,16 @@ function ornekSiparis() {
   var j = r.json || {};
   if (r.status === 200 && j.sent === true) {
     console.log("TAMAM: Meta olayi kabul etti. Events Manager > Test events'te 1,00 TRY'lik Purchase gorunmeli.");
-    console.log("Sonra config.php'de meta_test_event_code degerini bosalt.");
+    console.log("Sonra meta.php'de meta_test_event_code degerini bosalt.");
     process.exit(0);
   }
   if (r.status === 200 && j.reason === "test_mode") {
     console.log("Imza ve kurulum DOGRU; Meta'ya bir sey gonderilmedi cunku meta_test_event_code bos.");
-    console.log("Ucdan uca gormek icin Events Manager > Test events'teki kodu config.php'ye yaz ve yeniden calistir.");
+    console.log("Ucdan uca gormek icin Events Manager > Test events'teki kodu meta.php'ye yaz ve yeniden calistir.");
     process.exit(0);
   }
-  if (r.status === 401) console.error("HATA: imza reddedildi. Ortam degiskenindeki sir, config.php'deki ls_webhook_secret ile ayni degil.");
-  else if (r.status === 503) console.error("HATA: sunucu yapilandirmasi eksik (meta_capi_enabled, meta_capi_token, ls_webhook_secret).");
+  if (r.status === 401) console.error("HATA: imza reddedildi. Ortam degiskenindeki sir, meta.php'deki ls_webhook_secret ile ayni degil.");
+  else if (r.status === 503) console.error("HATA: sunucu yapilandirmasi eksik (private/pro-v1/meta.php: meta_capi_enabled, meta_capi_token, ls_webhook_secret).");
   else if (r.status === 502) console.error("HATA: Meta olayi reddetti (HTTP " + j.meta_http + ", kod " + j.meta_code + "): " + (j.meta_error || "ayrinti yok") + "\nBelirteci ve piksel kimligini kontrol et.");
   else console.error("HATA: beklenmeyen yanit (HTTP " + r.status + "): " + r.metin.slice(0, 300));
   process.exit(1);
