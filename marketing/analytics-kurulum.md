@@ -83,6 +83,7 @@ içinde görünür. Görünmezse reklam engelleyicin script'i durduruyordur — 
 # Meta pikseli ve satın alma ölçümü (reklamlar için)
 
 **Durum:** kod hazır (26 Kasım 2026), canlıda **değil**. Aşağıdaki adımlar bitince çalışır.
+Site tarafı 1. adımla, satın alma bildirimi 2–8. adımlarla açılır.
 
 **Neden:** Meta reklamları satın almaları göremiyordu. Piksel yalnız Lemon Squeezy'nin ödeme
 penceresinde çalışıyordu; pencere sitenin içinde açıldığı için reklam tıklaması (`fbclid`)
@@ -100,15 +101,19 @@ satın almaya bağlanamıyordu. Reklam Yöneticisi'nde 1 Ağustos'tan beri 1 sat
 
 ## Senin yapman gerekenler (sırayla)
 
-1. **Meta erişim belirteci üret.** Events Manager → "Suflo | Web ve Satın Alma" pikseli →
+1. **PR'ı birleştir.** Site yayına girer: şerit görünür, kabul edende piksel çalışır (sayfa
+   görüntüleme, Pro'yu görme, "Pro'yu al" tıklaması). Satın alma tarafı aşağıdaki adımlar bitene
+   kadar eskisi gibi kalır, hiçbir şey bozulmaz. Dosyalar bundan sonra `main` dalında durur;
+   4. ve 7. adımda bilgisayarındaki kopyanın güncel olması gerekir (değilse bana söyle, güncellerim).
+2. **Meta erişim belirteci üret.** Events Manager → "Suflo | Web ve Satın Alma" pikseli →
    Ayarlar → Conversions API bölümü → "Erişim belirteci oluştur" (Generate access token).
    Kopyala. Bu belirteç şifre gibidir: sohbete, e-postaya, GitHub'a yapıştırma.
-2. **Webhook sırrı üret.** PowerShell'de:
+3. **Webhook sırrı üret.** PowerShell'de:
    ```powershell
    node -e "console.log(require('crypto').randomBytes(20).toString('hex'))"
    ```
-   Çıkan 40 karakteri bir yere not et; iki yerde kullanacaksın (3. ve 5. adım).
-3. **Sunucuya koy (Hostinger Dosya Yöneticisi).**
+   Çıkan 40 karakteri bir yere not et; iki yerde kullanacaksın (4. ve 6. adım).
+4. **Sunucuya koy (Hostinger Dosya Yöneticisi).**
    - `server/pro-v1/ls-webhook.php` dosyasını `public_html/pro/v1/` içine yükle.
    - `private/pro-v1/config.php` dosyasını aç. Sondaki `];` satırından hemen önce şunları ekle
      (bir üstteki satırın sonunda virgül olmalı):
@@ -119,13 +124,13 @@ satın almaya bağlanamıyordu. Reklam Yöneticisi'nde 1 Ağustos'tan beri 1 sat
          'ls_webhook_secret' => 'SIRRI_BURAYA_YAPISTIR',
          'meta_test_event_code' => '',
      ```
-4. **Dosya yerinde mi bak.** Tarayıcıda `https://assets.suflo.app/pro/v1/ls-webhook.php` aç.
-   `"ready":true` yazmalı. `false` ise 3. adımdaki satırlardan biri eksik ya da boş.
-5. **Lemon Squeezy'de webhook ekle.** Settings → Webhooks → "+":
+5. **Dosya yerinde mi bak.** Tarayıcıda `https://assets.suflo.app/pro/v1/ls-webhook.php` aç.
+   `"ready":true` yazmalı. `false` ise 4. adımdaki satırlardan biri eksik ya da boş.
+6. **Lemon Squeezy'de webhook ekle.** Settings → Webhooks → "+":
    - Callback URL: `https://assets.suflo.app/pro/v1/ls-webhook.php`
-   - Signing secret: 2. adımdaki sır
+   - Signing secret: 3. adımdaki sır
    - Olay: yalnız `order_created`
-6. **"Test events" ile doğrula (satın alma yapmadan).**
+7. **"Test events" ile doğrula (satın alma yapmadan).**
    - Events Manager → Test events (Olayları test et) → sunucu olayları için gösterilen test
      kodunu kopyala (`TEST12345` gibi).
    - `config.php`'de `'meta_test_event_code' => 'TEST12345'` yap.
@@ -139,16 +144,16 @@ satın almaya bağlanamıyordu. Reklam Yöneticisi'nde 1 Ağustos'tan beri 1 sat
    - "TAMAM" yazmalı ve Test events ekranında 1,00 TRY'lik bir Purchase görünmeli. (Meta test
      olaylarını da sayar: pikselde 1 TL'lik tek bir deneme satın alması kalır.)
    - Sonra `meta_test_event_code` değerini yeniden boşalt (`''`).
-7. **Site değişikliğini yayınla** (PR'ı birleştir).
 8. **Lemon Squeezy'nin kendi pikselini kapat.** Lemon Squeezy → Design → **"Meta pixel"
-   anahtarını kapat.** İki nedeni var; 7. adımla aynı gün yap:
+   anahtarını kapat.** 7. adım geçer geçmez, aynı gün yap. İki nedeni var:
    - Çift sayım: o piksel satın almayı Meta'nın eşleştirebileceği bir kimlikle göndermiyor;
      açık kalırsa onay veren alıcının satın alması **iki kez** sayılır.
    - Şeritteki söz: o piksel ödeme penceresinde kimseye sormadan yükleniyor. Açık kalırsa
      "Reddet" diyen ziyaretçi "Pro'yu al"a bastığında Meta pikseli yine çalışır.
 9. **Canlıda bak.** suflo.app'i gizli sekmede aç, "Kabul et" de, sayfada gez, "Pro'yu al"a bas.
    Events Manager → Test events'te (tarayıcı olayları) PageView, ViewContent, InitiateCheckout
-   görünmeli.
+   görünmeli. İlk gerçek satıştan sonra `private/pro-v1/meta-webhook.log` dosyasında o siparişin
+   `sent` satırına bak.
 
 ## Bilmen gerekenler
 
