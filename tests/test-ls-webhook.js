@@ -402,7 +402,7 @@ async function calis() {
   var a3 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: SIR });
   var ma = meta.istekler[once];
   ok("deneme araci, test kodu varken: TAMAM, Meta'ya test koduyla 1,00 TRY'lik Purchase gider", a3.kod === 0 && /TAMAM/.test(a3.cikti) && meta.istekler.length === once + 1 && ma.alanlar.test_event_code === "TEST12345" &&
-    ma.data[0].event_name === "Purchase" && ma.data[0].custom_data.value === 1 && ma.data[0].custom_data.currency === "TRY" && /^deneme-d+$/.test(ma.data[0].event_id) &&
+    ma.data[0].event_name === "Purchase" && ma.data[0].custom_data.value === 1 && ma.data[0].custom_data.currency === "TRY" && /^deneme-\d+$/.test(ma.data[0].event_id) &&
     JSON.stringify(ma.data[0].user_data.em) === JSON.stringify([crypto.createHash("sha256").update("deneme@suflo.app").digest("hex")]) && ma.data[0].user_data.client_user_agent === "Suflo-Webhook-Deneme/1.0",
     a3.cikti + " " + JSON.stringify(ma && ma.data));
   var a4 = await aracKos({ SUFLO_LS_WEBHOOK_SECRET: "yanlis-sir-0123456789abcdef" });
