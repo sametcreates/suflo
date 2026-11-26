@@ -33,6 +33,7 @@ fs.rmSync(outRoot, { recursive: true, force: true });
 fs.mkdirSync(publicDir, { recursive: true });
 fs.mkdirSync(contentDir, { recursive: true });
 fs.copyFileSync(path.join(root, "server", "pro-v1", "index.php"), path.join(publicDir, "index.php"));
+fs.copyFileSync(path.join(root, "server", "pro-v1", "ls-webhook.php"), path.join(publicDir, "ls-webhook.php"));
 fs.copyFileSync(path.join(root, "server", "pro-v1", ".htaccess"), path.join(publicDir, ".htaccess"));
 
 var AUDIO = /\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$/i;
@@ -132,7 +133,17 @@ var config = "<?php\nreturn [\n" +
   "    'referral_variant_ids' => [],\n" +
   "    'referrals_path' => __DIR__ . '/referrals.json',\n" +
   "    'attribution_path' => __DIR__ . '/attribution.jsonl',\n" +
-  "    'davet_dir' => __DIR__ . '/davet'\n" +
+  "    'davet_dir' => __DIR__ . '/davet',\n" +
+  "    // Meta Conversions API (ls-webhook.php): uyuyan ozellik. Belirtec ve sir yalniz bu dosyada durur.\n" +
+  "    'meta_capi_enabled' => false,\n" +
+  "    'meta_pixel_id' => '1084974704080878',\n" +
+  "    'meta_capi_token' => '',\n" +
+  "    'ls_webhook_secret' => '',\n" +
+  "    'meta_test_event_code' => '',\n" +
+  "    'meta_api_version' => 'v27.0',\n" +
+  "    'meta_event_source_url' => 'https://suflo.app/',\n" +
+  "    'meta_log_path' => __DIR__ . '/meta-webhook.log',\n" +
+  "    'meta_sent_dir' => __DIR__ . '/meta-sent'\n" +
   "];\n";
 fs.writeFileSync(path.join(privateDir, "config.php"), config, "utf8");
 fs.writeFileSync(path.join(upload, "YUKLEME.txt"),
